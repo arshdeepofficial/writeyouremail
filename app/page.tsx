@@ -344,12 +344,12 @@ const handleGenerate = async () => {
             </div>
           )}
 
-          // Inside the JSX, maybe above the "Generate Email" button:
+          
           {user && (
           <p className="text-center text-xs text-slate-500 mb-2">
             Daily usage: {usageCount} / {REGISTERED_LIMIT}
           </p>
-      )}
+          )}
 
           <button
             onClick={handleGenerate}
