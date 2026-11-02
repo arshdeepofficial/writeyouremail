@@ -92,49 +92,113 @@ export default function Home() {
     await supabase.auth.signOut();
   };
 
-  const handleGenerate = async () => {
-    if (!context.trim()) {
-      setError("Please describe what you want to say");
-      return;
+  // Inside your Home component, add these state variables
+const [usageCount, setUsageCount] = useState(0);
+const GUEST_LIMIT = 2;
+const REGISTERED_LIMIT = 5;
+
+// Add this function to check and update usage
+const checkAndUpdateUsage = async () => {
+  // 1. Logic for GUESTS (Not logged in)
+  if (!user) {
+    const guestUsage = parseInt(localStorage.getItem("guest_usage") || "0");
+    if (guestUsage >= GUEST_LIMIT) {
+      setError("Guest limit reached! Please Sign Up to get 5 more free emails.");
+      setIsAuthOpen(true);
+      return false;
     }
-    setError("");
-    setLoading(true);
-    setResult("");
+    localStorage.setItem("guest_usage", (guestUsage + 1).toString());
+    return true;
+  }
 
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailType, context, recipient, sender, tone }),
-      });
+  // 2. Logic for REGISTERED USERS
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Get current usage from DB
+  const { data: usageData, error: fetchError } = await supabase
+    .from("usage_tracking")
+    .select("*")
+    .eq("user_id", user.id)
+    .single();
 
-      const data = await res.json();
+  if (fetchError && fetchError.code !== "PGRST116") { // PGRST116 means no row found
+    console.error(fetchError);
+    return true; // Let them pass if DB fails
+  }
 
-      if (data.error) {
-        setError(data.error);
-      } else {
-        setResult(data.email);
+  // Reset count if it's a new day
+  if (!usageData || usageData.last_reset !== today) {
+    await supabase.from("usage_tracking").upsert({
+      user_id: user.id,
+      count: 1,
+      last_reset: today
+    });
+    setUsageCount(1);
+    return true;
+  }
 
-        // If user is logged in, save email to Supabase database
-        if (user) {
-          await supabase.from("emails").insert({
-            user_id: user.id,
-            email_type: emailType,
-            context,
-            recipient,
-            sender,
-            tone,
-            generated_email: data.email,
-          });
-          loadHistory(user.id);
-        }
+  if (usageData.count >= REGISTERED_LIMIT) {
+    setError(`Daily limit reached (${REGISTERED_LIMIT}/5). Upgrade to Pro for unlimited emails!`);
+    return false;
+  }
+
+  // Increment count
+  await supabase
+    .from("usage_tracking")
+    .update({ count: usageData.count + 1 })
+    .eq("user_id", user.id);
+  
+  setUsageCount(usageData.count + 1);
+  return true;
+};
+
+// Update your handleGenerate function
+const handleGenerate = async () => {
+  if (!context.trim()) {
+    setError("Please describe what you want to say");
+    return;
+  }
+  
+  setError("");
+  
+  // NEW: Check usage before proceeding
+  const canProceed = await checkAndUpdateUsage();
+  if (!canProceed) return;
+
+  setLoading(true);
+  setResult("");
+
+  try {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emailType, context, recipient, sender, tone }),
+    });
+
+    const data = await res.json();
+
+    if (data.error) {
+      setError(data.error);
+    } else {
+      setResult(data.email);
+      if (user) {
+        await supabase.from("emails").insert({
+          user_id: user.id,
+          email_type: emailType,
+          context,
+          recipient,
+          sender,
+          tone,
+          generated_email: data.email,
+        });
+        loadHistory(user.id);
       }
-    } catch {
-      setError("Something went wrong. Please try again.");
     }
-
-    setLoading(false);
-  };
+  } catch {
+    setError("Something went wrong. Please try again.");
+  }
+  setLoading(false);
+};
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -279,6 +343,13 @@ export default function Home() {
               ⚠️ {error}
             </div>
           )}
+
+          // Inside the JSX, maybe above the "Generate Email" button:
+{user && (
+  <p className="text-center text-xs text-slate-500 mb-2">
+    Daily usage: {usageCount} / {REGISTERED_LIMIT}
+  </p>
+)}
 
           <button
             onClick={handleGenerate}
