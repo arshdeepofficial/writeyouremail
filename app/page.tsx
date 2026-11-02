@@ -672,7 +672,7 @@ export default function Home() {
             </a>
           </div>
           <p className="text-xs text-neutral-600">
-            © {new Date().getFullYear()} WriteYourEmail. All rights reserved.
+            © 2026 WriteYourEmail. All rights reserved.
           </p>
         </div>
       </footer>
