@@ -481,6 +481,203 @@ export default function Home() {
             </div>
           )}
         </main>
+
+        {/* ==================== FEATURES GRID ==================== */}
+<section className="max-w-6xl mx-auto px-6 py-24 border-t border-neutral-900">
+  <div className="text-center mb-16">
+    <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+      Everything you need to write better emails
+    </h2>
+    <p className="text-neutral-400 max-w-xl mx-auto">
+      Built for speed, clarity, and results. No fluff.
+    </p>
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    {/* Feature 1 */}
+    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 hover:border-neutral-700 transition">
+      <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-lg mb-4">
+        ⚡
+      </div>
+      <h3 className="font-semibold text-white mb-2">Instant Drafts</h3>
+      <p className="text-sm text-neutral-400 leading-relaxed">
+        Go from rough thoughts to a polished email in under 3 seconds. No more blank page anxiety.
+      </p>
+    </div>
+
+    {/* Feature 2 */}
+    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 hover:border-neutral-700 transition">
+      <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-lg mb-4">
+        🎯
+      </div>
+      <h3 className="font-semibold text-white mb-2">10+ Email Types</h3>
+      <p className="text-sm text-neutral-400 leading-relaxed">
+        Job applications, cold outreach, follow-ups, resignations, sales pitches and more — all covered.
+      </p>
+    </div>
+
+    {/* Feature 3 */}
+    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 hover:border-neutral-700 transition">
+      <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-lg mb-4">
+        🔒
+      </div>
+      <h3 className="font-semibold text-white mb-2">Private & Secure</h3>
+      <p className="text-sm text-neutral-400 leading-relaxed">
+        Your emails and history are private. We never train on your data or share it with anyone.
+      </p>
+    </div>
+
+    {/* Feature 4 */}
+    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 hover:border-neutral-700 transition">
+      <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-lg mb-4">
+        📋
+      </div>
+      <h3 className="font-semibold text-white mb-2">Saved History</h3>
+      <p className="text-sm text-neutral-400 leading-relaxed">
+        Every email you generate is automatically saved so you can copy and reuse it anytime.
+      </p>
+    </div>
+
+    {/* Feature 5 */}
+    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 hover:border-neutral-700 transition">
+      <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-lg mb-4">
+        🗣️
+      </div>
+      <h3 className="font-semibold text-white mb-2">Tone Control</h3>
+      <p className="text-sm text-neutral-400 leading-relaxed">
+        Professional, friendly, urgent, formal — dial in exactly how you want to sound.
+      </p>
+    </div>
+
+    {/* Feature 6 */}
+    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 hover:border-neutral-700 transition">
+      <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center text-lg mb-4">
+        🚀
+      </div>
+      <h3 className="font-semibold text-white mb-2">Zero Learning Curve</h3>
+      <p className="text-sm text-neutral-400 leading-relaxed">
+        Just type what you want to say. No prompt engineering skills required.
+      </p>
+    </div>
+  </div>
+</section>
+
+{/* ==================== PRICING TABLE ==================== */}
+<section id="pricing" className="max-w-6xl mx-auto px-6 py-24 border-t border-neutral-900">
+  <div className="text-center mb-16">
+    <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+      Simple, transparent pricing
+    </h2>
+    <p className="text-neutral-400 max-w-xl mx-auto">
+      Start free. Upgrade when you need unlimited power.
+    </p>
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+    
+    {/* FREE PLAN */}
+    <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-8 relative">
+      <h3 className="text-lg font-semibold text-white mb-1">Free</h3>
+      <p className="text-sm text-neutral-400 mb-6">Perfect for trying it out</p>
+      
+      <div className="flex items-baseline gap-1 mb-6">
+        <span className="text-4xl font-bold tracking-tight">$0</span>
+        <span className="text-neutral-500 text-sm">/ forever</span>
+      </div>
+
+      <ul className="space-y-3 mb-8 text-sm text-neutral-300">
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> 2 emails as guest
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> 5 emails / day after signup
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> All email types & tones
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> Saved history
+        </li>
+        <li className="flex items-center gap-2 text-neutral-500">
+          <span>○</span> No unlimited access
+        </li>
+      </ul>
+
+      <button
+        onClick={() => setIsAuthOpen(true)}
+        className="w-full py-2.5 rounded-xl border border-neutral-700 text-sm font-medium text-white hover:bg-neutral-900 transition cursor-pointer"
+      >
+        Get Started Free
+      </button>
+    </div>
+
+    {/* PRO PLAN */}
+    <div className="bg-neutral-950 border border-white/20 rounded-2xl p-8 relative shadow-[0_0_40px_-15px_rgba(255,255,255,0.15)]">
+      {/* Popular badge */}
+      <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-white text-black text-[11px] font-bold px-3 py-1 rounded-full tracking-wide uppercase">
+        Most Popular
+      </div>
+
+      <h3 className="text-lg font-semibold text-white mb-1">Pro</h3>
+      <p className="text-sm text-neutral-400 mb-6">For power users & professionals</p>
+      
+      <div className="flex items-baseline gap-1 mb-6">
+        <span className="text-4xl font-bold tracking-tight">$9</span>
+        <span className="text-neutral-500 text-sm">/ month</span>
+      </div>
+
+      <ul className="space-y-3 mb-8 text-sm text-neutral-300">
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> <strong>Unlimited</strong> emails
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> All email types & tones
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> Full history & search
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> Priority generation speed
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="text-emerald-500">✓</span> Future Pro templates
+        </li>
+      </ul>
+
+      <button
+        onClick={() => {
+          // For now just open auth. Later we will link Lemon Squeezy / PayPal
+          setIsAuthOpen(true);
+        }}
+        className="w-full py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-neutral-200 transition cursor-pointer"
+      >
+        Upgrade to Pro
+      </button>
+    </div>
+  </div>
+
+  <p className="text-center text-xs text-neutral-600 mt-8">
+    Payments via PayPal · Cancel anytime · 7-day money-back guarantee
+  </p>
+</section>
+
+{/* ==================== FOOTER ==================== */}
+<footer className="border-t border-neutral-900 py-10">
+  <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div className="flex items-center gap-2 text-sm text-neutral-500">
+      <span className="w-6 h-6 bg-white text-black rounded flex items-center justify-center text-[10px] font-black">W</span>
+      WriteYourEmail.com
+    </div>
+    <div className="flex items-center gap-6 text-xs text-neutral-500">
+      <a href="#" className="hover:text-white transition">Privacy</a>
+      <a href="#" className="hover:text-white transition">Terms</a>
+      <a href="#pricing" className="hover:text-white transition">Pricing</a>
+    </div>
+    <p className="text-xs text-neutral-600">
+      © {new Date().getFullYear()} WriteYourEmail. All rights reserved.
+    </p>
+  </div>
+</footer>
       </div>
 
       {/* Auth Modal */}
