@@ -63,30 +63,35 @@ export default function Home() {
 
   // Check current logged-in user session
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadHistory(session.user.id);
-      }
-    };
-    getUser();
+  const getUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    setUser(session?.user ?? null);
+    if (session?.user) {
+      loadHistory(session.user.id);
+      
+      // NEW: Fetch usage count when user is found
+      const { data } = await supabase
+        .from("usage_tracking")
+        .select("count")
+        .eq("user_id", session.user.id)
+        .single();
+      if (data) setUsageCount(data.count);
+    }
+  };
+  getUser();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadHistory(session.user.id);
-      } else {
-        setHistory([]);
-      }
-    });
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    setUser(session?.user ?? null);
+    if (session?.user) {
+      loadHistory(session.user.id);
+    } else {
+      setHistory([]);
+      setUsageCount(0); // Reset UI on logout
+    }
+  });
 
-    return () => subscription.unsubscribe();
-  }, [loadHistory]);
+  return () => subscription.unsubscribe();
+}, [loadHistory]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
