@@ -654,30 +654,30 @@ export default function Home() {
       </section>
 
       {/* ==================== FOOTER ==================== */}
-      <footer className="border-t border-neutral-900 py-10">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm text-neutral-500">
-            <span className="w-6 h-6 bg-white text-black rounded flex items-center justify-center text-[10px] font-black">
-              W
-            </span>
-            WriteYourEmail.com
-          </div>
-          <div className="flex items-center gap-6 text-xs text-neutral-500">
-            <a href="#" className="hover:text-white transition">
-              Privacy
-            </a>
-            <a href="#" className="hover:text-white transition">
-              Terms
-            </a>
-            <a href="#pricing" className="hover:text-white transition">
-              Pricing
-            </a>
-          </div>
-          <p className="text-xs text-neutral-600">
-            © 2026 WriteYourEmail. All rights reserved.
-          </p>
-        </div>
-      </footer>
+<footer className="border-t border-neutral-900 py-10">
+  <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
+    <div className="flex items-center gap-2 text-sm text-neutral-500">
+      <span className="w-6 h-6 bg-white text-black rounded flex items-center justify-center text-[10px] font-black">
+        W
+      </span>
+      WriteYourEmail.com
+    </div>
+    <div className="flex items-center gap-6 text-xs text-neutral-500">
+      <a href="/privacy" className="hover:text-white transition">
+        Privacy
+      </a>
+      <a href="/terms" className="hover:text-white transition">
+        Terms
+      </a>
+      <a href="#pricing" className="hover:text-white transition">
+        Pricing
+      </a>
+    </div>
+    <p className="text-xs text-neutral-600">
+      © 2026 WriteYourEmail. All rights reserved.
+    </p>
+  </div>
+</footer>
 
       {/* Auth Modal */}
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
