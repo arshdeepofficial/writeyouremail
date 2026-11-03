@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 
@@ -36,8 +36,10 @@ export default function Home() {
   // FAQ State
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
+  // Result Anchor Ref for Auto-Scroll
+  const resultRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    // Lock body scroll when mobile menu is open
     if (mobileMenuOpen) {
       document.body.style.overflow = "hidden";
     } else {
@@ -107,6 +109,7 @@ export default function Home() {
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!isPro) {
       if (!user && guestUsage >= 2) {
         alert("You have reached your 2 free guest emails! Please log in or sign up to get 5 free emails every day.");
@@ -120,23 +123,49 @@ export default function Home() {
     }
 
     setLoading(true);
-    setGeneratedEmail("");
 
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emailType, context, recipient, sender, tone }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to generate email");
+    let attempts = 0;
+    let success = false;
+    let finalEmailText = "";
 
-      setGeneratedEmail(data.email);
+    // Automatic silent retry loop (up to 3 attempts)
+    while (attempts < 3 && !success) {
+      try {
+        attempts++;
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emailType, context, recipient, sender, tone }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.email && data.email.trim().length > 10) {
+          finalEmailText = data.email.trim();
+          success = true;
+          break;
+        }
+      } catch (err) {
+        console.warn(`Generation attempt ${attempts} encountered an issue. Retrying silently...`);
+      }
+
+      if (!success && attempts < 3) {
+        // Wait 1 second before silent retry
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    setLoading(false);
+
+    // ONLY DEDUCT CREDIT AND SHOW RESULT IF IT ACTUALLY SUCCEEDED
+    if (success && finalEmailText) {
+      setGeneratedEmail(finalEmailText);
       await incrementUsageAfterSuccess();
-    } catch (err: any) {
-      alert(err.message || "An error occurred while generating your email.");
-    } finally {
-      setLoading(false);
+
+      // Smooth auto-scroll to the generated result
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
     }
   };
 
@@ -239,7 +268,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Mobile Slide-out Menu (Fixed Overflow Issue) */}
+      {/* Mobile Slide-out Menu */}
       <div className={`fixed inset-0 z-40 bg-black md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
         <nav className="flex flex-col text-sm font-medium text-zinc-300">
           <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Products</a>
@@ -302,7 +331,6 @@ export default function Home() {
         <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-6 sm:p-10 shadow-2xl backdrop-blur-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
           
-          {/* Fixed Mobile Header Overlap */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-4 border-b border-zinc-900 gap-4">
             <div>
               <h2 className="text-xl font-semibold tracking-tight text-white">Email Studio</h2>
@@ -353,7 +381,7 @@ export default function Home() {
               <input type="text" placeholder="Your Name (Sender Signature)" value={sender} onChange={(e) => setSender(e.target.value)} className="bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 w-full sm:w-1/2" />
               <button type="submit" disabled={loading} className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 font-semibold px-8 py-3 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2">
                 {loading ? (
-                  <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /><span>Writing...</span></>
+                  <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /><span>Optimizing AI...</span></>
                 ) : (
                   <span>Generate Email ▲</span>
                 )}
@@ -361,15 +389,18 @@ export default function Home() {
             </div>
           </form>
 
+          {/* Generated Result Output with Auto-Scroll Target */}
           {generatedEmail && (
-            <div className="mt-8 pt-6 border-t border-zinc-900">
+            <div ref={resultRef} className="mt-8 pt-6 border-t border-zinc-900 transition-all duration-500">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Generated Result</span>
-                <button onClick={copyToClipboard} className="text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-3 py-1.5 rounded-full text-zinc-300 transition">
+                <span className="text-xs font-mono uppercase tracking-wider text-green-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" /> Generated Successfully
+                </span>
+                <button onClick={copyToClipboard} className="text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-3.5 py-1.5 rounded-full text-zinc-300 transition flex items-center gap-1">
                   {copied ? "Copied to Clipboard!" : "Copy Text"}
                 </button>
               </div>
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-5 text-zinc-200 font-sans leading-relaxed whitespace-pre-wrap text-sm">
+              <div className="bg-zinc-900/90 border border-zinc-700/80 rounded-xl p-5 text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap text-sm shadow-xl">
                 {generatedEmail}
               </div>
             </div>
