@@ -5,12 +5,11 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// Fallback models in case one model is busy or rate-limited
+// Currently ACTIVE Groq Model IDs
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama3-70b-8192",
-  "llama3-8b-8192",
-  "gemma2-9b-it",
+  "openai/gpt-oss-20b",
+  "llama-3.1-8b-instant",
+  "mixtral-8x7b-32768",
 ];
 
 export async function POST(req: Request) {
@@ -40,7 +39,7 @@ Requirements:
     let generatedEmail = "";
     let lastError = null;
 
-    // Try each model sequentially if one fails
+    // Try active Groq models in sequence
     for (const model of GROQ_MODELS) {
       try {
         const completion = await groq.chat.completions.create({
@@ -62,16 +61,16 @@ Requirements:
         const resultText = completion.choices[0]?.message?.content;
         if (resultText && resultText.trim().length > 10) {
           generatedEmail = resultText.trim();
-          break; // Success! Exit loop.
+          break; // Success! Exit loop immediately.
         }
       } catch (err) {
-        console.warn(`Model ${model} failed, trying next fallback...`, err);
+        console.warn(`Groq Model ${model} failed, trying fallback...`, err);
         lastError = err;
       }
     }
 
     if (!generatedEmail) {
-      throw lastError || new Error("All AI fallback models failed to respond.");
+      throw lastError || new Error("All active Groq models failed to respond.");
     }
 
     return NextResponse.json({ email: generatedEmail });
