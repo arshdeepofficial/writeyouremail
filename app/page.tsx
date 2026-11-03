@@ -55,6 +55,20 @@ export default function Home() {
   const GUEST_LIMIT = 2;
   const REGISTERED_LIMIT = 5;
 
+  const LEMON_SQUEEZY_CHECKOUT_URL =
+    "https://writeyouremail.lemonsqueezy.com/checkout/buy/8de4d383-5177-4977-8066-de6872cdb69d";
+
+  const handleUpgrade = () => {
+    if (!user) {
+      setIsAuthOpen(true);
+      return;
+    }
+    const checkoutUrlWithEmail = `${LEMON_SQUEEZY_CHECKOUT_URL}?checkout[email]=${encodeURIComponent(
+      user.email || ""
+    )}`;
+    window.open(checkoutUrlWithEmail, "_blank");
+  };
+
   // Load user history
   const loadHistory = useCallback(async (userId: string) => {
     const { data } = await supabase
@@ -279,17 +293,14 @@ export default function Home() {
 
       {/* Vercel Style Hero Section with Radial Glow */}
       <div className="relative overflow-hidden pt-16 pb-12">
-        {/* Soft Radial Spotlight Glow behind hero */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-b from-white/10 via-neutral-900/20 to-transparent blur-3xl pointer-events-none rounded-full" />
 
         <section className="relative max-w-4xl mx-auto px-6 text-center">
-          {/* Pill Badge */}
           <div className="inline-flex items-center gap-2 border border-neutral-800 bg-neutral-900/80 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs text-neutral-300 mb-6">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             AI Email Engine v2.0 Live
           </div>
 
-          {/* Hero Headline */}
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-4 bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-neutral-400">
             Write perfect emails in seconds.
           </h1>
@@ -302,10 +313,8 @@ export default function Home() {
         {/* Main Generator Card */}
         <main className="relative max-w-3xl mx-auto px-6">
           <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 md:p-8 shadow-2xl relative">
-            {/* Top gradient highlight line */}
             <div className="absolute top-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
-            {/* Row 1: Email Type + Tone */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
@@ -342,7 +351,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Row 2: Names */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
@@ -373,7 +381,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Row 3: Context */}
             <div className="mb-6">
               <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">
                 What do you want to say? <span className="text-emerald-500">*</span>
@@ -387,14 +394,12 @@ export default function Home() {
               />
             </div>
 
-            {/* Error Display */}
             {error && (
               <div className="mb-4 p-3 bg-red-950/40 border border-red-800/60 rounded-xl text-red-300 text-xs font-medium flex items-center gap-2">
                 <span>⚠️</span> {error}
               </div>
             )}
 
-            {/* Usage Stats Banner */}
             <div className="flex items-center justify-between text-xs text-neutral-500 mb-3 px-1">
               <span>Daily credits used:</span>
               <span className="font-mono text-neutral-300">
@@ -402,7 +407,6 @@ export default function Home() {
               </span>
             </div>
 
-            {/* Generate Button */}
             <button
               onClick={handleGenerate}
               disabled={loading}
@@ -422,7 +426,6 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Result Card */}
           {result && (
             <div className="mt-8 bg-neutral-950 border border-neutral-800 rounded-2xl p-6 md:p-8 shadow-2xl relative animate-in fade-in duration-300">
               <div className="flex items-center justify-between mb-4 border-b border-neutral-800 pb-3">
@@ -442,7 +445,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* User History Section */}
           {user && history.length > 0 && (
             <div className="mt-14">
               <h3 className="text-base font-semibold tracking-tight mb-4 text-white flex items-center justify-between">
@@ -638,16 +640,16 @@ export default function Home() {
             </ul>
 
             <button
-              onClick={() => setIsAuthOpen(true)}
+              onClick={handleUpgrade}
               className="w-full py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-neutral-200 transition cursor-pointer"
             >
-              Upgrade to Pro
+              Upgrade to Pro ($9/mo)
             </button>
           </div>
         </div>
 
         <p className="text-center text-xs text-neutral-600 mt-8">
-          Payments via PayPal · Cancel anytime · 7-day money-back guarantee
+          Payments via PayPal & Cards · Cancel anytime · 7-day money-back guarantee
         </p>
       </section>
 
