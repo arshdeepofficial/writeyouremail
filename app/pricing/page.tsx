@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const PRO_CHECKOUT_URL =
   "https://writeyouremail.lemonsqueezy.com/checkout/buy/8de4d383-5177-4977-8066-de6872cdb69d";
@@ -9,13 +9,21 @@ const PRO_CHECKOUT_URL =
 export default function PricingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+  }, [mobileMenuOpen]);
+
   return (
-    <div className="min-h-screen bg-black text-white font-sans selection:bg-white selection:text-black overflow-x-hidden">
+    <div className="relative w-full overflow-x-hidden min-h-screen bg-black text-white font-sans selection:bg-white selection:text-black">
       {/* Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-zinc-900 bg-black/70 backdrop-blur-xl">
+      <header className={`sticky top-0 z-50 border-b border-zinc-900 transition-colors duration-300 ${mobileMenuOpen ? 'bg-black' : 'bg-black/70 backdrop-blur-xl'}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center space-x-2 font-bold tracking-tight text-lg z-50">
+            <Link href="/" className="flex items-center space-x-2 font-bold tracking-tight text-lg z-50" onClick={() => setMobileMenuOpen(false)}>
               <span className="w-5 h-5 bg-white text-black flex items-center justify-center font-black text-xs rounded-sm">▲</span>
               <span>WriteYourEmail</span>
             </Link>
@@ -46,7 +54,7 @@ export default function PricingPage() {
 
           {/* Mobile Menu Toggle */}
           <button 
-            className="md:hidden text-zinc-400 hover:text-white z-50"
+            className="md:hidden text-zinc-400 hover:text-white z-50 p-2 -mr-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
@@ -58,15 +66,15 @@ export default function PricingPage() {
         </div>
       </header>
 
-      {/* Mobile Slide-out Menu */}
-      <div className={`fixed inset-0 z-30 bg-black/95 backdrop-blur-xl transform ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 md:hidden pt-24 px-6`}>
-        <nav className="flex flex-col space-y-6 text-lg font-medium text-zinc-300">
-          <Link href="/#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 pb-4">Products</Link>
-          <Link href="/#faq" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 pb-4">Resources</Link>
-          <Link href="/#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 pb-4">Enterprise</Link>
-          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="text-white border-b border-zinc-900 pb-4">Pricing</Link>
+      {/* Mobile Slide-out Menu (Fixed Overflow Issue) */}
+      <div className={`fixed inset-0 z-40 bg-black md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+        <nav className="flex flex-col text-sm font-medium text-zinc-300">
+          <Link href="/#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Products</Link>
+          <Link href="/#faq" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Resources</Link>
+          <Link href="/#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Enterprise</Link>
+          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="text-white border-b border-zinc-900 py-4">Pricing</Link>
           
-          <div className="pt-6 flex flex-col space-y-4">
+          <div className="pt-8 flex flex-col space-y-4">
             <Link href="/#generator" className="text-center bg-zinc-900 text-white py-3 rounded-full text-sm font-semibold border border-zinc-800">
               Get a Demo
             </Link>
@@ -77,7 +85,7 @@ export default function PricingPage() {
       </div>
 
       {/* Pricing Header */}
-      <section className="pt-24 pb-12 px-6 max-w-4xl mx-auto text-center">
+      <section className="pt-20 pb-12 px-6 max-w-4xl mx-auto text-center">
         <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight text-white mb-6">
           Pricing for everyone.
         </h1>

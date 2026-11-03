@@ -37,6 +37,15 @@ export default function Home() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
+    // Lock body scroll when mobile menu is open
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -172,15 +181,15 @@ export default function Home() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans selection:bg-white selection:text-black overflow-x-hidden">
+    <div className="relative w-full overflow-x-hidden min-h-screen bg-black text-white font-sans selection:bg-white selection:text-black">
       {/* Background Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-b from-zinc-700/20 via-zinc-900/10 to-transparent blur-3xl pointer-events-none rounded-full" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[350px] bg-gradient-to-b from-zinc-700/20 via-zinc-900/10 to-transparent blur-3xl pointer-events-none rounded-full" />
 
       {/* Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-zinc-900 bg-black/70 backdrop-blur-xl">
+      <header className={`sticky top-0 z-50 border-b border-zinc-900 transition-colors duration-300 ${mobileMenuOpen ? 'bg-black' : 'bg-black/70 backdrop-blur-xl'}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center space-x-2 font-bold tracking-tight text-lg z-50">
+            <Link href="/" className="flex items-center space-x-2 font-bold tracking-tight text-lg z-50" onClick={() => setMobileMenuOpen(false)}>
               <span className="w-5 h-5 bg-white text-black flex items-center justify-center font-black text-xs rounded-sm">▲</span>
               <span>WriteYourEmail</span>
             </Link>
@@ -218,7 +227,7 @@ export default function Home() {
 
           {/* Mobile Menu Toggle */}
           <button 
-            className="md:hidden text-zinc-400 hover:text-white z-50"
+            className="md:hidden text-zinc-400 hover:text-white z-50 p-2 -mr-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
@@ -230,15 +239,15 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Mobile Slide-out Menu */}
-      <div className={`fixed inset-0 z-30 bg-black/95 backdrop-blur-xl transform ${mobileMenuOpen ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 md:hidden pt-24 px-6`}>
-        <nav className="flex flex-col space-y-6 text-lg font-medium text-zinc-300">
-          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 pb-4">Products</a>
-          <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 pb-4">Resources</a>
-          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 pb-4">Enterprise</a>
-          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 pb-4">Pricing</Link>
+      {/* Mobile Slide-out Menu (Fixed Overflow Issue) */}
+      <div className={`fixed inset-0 z-40 bg-black md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+        <nav className="flex flex-col text-sm font-medium text-zinc-300">
+          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Products</a>
+          <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Resources</a>
+          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Enterprise</a>
+          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Pricing</Link>
           
-          <div className="pt-6 flex flex-col space-y-4">
+          <div className="pt-8 flex flex-col space-y-4">
             <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="text-center bg-zinc-900 text-white py-3 rounded-full text-sm font-semibold border border-zinc-800">
               Get a Demo
             </a>
@@ -249,8 +258,8 @@ export default function Home() {
               </>
             ) : (
               <>
-                <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); }} className="text-center bg-zinc-900 text-white py-3 rounded-full text-sm font-semibold border border-zinc-800">Log In</button>
-                <button onClick={() => { setIsSignUp(true); setAuthModalOpen(true); }} className="text-center bg-white text-black py-3 rounded-full text-sm font-semibold">Sign Up</button>
+                <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="text-center bg-zinc-900 text-white py-3 rounded-full text-sm font-semibold border border-zinc-800">Log In</button>
+                <button onClick={() => { setIsSignUp(true); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="text-center bg-white text-black py-3 rounded-full text-sm font-semibold">Sign Up</button>
               </>
             )}
           </div>
@@ -258,7 +267,7 @@ export default function Home() {
       </div>
 
       {/* Hero Section */}
-      <section className="relative pt-24 pb-20 px-6 max-w-7xl mx-auto">
+      <section className="relative pt-20 pb-20 px-6 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8">
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white leading-[1.05]">
@@ -292,14 +301,16 @@ export default function Home() {
       <section id="generator" className="py-16 px-6 max-w-5xl mx-auto">
         <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-6 sm:p-10 shadow-2xl backdrop-blur-md relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="flex items-center justify-between mb-8 pb-4 border-b border-zinc-900">
+          
+          {/* Fixed Mobile Header Overlap */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-4 border-b border-zinc-900 gap-4">
             <div>
               <h2 className="text-xl font-semibold tracking-tight text-white">Email Studio</h2>
               <p className="text-xs text-zinc-400 mt-1">Fill in the details below to generate your professional email instantly.</p>
             </div>
             {!isPro && (
-              <div className="text-right">
-                <span className="text-xs px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-full text-zinc-400 font-mono">
+              <div className="shrink-0">
+                <span className="text-xs px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-full text-zinc-400 font-mono whitespace-nowrap">
                   {user ? `${dailyUsage}/5 Free Daily` : `${guestUsage}/2 Guest Free`}
                 </span>
               </div>
@@ -393,7 +404,7 @@ export default function Home() {
       {authModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full relative">
-            <button onClick={() => setAuthModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white">✕</button>
+            <button onClick={() => setAuthModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2">✕</button>
             <h3 className="text-lg font-bold text-white mb-2">{isSignUp ? "Create your account" : "Log in to WriteYourEmail"}</h3>
             <p className="text-xs text-zinc-400 mb-6">Get 5 free AI email generations every day.</p>
             <form onSubmit={handleAuth} className="space-y-4">
