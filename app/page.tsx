@@ -37,39 +37,30 @@ const LANGUAGES = [
 ];
 
 export default function Home() {
-  // Studio Mode: 'create' | 'polish'
   const [studioMode, setStudioMode] = useState<"create" | "polish">("create");
-
-  // Create Mode Inputs
   const [emailType, setEmailType] = useState("cold_outreach");
   const [context, setContext] = useState("");
   const [recipient, setRecipient] = useState("");
   const [sender, setSender] = useState("");
   const [tone, setTone] = useState("professional");
   const [targetLanguage, setTargetLanguage] = useState("English");
-
-  // Polish Mode Inputs
   const [draftText, setDraftText] = useState("");
   const [polishGoal, setPolishGoal] = useState("Fix grammar, typos & improve flow");
 
-  // Output State
   const [subjectLines, setSubjectLines] = useState<SubjectLine[]>([]);
   const [variations, setVariations] = useState<EmailVariation[]>([]);
   const [selectedTab, setSelectedTab] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
-  // History State
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [savedHistory, setSavedHistory] = useState<SavedEmailRecord[]>([]);
   const [historySearch, setHistorySearch] = useState("");
 
-  // Auth & Usage State
   const [user, setUser] = useState<any>(null);
   const [dailyUsage, setDailyUsage] = useState<number>(0);
   const [isPro, setIsPro] = useState<boolean>(false);
   const [guestUsage, setGuestUsage] = useState<number>(0);
 
-  // UI state
   const [copiedSubject, setCopiedSubject] = useState<number | null>(null);
   const [copiedBody, setCopiedBody] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -118,85 +109,51 @@ export default function Home() {
 
   const fetchUserUsage = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("usage_tracking")
-        .select("count, is_pro, last_reset")
-        .eq("user_id", userId)
-        .single();
-
+      const { data, error } = await supabase.from("usage_tracking").select("count, is_pro, last_reset").eq("user_id", userId).single();
       if (!error && data) {
         setIsPro(data.is_pro || false);
         setDailyUsage(data.count || 0);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const fetchUserHistory = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("emails")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
+      const { data, error } = await supabase.from("emails").select("*").eq("user_id", userId).order("created_at", { ascending: false });
       if (!error && data) {
-        setSavedHistory(
-          data.map((item: any) => ({
-            id: item.id,
-            created_at: item.created_at,
-            email_type: item.email_type,
-            subject_line: item.recipient || "Generated Email",
-            body: item.generated_email,
-            language: item.tone || "English",
-          }))
-        );
+        setSavedHistory(data.map((item: any) => ({
+          id: item.id, created_at: item.created_at, email_type: item.email_type,
+          subject_line: item.recipient || "Generated Email", body: item.generated_email, language: item.tone || "English",
+        })));
       }
-    } catch (e) {
-      console.error("Error fetching history:", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const loadGuestHistory = () => {
     const raw = localStorage.getItem("guest_email_history");
     if (raw) {
-      try {
-        setSavedHistory(JSON.parse(raw));
-      } catch (e) {
-        console.error("Error parsing guest history");
-      }
+      try { setSavedHistory(JSON.parse(raw)); } catch (e) { console.error(e); }
     }
   };
 
   const saveToHistory = async (subjects: SubjectLine[], vars: EmailVariation[]) => {
     const primarySubject = subjects[0]?.subject || "Generated Email";
     const primaryBody = vars[0]?.body || "";
-
     const newRecord: SavedEmailRecord = {
-      id: Date.now().toString(),
-      created_at: new Date().toISOString(),
+      id: Date.now().toString(), created_at: new Date().toISOString(),
       email_type: studioMode === "create" ? emailType : "Magic Polish",
-      subject_line: primarySubject,
-      body: primaryBody,
-      language: targetLanguage,
+      subject_line: primarySubject, body: primaryBody, language: targetLanguage,
     };
 
     if (user) {
       try {
         await supabase.from("emails").insert({
-          user_id: user.id,
-          email_type: studioMode === "create" ? emailType : "Magic Polish",
-          context: studioMode === "create" ? context : draftText,
-          recipient: primarySubject,
-          sender: sender || "User",
-          tone: targetLanguage,
-          generated_email: primaryBody,
+          user_id: user.id, email_type: studioMode === "create" ? emailType : "Magic Polish",
+          context: studioMode === "create" ? context : draftText, recipient: primarySubject,
+          sender: sender || "User", tone: targetLanguage, generated_email: primaryBody,
         });
         fetchUserHistory(user.id);
-      } catch (e) {
-        console.error("Failed to save to Supabase history:", e);
-      }
+      } catch (e) { console.error(e); }
     } else {
       const updated = [newRecord, ...savedHistory];
       setSavedHistory(updated);
@@ -227,24 +184,17 @@ export default function Home() {
     setDailyUsage(nextUsage);
     try {
       await supabase.from("usage_tracking").upsert({
-        user_id: user.id,
-        count: nextUsage,
-        last_reset: new Date().toISOString().split("T")[0],
-        is_pro: isPro,
+        user_id: user.id, count: nextUsage, last_reset: new Date().toISOString().split("T")[0], is_pro: isPro,
       });
-    } catch (err) {
-      console.error("Failed to sync usage:", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!isPro) {
       if (!user && guestUsage >= 2) {
         alert("You have reached your 2 free guest emails! Log in or sign up to get 5 free emails every day.");
-        setAuthModalOpen(true);
-        return;
+        setAuthModalOpen(true); return;
       }
       if (user && dailyUsage >= 5) {
         alert("You have reached your 5 daily free emails! Upgrade to Pro for unlimited emails.");
@@ -260,23 +210,10 @@ export default function Home() {
       try {
         attempts++;
         const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mode: studioMode,
-            emailType,
-            context,
-            recipient,
-            sender,
-            tone,
-            targetLanguage,
-            draftText,
-            polishGoal,
-          }),
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode: studioMode, emailType, context, recipient, sender, tone, targetLanguage, draftText, polishGoal }),
         });
-
         const data = await response.json();
-
         if (response.ok && data.variations && data.variations.length > 0) {
           setSubjectLines(data.subjectLines || []);
           setVariations(data.variations || []);
@@ -285,22 +222,14 @@ export default function Home() {
           await saveToHistory(data.subjectLines || [], data.variations || []);
           break;
         }
-      } catch (err) {
-        console.warn(`Attempt ${attempts} retrying...`);
-      }
-
-      if (!success && attempts < 3) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
+      } catch (err) { console.warn(`Attempt ${attempts} retrying...`); }
+      if (!success && attempts < 3) await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     setLoading(false);
-
     if (success) {
       await incrementUsageAfterSuccess();
-      setTimeout(() => {
-        resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 200);
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
     }
   };
 
@@ -315,48 +244,30 @@ export default function Home() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
         if (error) throw error;
-        setAuthModalOpen(false);
-        setMobileMenuOpen(false);
+        setAuthModalOpen(false); setMobileMenuOpen(false);
       }
-    } catch (err: any) {
-      setAuthMessage(err.message);
-    }
+    } catch (err: any) { setAuthMessage(err.message); }
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setIsPro(false);
-    setDailyUsage(0);
-    setMobileMenuOpen(false);
+    setUser(null); setIsPro(false); setDailyUsage(0); setMobileMenuOpen(false);
   };
 
   const copySubject = (text: string, index: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedSubject(index);
-    setTimeout(() => setCopiedSubject(null), 2000);
+    navigator.clipboard.writeText(text); setCopiedSubject(index); setTimeout(() => setCopiedSubject(null), 2000);
   };
 
   const copyBody = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedBody(true);
-    setTimeout(() => setCopiedBody(false), 2000);
+    navigator.clipboard.writeText(text); setCopiedBody(true); setTimeout(() => setCopiedBody(false), 2000);
   };
 
-  // Open Direct in Gmail
   const openInGmail = (subjectText: string, bodyText: string) => {
-    const url = `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(
-      subjectText
-    )}&body=${encodeURIComponent(bodyText)}`;
-    window.open(url, "_blank");
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`, "_blank");
   };
 
-  // Open Direct in Default Mail Client (mailto)
   const openInMailClient = (subjectText: string, bodyText: string) => {
-    const url = `mailto:?subject=${encodeURIComponent(
-      subjectText
-    )}&body=${encodeURIComponent(bodyText)}`;
-    window.location.href = url;
+    window.location.href = `mailto:?subject=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`;
   };
 
   const filteredHistory = savedHistory.filter((item) =>
@@ -373,51 +284,51 @@ export default function Home() {
   ];
 
   return (
-    <div className="relative w-full overflow-x-hidden min-h-screen bg-black text-white font-sans selection:bg-white selection:text-black">
-      {/* Background Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[350px] bg-gradient-to-b from-zinc-700/20 via-zinc-900/10 to-transparent blur-3xl pointer-events-none rounded-full" />
+    <div className="relative w-full overflow-x-hidden min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+      
+      {/* Apple-style Ambient Glow */}
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[100px] pointer-events-none rounded-full" />
 
       {/* Navigation Header */}
-      <header className={`sticky top-0 z-50 border-b border-zinc-900 transition-colors duration-300 ${mobileMenuOpen ? 'bg-black' : 'bg-black/70 backdrop-blur-xl'}`}>
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <header className={`sticky top-0 z-50 border-b border-white/10 transition-colors duration-300 ${mobileMenuOpen ? 'bg-[#000000]' : 'bg-[#000000]/70 backdrop-blur-2xl saturate-150'}`}>
+        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center space-x-2 font-bold tracking-tight text-lg z-50" onClick={() => setMobileMenuOpen(false)}>
-              <span className="w-5 h-5 bg-white text-black flex items-center justify-center font-black text-xs rounded-sm">▲</span>
+            <Link href="/" className="flex items-center space-x-2 font-semibold tracking-tight text-lg z-50" onClick={() => setMobileMenuOpen(false)}>
+              <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">✉️</span>
               <span>WriteYourEmail</span>
             </Link>
             
-            <nav className="hidden md:flex items-center space-x-6 text-sm text-zinc-400">
-              <a href="#generator" className="hover:text-white transition">Products</a>
-              <a href="#faq" className="hover:text-white transition">Resources</a>
-              <a href="#generator" className="hover:text-white transition">Enterprise</a>
-              <Link href="/pricing" className="hover:text-white transition">Pricing</Link>
+            <nav className="hidden md:flex items-center space-x-6 text-sm text-[#86868b] font-medium">
+              <a href="#generator" className="hover:text-[#f5f5f7] transition-colors">Products</a>
+              <a href="#faq" className="hover:text-[#f5f5f7] transition-colors">Resources</a>
+              <Link href="/pricing" className="hover:text-[#f5f5f7] transition-colors">Pricing</Link>
             </nav>
           </div>
 
-          <div className="hidden md:flex items-center space-x-3">
+          <div className="hidden md:flex items-center space-x-4">
             <button
               onClick={() => setHistoryModalOpen(true)}
-              className="text-xs font-medium text-zinc-300 hover:text-white px-3.5 py-2 rounded-full border border-zinc-800 hover:border-zinc-700 transition flex items-center gap-1.5"
+              className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition flex items-center gap-1.5"
             >
-              <span>📜 History</span>
+              <span>History</span>
               {savedHistory.length > 0 && (
-                <span className="bg-zinc-800 text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono">
+                <span className="bg-[#2c2c2e] text-[#f5f5f7] text-[10px] px-1.5 py-0.5 rounded-full">
                   {savedHistory.length}
                 </span>
               )}
             </button>
 
             {user ? (
-              <div className="flex items-center space-x-3 ml-2 border-l border-zinc-800 pl-4">
-                <span className="text-xs text-zinc-400">{user.email}</span>
-                <button onClick={handleLogout} className="text-xs text-zinc-400 hover:text-white transition">Log out</button>
+              <div className="flex items-center space-x-4 ml-2 border-l border-white/10 pl-4">
+                <span className="text-sm text-[#86868b]">{user.email}</span>
+                <button onClick={handleLogout} className="text-sm text-[#86868b] hover:text-[#f5f5f7] transition">Log out</button>
               </div>
             ) : (
-              <div className="flex items-center space-x-3 ml-2 border-l border-zinc-800 pl-4">
-                <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); }} className="text-xs font-medium text-zinc-300 hover:text-white px-3.5 py-2 rounded-full border border-zinc-800 hover:border-zinc-700 transition">
+              <div className="flex items-center space-x-3 ml-2 border-l border-white/10 pl-4">
+                <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); }} className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition">
                   Log In
                 </button>
-                <button onClick={() => { setIsSignUp(true); setAuthModalOpen(true); }} className="text-xs font-medium bg-white text-black hover:bg-zinc-200 px-4 py-2 rounded-full transition">
+                <button onClick={() => { setIsSignUp(true); setAuthModalOpen(true); }} className="text-sm font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-1.5 rounded-full transition shadow-sm">
                   Sign Up
                 </button>
               </div>
@@ -425,7 +336,7 @@ export default function Home() {
           </div>
 
           <button 
-            className="md:hidden text-zinc-400 hover:text-white z-50 p-2 -mr-2"
+            className="md:hidden text-[#86868b] hover:text-[#f5f5f7] z-50 p-2 -mr-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
@@ -438,29 +349,28 @@ export default function Home() {
       </header>
 
       {/* Mobile Overlay Menu */}
-      <div className={`fixed inset-0 z-40 bg-black md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
-        <nav className="flex flex-col text-sm font-medium text-zinc-300">
-          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Products</a>
-          <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Resources</a>
-          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Enterprise</a>
-          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Pricing</Link>
+      <div className={`fixed inset-0 z-40 bg-[#000000] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+        <nav className="flex flex-col text-lg font-medium text-[#f5f5f7]">
+          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">Products</a>
+          <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">Resources</a>
+          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">Pricing</Link>
           
           <div className="pt-8 flex flex-col space-y-4">
             <button 
               onClick={() => { setMobileMenuOpen(false); setHistoryModalOpen(true); }}
-              className="text-center bg-zinc-900 text-white py-3 rounded-full text-sm font-semibold border border-zinc-800"
+              className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold"
             >
-              📜 Saved Email History ({savedHistory.length})
+              Saved History ({savedHistory.length})
             </button>
             {user ? (
               <>
-                <span className="text-sm text-zinc-500 text-center">{user.email}</span>
-                <button onClick={handleLogout} className="text-center bg-white text-black py-3 rounded-full text-sm font-semibold">Log Out</button>
+                <span className="text-sm text-[#86868b] text-center">{user.email}</span>
+                <button onClick={handleLogout} className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold">Log Out</button>
               </>
             ) : (
               <>
-                <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="text-center bg-zinc-900 text-white py-3 rounded-full text-sm font-semibold border border-zinc-800">Log In</button>
-                <button onClick={() => { setIsSignUp(true); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="text-center bg-white text-black py-3 rounded-full text-sm font-semibold">Sign Up</button>
+                <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold">Log In</button>
+                <button onClick={() => { setIsSignUp(true); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold">Sign Up</button>
               </>
             )}
           </div>
@@ -468,96 +378,78 @@ export default function Home() {
       </div>
 
       {/* Hero Section */}
-      <section className="relative pt-20 pb-20 px-6 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7 space-y-8">
-            <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white leading-[1.05]">
-              Agentic <br /> Email Studio
-            </h1>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <a href="#generator" className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-3 rounded-full text-sm transition shadow-lg shadow-white/5 w-full sm:w-auto text-center">
-                Start Writing
-              </a>
-              <button
-                onClick={() => setHistoryModalOpen(true)}
-                className="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-white font-medium px-6 py-3 rounded-full text-sm transition backdrop-blur-md w-full sm:w-auto text-center flex items-center justify-center gap-2"
-              >
-                <span>📜 View Saved History</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="lg:col-span-5 relative">
-            <div className="relative z-10 space-y-4 text-zinc-300 font-medium text-lg sm:text-xl border-l border-zinc-800 pl-6">
-              <p className="hover:text-white transition">25+ Languages supported natively</p>
-              <p className="hover:text-white transition">Direct 1-click open in Gmail</p>
-              <p className="hover:text-white transition">Auto-saved email history</p>
-            </div>
-            <div className="mt-12 relative flex justify-center items-center">
-              <div className="w-48 h-48 bg-gradient-to-tr from-white/20 via-zinc-500/10 to-transparent rounded-full blur-2xl absolute" />
-              <div className="w-0 h-0 border-l-[60px] border-l-transparent border-r-[60px] border-r-transparent border-b-[100px] border-b-zinc-200 filter drop-shadow-[0_0_25px_rgba(255,255,255,0.4)] opacity-95 transition-transform hover:scale-105 duration-500" />
-            </div>
-          </div>
+      <section className="relative pt-24 pb-20 px-6 max-w-5xl mx-auto text-center">
+        <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#f5f5f7] leading-tight mb-6">
+          Intelligence that writes.
+        </h1>
+        <p className="text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium">
+          Generate high-converting emails in 25+ languages, polish existing drafts, and test subject line spam risks instantly.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <a href="#generator" className="bg-[#f5f5f7] text-black hover:bg-white font-semibold px-8 py-3.5 rounded-full text-base transition shadow-sm w-full sm:w-auto">
+            Start Writing
+          </a>
+          <Link href="/pricing" className="bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#f5f5f7] font-semibold px-8 py-3.5 rounded-full text-base transition w-full sm:w-auto">
+            View Pricing
+          </Link>
         </div>
       </section>
 
       {/* Generator Workspace */}
-      <section id="generator" className="py-16 px-6 max-w-5xl mx-auto">
-        <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-6 sm:p-10 shadow-2xl backdrop-blur-md relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+      <section id="generator" className="py-12 px-4 sm:px-6 max-w-4xl mx-auto">
+        <div className="bg-[#1c1c1e]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
           
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-4 border-b border-zinc-900 gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">Email Studio v3.0</h2>
-              <p className="text-xs text-zinc-400 mt-1">Multi-language AI email creation, draft polishing & auto-save.</p>
+              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio</h2>
+              <p className="text-sm text-[#86868b] mt-1">Powered by advanced AI models.</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setHistoryModalOpen(true)}
-                className="text-xs px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-full text-zinc-300 transition"
+                className="text-sm px-4 py-2 bg-[#2c2c2e] hover:bg-[#3a3a3c] rounded-full text-[#f5f5f7] transition font-medium"
               >
-                📜 History ({savedHistory.length})
+                History ({savedHistory.length})
               </button>
               {!isPro && (
-                <span className="text-xs px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-full text-zinc-400 font-mono whitespace-nowrap">
-                  {user ? `${dailyUsage}/5 Free Daily` : `${guestUsage}/2 Guest Free`}
+                <span className="text-sm px-4 py-2 bg-[#2c2c2e] rounded-full text-[#86868b] font-medium">
+                  {user ? `${dailyUsage}/5 Free` : `${guestUsage}/2 Free`}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="flex items-center space-x-3 mb-6 bg-zinc-900/80 p-1.5 rounded-xl border border-zinc-800 w-fit">
+          {/* Apple-style Segmented Control */}
+          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-fit mb-8">
             <button
               onClick={() => setStudioMode("create")}
-              className={`text-xs font-semibold px-4 py-2 rounded-lg transition ${
-                studioMode === "create" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
+              className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${
+                studioMode === "create" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
               }`}
             >
-              ✨ Create New Email
+              Create New
             </button>
             <button
               onClick={() => setStudioMode("polish")}
-              className={`text-xs font-semibold px-4 py-2 rounded-lg transition ${
-                studioMode === "polish" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
+              className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${
+                studioMode === "polish" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
               }`}
             >
-              🪄 Magic Polish Draft
+              Magic Polish
             </button>
           </div>
 
           <form onSubmit={handleGenerate} className="space-y-6">
             
-            {/* Output Language Selector */}
             <div className="max-w-xs">
-              <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
-                🌍 Output Language
+              <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                Output Language
               </label>
               <select
                 value={targetLanguage}
                 onChange={(e) => setTargetLanguage(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition"
+                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none"
               >
                 {LANGUAGES.map((lang) => (
                   <option key={lang} value={lang}>{lang}</option>
@@ -566,12 +458,11 @@ export default function Home() {
             </div>
 
             {studioMode === "create" ? (
-              /* CREATE MODE INPUTS */
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Email Type</label>
-                    <select value={emailType} onChange={(e) => setEmailType(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition">
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Email Type</label>
+                    <select value={emailType} onChange={(e) => setEmailType(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none">
                       <option value="cold_outreach">Cold Outreach / Sales</option>
                       <option value="job_application">Job Application / Pitch</option>
                       <option value="follow_up">Follow Up</option>
@@ -580,8 +471,8 @@ export default function Home() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Tone of Voice</label>
-                    <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition">
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Tone of Voice</label>
+                    <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none">
                       <option value="professional">Professional & Direct</option>
                       <option value="persuasive">Persuasive & Confident</option>
                       <option value="friendly">Friendly & Warm</option>
@@ -589,22 +480,21 @@ export default function Home() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Recipient Name / Title</label>
-                    <input type="text" placeholder="e.g. Sarah Connor" value={recipient} onChange={(e) => setRecipient(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600" />
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Recipient Name</label>
+                    <input type="text" placeholder="e.g. Tim Cook" value={recipient} onChange={(e) => setRecipient(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]" />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Context & Main Points</label>
-                  <textarea rows={4} required placeholder="What is the key goal of this email?" value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 resize-none" />
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Context & Main Points</label>
+                  <textarea rows={4} required placeholder="What is the key goal of this email?" value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none" />
                 </div>
               </>
             ) : (
-              /* MAGIC POLISH DRAFT INPUTS */
               <>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
-                    Paste Your Existing Rough Draft
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    Paste Your Existing Draft
                   </label>
                   <textarea
                     rows={5}
@@ -612,12 +502,12 @@ export default function Home() {
                     placeholder="Paste your messy draft, notes, or bullet points here..."
                     value={draftText}
                     onChange={(e) => setDraftText(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 resize-none"
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
                     Select Polish Goal
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -631,10 +521,10 @@ export default function Home() {
                         type="button"
                         key={goal}
                         onClick={() => setPolishGoal(goal)}
-                        className={`text-xs px-3.5 py-2 rounded-lg border transition ${
+                        className={`text-sm px-4 py-2 rounded-full transition font-medium ${
                           polishGoal === goal
-                            ? "bg-white text-black border-white font-medium"
-                            : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white"
+                            ? "bg-[#0a84ff] text-white"
+                            : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
                         }`}
                       >
                         {goal}
@@ -645,13 +535,13 @@ export default function Home() {
               </>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-              <input type="text" placeholder="Your Name (Sender Signature)" value={sender} onChange={(e) => setSender(e.target.value)} className="bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 w-full sm:w-1/2" />
-              <button type="submit" disabled={loading} className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 font-semibold px-8 py-3 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+              <input type="text" placeholder="Your Name (Sender Signature)" value={sender} onChange={(e) => setSender(e.target.value)} className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] w-full sm:w-1/2" />
+              <button type="submit" disabled={loading} className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2 shadow-md">
                 {loading ? (
-                  <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /><span>Processing AI Studio...</span></>
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Processing...</span></>
                 ) : (
-                  <span>{studioMode === "create" ? "Generate Emails ▲" : "Magic Polish Draft ▲"}</span>
+                  <span>{studioMode === "create" ? "Generate Emails" : "Magic Polish Draft"}</span>
                 )}
               </button>
             </div>
@@ -659,31 +549,31 @@ export default function Home() {
 
           {/* Result Output Display */}
           {variations.length > 0 && (
-            <div ref={resultRef} className="mt-10 pt-8 border-t border-zinc-900 space-y-8">
+            <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8">
               
               {/* Subject Lines */}
               {subjectLines.length > 0 && (
                 <div className="space-y-3">
-                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                    🎯 Subject Line Studio ({targetLanguage})
+                  <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                    Subject Line Studio
                   </span>
                   <div className="space-y-2">
                     {subjectLines.map((subj, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-zinc-900/80 border border-zinc-800 p-3 rounded-xl gap-2">
-                        <span className="text-sm font-medium text-zinc-200">{subj.subject}</span>
+                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#2c2c2e] p-4 rounded-2xl gap-3">
+                        <span className="text-sm font-medium text-[#f5f5f7]">{subj.subject}</span>
                         <div className="flex items-center space-x-3 shrink-0">
-                          <span className={`text-[10px] font-semibold uppercase px-2.5 py-1 rounded-full border ${
+                          <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
                             subj.score >= 90 
-                              ? 'bg-emerald-950/60 border-emerald-800 text-emerald-400' 
-                              : 'bg-amber-950/60 border-amber-800 text-amber-400'
+                              ? 'bg-[#34c759]/20 text-[#34c759]' 
+                              : 'bg-[#ff9f0a]/20 text-[#ff9f0a]'
                           }`}>
-                            {subj.spamRisk} ({subj.score}/100)
+                            {subj.spamRisk}
                           </span>
                           <button 
                             onClick={() => copySubject(subj.subject, idx)}
-                            className="text-xs text-zinc-400 hover:text-white bg-zinc-800 px-3 py-1 rounded-lg transition"
+                            className="text-xs font-medium text-[#0a84ff] hover:text-[#0071e3] bg-[#0a84ff]/10 px-3 py-1.5 rounded-full transition"
                           >
-                            {copiedSubject === idx ? "Copied!" : "Copy"}
+                            {copiedSubject === idx ? "Copied" : "Copy"}
                           </button>
                         </div>
                       </div>
@@ -694,11 +584,11 @@ export default function Home() {
 
               {/* Variations */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                    ⚡ {targetLanguage} Output Options
+                <div className="flex items-center justify-between pb-2">
+                  <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                    {targetLanguage} Output Options
                   </span>
-                  <span className="text-xs text-zinc-500 font-mono">
+                  <span className="text-xs text-[#86868b] font-medium">
                     {variations[selectedTab]?.readingTime}
                   </span>
                 </div>
@@ -708,10 +598,10 @@ export default function Home() {
                     <button
                       key={v.id || i}
                       onClick={() => setSelectedTab(i)}
-                      className={`text-xs font-medium px-4 py-2 rounded-full border transition ${
+                      className={`text-sm font-medium px-5 py-2 rounded-full transition ${
                         selectedTab === i
-                          ? "bg-white text-black border-white"
-                          : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white"
+                          ? "bg-[#f5f5f7] text-black"
+                          : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
                       }`}
                     >
                       Option {i + 1}: {v.title}
@@ -719,31 +609,30 @@ export default function Home() {
                   ))}
                 </div>
 
-                <div className="relative bg-zinc-900/90 border border-zinc-700/80 rounded-xl p-5 text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap text-sm shadow-xl mt-4">
-                  {/* Phase 1 Action Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-zinc-800/80">
-                    <span className="text-xs font-mono text-emerald-400 flex items-center gap-1">
-                      ✓ Auto-saved to History
+                <div className="relative bg-[#2c2c2e] rounded-2xl p-6 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px] shadow-inner mt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-5 pb-4 border-b border-white/10">
+                    <span className="text-xs font-medium text-[#34c759] flex items-center gap-1">
+                      ✓ Auto-saved
                     </span>
                     
                     <div className="flex flex-wrap items-center gap-2">
                       <button 
                         onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)} 
-                        className="text-xs bg-red-950/60 hover:bg-red-900/80 border border-red-800 text-red-200 px-3 py-1.5 rounded-full transition flex items-center gap-1"
+                        className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition"
                       >
-                        ✉️ Open in Gmail
+                        Open in Gmail
                       </button>
 
                       <button 
                         onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)} 
-                        className="text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 px-3 py-1.5 rounded-full transition flex items-center gap-1"
+                        className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition"
                       >
-                        📬 Mail App
+                        Mail App
                       </button>
 
                       <button 
                         onClick={() => copyBody(variations[selectedTab]?.body)} 
-                        className="text-xs bg-white text-black hover:bg-zinc-200 font-medium px-3 py-1.5 rounded-full transition"
+                        className="text-xs font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-2 rounded-full transition shadow-sm"
                       >
                         {copiedBody ? "Copied!" : "Copy Text"}
                       </button>
@@ -759,20 +648,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Saved History Drawer / Modal */}
+      {/* Saved History Modal (Apple Sheet Style) */}
       {historyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] flex flex-col relative shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-zinc-900">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-md p-0 sm:p-4">
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-6 max-w-2xl w-full h-[85vh] sm:max-h-[80vh] flex flex-col relative shadow-2xl transform transition-transform">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <span>📜 Saved Email History</span>
-                </h3>
-                <p className="text-xs text-zinc-400">Search and re-open past email generations.</p>
+                <h3 className="text-xl font-semibold text-[#f5f5f7]">Saved History</h3>
+                <p className="text-sm text-[#86868b]">Search and re-open past emails.</p>
               </div>
               <button 
                 onClick={() => setHistoryModalOpen(false)} 
-                className="text-zinc-500 hover:text-white p-2 rounded-lg"
+                className="bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
               >
                 ✕
               </button>
@@ -781,50 +668,35 @@ export default function Home() {
             <div className="py-4">
               <input
                 type="text"
-                placeholder="Search history by keyword or subject..."
+                placeholder="Search history..."
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-white transition"
+                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]"
               />
             </div>
 
-            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+            <div className="overflow-y-auto flex-1 space-y-4 pr-2">
               {filteredHistory.length === 0 ? (
-                <div className="text-center py-12 text-zinc-500 text-xs font-mono">
+                <div className="text-center py-12 text-[#86868b] text-sm font-medium">
                   No saved emails found.
                 </div>
               ) : (
                 filteredHistory.map((item) => (
-                  <div key={item.id} className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-4 space-y-3 hover:border-zinc-700 transition">
-                    <div className="flex items-center justify-between text-xs text-zinc-400 border-b border-zinc-800/60 pb-2">
-                      <span className="font-mono text-zinc-300 uppercase">{item.email_type} ({item.language})</span>
-                      <span className="text-[10px] text-zinc-500">{new Date(item.created_at).toLocaleDateString()}</span>
+                  <div key={item.id} className="bg-[#2c2c2e] rounded-2xl p-5 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-[#86868b] border-b border-white/5 pb-2">
+                      <span className="font-semibold uppercase tracking-wider">{item.email_type} ({item.language})</span>
+                      <span>{new Date(item.created_at).toLocaleDateString()}</span>
                     </div>
 
-                    <p className="text-xs font-medium text-white truncate">{item.subject_line}</p>
-                    <p className="text-xs text-zinc-400 line-clamp-3 whitespace-pre-wrap font-sans">{item.body}</p>
+                    <p className="text-sm font-semibold text-[#f5f5f7] truncate">{item.subject_line}</p>
+                    <p className="text-sm text-[#86868b] line-clamp-3 whitespace-pre-wrap">{item.body}</p>
 
-                    <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center justify-between pt-2">
                       <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => openInGmail(item.subject_line, item.body)}
-                          className="text-[11px] bg-red-950/60 hover:bg-red-900/80 text-red-200 border border-red-800 px-2.5 py-1 rounded-md transition"
-                        >
-                          Gmail
-                        </button>
-                        <button
-                          onClick={() => copyBody(item.body)}
-                          className="text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 rounded-md transition"
-                        >
-                          Copy
-                        </button>
+                        <button onClick={() => openInGmail(item.subject_line, item.body)} className="text-xs font-medium bg-[#ff3b30]/10 text-[#ff3b30] px-3 py-1.5 rounded-full">Gmail</button>
+                        <button onClick={() => copyBody(item.body)} className="text-xs font-medium bg-[#f5f5f7] text-black px-3 py-1.5 rounded-full">Copy</button>
                       </div>
-                      <button
-                        onClick={() => deleteHistoryItem(item.id)}
-                        className="text-[11px] text-zinc-500 hover:text-red-400 transition"
-                      >
-                        Delete
-                      </button>
+                      <button onClick={() => deleteHistoryItem(item.id)} className="text-xs font-medium text-[#86868b] hover:text-[#ff3b30] transition">Delete</button>
                     </div>
                   </div>
                 ))
@@ -835,20 +707,20 @@ export default function Home() {
       )}
 
       {/* FAQ Section */}
-      <section id="faq" className="py-20 px-6 max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold tracking-tight text-white mb-10 text-center">Frequently Asked Questions</h2>
-        <div className="space-y-4">
+      <section id="faq" className="py-24 px-6 max-w-3xl mx-auto">
+        <h2 className="text-3xl font-bold tracking-tight text-[#f5f5f7] mb-10 text-center">Frequently Asked Questions</h2>
+        <div className="space-y-3">
           {faqs.map((faq, index) => (
-            <div key={index} className="border border-zinc-800 bg-zinc-950/50 rounded-xl overflow-hidden transition-all">
+            <div key={index} className="bg-[#1c1c1e] rounded-2xl overflow-hidden transition-all">
               <button 
                 onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                className="w-full flex items-center justify-between p-5 text-left focus:outline-none"
+                className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
               >
-                <span className="font-medium text-zinc-200">{faq.q}</span>
-                <span className="text-zinc-500 ml-4">{openFaq === index ? "−" : "+"}</span>
+                <span className="font-semibold text-[#f5f5f7]">{faq.q}</span>
+                <span className="text-[#86868b] ml-4 text-xl font-light">{openFaq === index ? "−" : "+"}</span>
               </button>
               {openFaq === index && (
-                <div className="px-5 pb-5 text-sm text-zinc-400 leading-relaxed">
+                <div className="px-6 pb-6 text-[15px] text-[#86868b] leading-relaxed">
                   {faq.a}
                 </div>
               )}
@@ -859,27 +731,25 @@ export default function Home() {
 
       {/* Auth Modal */}
       {authModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 max-w-sm w-full relative">
-            <button onClick={() => setAuthModalOpen(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white p-2">✕</button>
-            <h3 className="text-lg font-bold text-white mb-2">{isSignUp ? "Create your account" : "Log in to WriteYourEmail"}</h3>
-            <p className="text-xs text-zinc-400 mb-6">Get 5 free AI email generations every day.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full relative shadow-2xl">
+            <button onClick={() => setAuthModalOpen(false)} className="absolute top-6 right-6 bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition">✕</button>
+            <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
+            <p className="text-sm text-[#86868b] mb-8">Get 5 free AI email generations every day.</p>
             <form onSubmit={handleAuth} className="space-y-4">
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Email</label>
-                <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-white" />
+                <input type="email" required placeholder="Email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm focus:ring-2 focus:ring-[#0a84ff] outline-none placeholder-[#86868b]" />
               </div>
               <div>
-                <label className="block text-xs text-zinc-400 mb-1">Password</label>
-                <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-2.5 text-sm focus:outline-none focus:border-white" />
+                <input type="password" required placeholder="Password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm focus:ring-2 focus:ring-[#0a84ff] outline-none placeholder-[#86868b]" />
               </div>
-              {authMessage && <p className="text-xs text-zinc-400 border border-zinc-800 p-2 rounded">{authMessage}</p>}
-              <button type="submit" className="w-full bg-white text-black font-semibold py-2.5 rounded-full text-xs hover:bg-zinc-200 transition">
+              {authMessage && <p className="text-sm text-[#ff3b30] bg-[#ff3b30]/10 p-3 rounded-xl">{authMessage}</p>}
+              <button type="submit" className="w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-4 rounded-xl text-sm transition shadow-md mt-2">
                 {isSignUp ? "Sign Up" : "Log In"}
               </button>
             </form>
-            <div className="mt-4 text-center">
-              <button onClick={() => { setIsSignUp(!isSignUp); setAuthMessage(""); }} className="text-xs text-zinc-400 hover:text-white transition">
+            <div className="mt-6 text-center">
+              <button onClick={() => { setIsSignUp(!isSignUp); setAuthMessage(""); }} className="text-sm font-medium text-[#0a84ff] hover:text-[#0071e3] transition">
                 {isSignUp ? "Already have an account? Log In" : "Need an account? Sign Up"}
               </button>
             </div>
@@ -888,12 +758,12 @@ export default function Home() {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-zinc-900 py-10 text-center text-xs text-zinc-600">
+      <footer className="border-t border-white/10 py-12 text-center text-sm font-medium text-[#86868b]">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 WriteYourEmail.com. All rights reserved.</p>
+          <p>© 2026 WriteYourEmail. All rights reserved.</p>
           <div className="flex space-x-6">
-            <Link href="/terms" className="hover:text-zinc-400 transition">Terms of Service</Link>
-            <Link href="/privacy" className="hover:text-zinc-400 transition">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-[#f5f5f7] transition">Terms</Link>
+            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">Privacy</Link>
           </div>
         </div>
       </footer>
