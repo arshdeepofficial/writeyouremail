@@ -13,7 +13,7 @@ const GROQ_MODELS = [
 
 export async function POST(req: Request) {
   try {
-    const { mode, emailType, context, recipient, sender, tone, targetLanguage, draftText, polishGoal } = await req.json();
+    const { mode, emailType, context, recipient, sender, tone, targetLanguage, draftText, polishGoal, docuSignLink } = await req.json();
 
     const lang = targetLanguage || "English";
     let prompt = "";
@@ -28,6 +28,7 @@ Task: Polish and rewrite the user's rough email draft.
 - Target Output Language: ${lang}
 - Polish Goal: ${polishGoal || "Fix grammar and improve professional clarity"}
 - Original Draft: "${draftText}"
+${docuSignLink ? `- Include a professional e-signature Call To Action pointing to this DocuSign link: ${docuSignLink}` : ""}
 
 Requirements:
 1. Generate 3 improved subject line variations written in ${lang} with spam risk ratings.
@@ -40,13 +41,22 @@ Requirements:
         return NextResponse.json({ error: "Context is required." }, { status: 400 });
       }
 
-      prompt = `You are a world-class email copywriting engine. Create 3 subject lines with spam scores and 3 distinct email body variations based on these inputs:
+      const isContract = emailType === "contract_pitch";
+
+      prompt = `You are a world-class email copywriting engine specializing in executive communication and high-stakes deals.
+Create 3 subject lines with spam scores and 3 distinct email body variations based on these inputs:
 - Target Language: Output EVERYTHING natively in ${lang}
-- Email Type: ${emailType}
+- Email Type: ${emailType} ${isContract ? "(Contract/Proposal Pitch for e-Signature)" : ""}
 - Tone: ${tone}
 - Recipient: ${recipient || "Not specified"}
 - Sender Signature: ${sender || "Not specified"}
 - Context & Goals: ${context}
+${docuSignLink ? `- e-Signature / DocuSign Link: ${docuSignLink}` : ""}
+
+${isContract ? `SPECIAL INSTRUCTIONS FOR CONTRACT / DOCUSIGN PITCHING:
+- Clear instructions guiding the recipient to review and electronically sign via the provided link.
+- Friendly, professional tone assuring security and ease of signing.
+- Optional subtle deadline or call-to-action to complete agreement.` : ""}
 
 Requirements:
 1. Generate 3 high-converting subject line variations written natively in ${lang} with spam risk ratings.
@@ -94,14 +104,8 @@ DO NOT include markdown codeblocks (like \`\`\`json). Output pure JSON string on
       try {
         const completion = await groq.chat.completions.create({
           messages: [
-            {
-              role: "system",
-              content: "You are an AI assistant that outputs clean JSON only.",
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
+            { role: "system", content: "You are an AI assistant that outputs clean JSON only." },
+            { role: "user", content: prompt },
           ],
           model: model,
           temperature: 0.7,

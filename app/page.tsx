@@ -46,6 +46,7 @@ export default function Home() {
   const [targetLanguage, setTargetLanguage] = useState("English");
   const [draftText, setDraftText] = useState("");
   const [polishGoal, setPolishGoal] = useState("Fix grammar, typos & improve flow");
+  const [docuSignLink, setDocuSignLink] = useState("");
 
   const [subjectLines, setSubjectLines] = useState<SubjectLine[]>([]);
   const [variations, setVariations] = useState<EmailVariation[]>([]);
@@ -211,7 +212,7 @@ export default function Home() {
         attempts++;
         const response = await fetch("/api/generate", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: studioMode, emailType, context, recipient, sender, tone, targetLanguage, draftText, polishGoal }),
+          body: JSON.stringify({ mode: studioMode, emailType, context, recipient, sender, tone, targetLanguage, draftText, polishGoal, docuSignLink }),
         });
         const data = await response.json();
         if (response.ok && data.variations && data.variations.length > 0) {
@@ -277,19 +278,19 @@ export default function Home() {
   );
 
   const faqs = [
-    { q: "What is WriteYourEmail?", a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), and polishes draft emails into high-converting messages in seconds." },
+    { q: "What is WriteYourEmail?", a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), polishes drafts, and sends e-signature pitch requests." },
     { q: "Is there a free tier?", a: "Yes. Unregistered guests get 2 free emails. Registered users get 5 free emails every single day." },
-    { q: "What is included in the Pro plan?", a: "The Pro plan ($9/mo) gives you unlimited email generations, priority speed, multi-language support, and Magic Polish." },
+    { q: "What is included in the Pro plan?", a: "The Pro plan ($9/mo) gives you unlimited email generations, priority speed, DocuSign pitch tools, and multi-language support." },
     { q: "How do I cancel my subscription?", a: "You can manage or cancel your subscription anytime via Lemon Squeezy with one click." }
   ];
 
   return (
     <div className="relative w-full overflow-x-hidden min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
       
-      {/* Apple-style Ambient Glow */}
+      {/* Apple Ambient Glow */}
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[100px] pointer-events-none rounded-full" />
 
-      {/* Navigation Header */}
+      {/* Header */}
       <header className={`sticky top-0 z-50 border-b border-white/10 transition-colors duration-300 ${mobileMenuOpen ? 'bg-[#000000]' : 'bg-[#000000]/70 backdrop-blur-2xl saturate-150'}`}>
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center space-x-8">
@@ -348,7 +349,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Mobile Overlay Menu */}
+      {/* Mobile Menu */}
       <div className={`fixed inset-0 z-40 bg-[#000000] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
         <nav className="flex flex-col text-lg font-medium text-[#f5f5f7]">
           <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">Products</a>
@@ -377,13 +378,13 @@ export default function Home() {
         </nav>
       </div>
 
-      {/* Hero Section */}
+      {/* Hero */}
       <section className="relative pt-24 pb-20 px-6 max-w-5xl mx-auto text-center">
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#f5f5f7] leading-tight mb-6">
-          Intelligence that writes.
+          Intelligence that closes deals.
         </h1>
         <p className="text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium">
-          Generate high-converting emails in 25+ languages, polish existing drafts, and test subject line spam risks instantly.
+          Generate sales pitches, e-signature requests with DocuSign, and multi-language emails instantly.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
           <a href="#generator" className="bg-[#f5f5f7] text-black hover:bg-white font-semibold px-8 py-3.5 rounded-full text-base transition shadow-sm w-full sm:w-auto">
@@ -401,8 +402,8 @@ export default function Home() {
           
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio</h2>
-              <p className="text-sm text-[#86868b] mt-1">Powered by advanced AI models.</p>
+              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio v3.5</h2>
+              <p className="text-sm text-[#86868b] mt-1">Includes DocuSign & e-Signature request support.</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <button
@@ -420,7 +421,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Apple-style Segmented Control */}
+          {/* Segmented Control */}
           <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-fit mb-8">
             <button
               onClick={() => setStudioMode("create")}
@@ -464,6 +465,7 @@ export default function Home() {
                     <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Email Type</label>
                     <select value={emailType} onChange={(e) => setEmailType(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none">
                       <option value="cold_outreach">Cold Outreach / Sales</option>
+                      <option value="contract_pitch">Contract / Proposal Pitch (DocuSign)</option>
                       <option value="job_application">Job Application / Pitch</option>
                       <option value="follow_up">Follow Up</option>
                       <option value="resignation">Resignation / Transition</option>
@@ -485,9 +487,23 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* DocuSign URL Input Field */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    🖋️ DocuSign / e-Signature URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://app.docusign.com/signing/..."
+                    value={docuSignLink}
+                    onChange={(e) => setDocuSignLink(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]"
+                  />
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Context & Main Points</label>
-                  <textarea rows={4} required placeholder="What is the key goal of this email?" value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none" />
+                  <textarea rows={4} required placeholder="What is the key goal of this email or contract request?" value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none" />
                 </div>
               </>
             ) : (
@@ -499,7 +515,7 @@ export default function Home() {
                   <textarea
                     rows={5}
                     required
-                    placeholder="Paste your messy draft, notes, or bullet points here..."
+                    placeholder="Paste your messy draft, notes, or contract text here..."
                     value={draftText}
                     onChange={(e) => setDraftText(e.target.value)}
                     className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none"
@@ -616,6 +632,17 @@ export default function Home() {
                     </span>
                     
                     <div className="flex flex-wrap items-center gap-2">
+                      {docuSignLink && (
+                        <a
+                          href={docuSignLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-medium bg-[#ff9f0a]/10 hover:bg-[#ff9f0a]/20 text-[#ff9f0a] px-4 py-2 rounded-full transition flex items-center gap-1"
+                        >
+                          🖋️ Test DocuSign Link
+                        </a>
+                      )}
+
                       <button 
                         onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)} 
                         className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition"
@@ -648,7 +675,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Saved History Modal (Apple Sheet Style) */}
+      {/* History Modal */}
       {historyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-md p-0 sm:p-4">
           <div className="bg-[#1c1c1e] border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-6 max-w-2xl w-full h-[85vh] sm:max-h-[80vh] flex flex-col relative shadow-2xl transform transition-transform">
@@ -706,7 +733,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* FAQ Section */}
+      {/* FAQ */}
       <section id="faq" className="py-24 px-6 max-w-3xl mx-auto">
         <h2 className="text-3xl font-bold tracking-tight text-[#f5f5f7] mb-10 text-center">Frequently Asked Questions</h2>
         <div className="space-y-3">
