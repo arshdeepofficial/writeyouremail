@@ -10,6 +10,12 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const LEMON_SQUEEZY_CHECKOUT = "https://writeyouremail.lemonsqueezy.com/checkout/buy/8de4d383-5177-4977-8066-de6872cdb69d";
 
+const COMMON_SPAM_WORDS = [
+  "100% free", "free", "guaranteed", "no cost", "risk-free", "act now",
+  "click here", "urgent", "make money", "winner", "cash", "no obligation",
+  "special promotion", "congratulations", "credit card", "order now"
+];
+
 interface SubjectLine {
   subject: string;
   spamRisk: string;
@@ -39,7 +45,7 @@ const LANGUAGES = [
 ];
 
 export default function Home() {
-  const [studioMode, setStudioMode] = useState<"create" | "polish" | "sequence">("create");
+  const [studioMode, setStudioMode] = useState<"create" | "polish" | "sequence" | "reply">("create");
   const [emailType, setEmailType] = useState("cold_outreach");
   const [context, setContext] = useState("");
   const [recipient, setRecipient] = useState("");
@@ -48,8 +54,12 @@ export default function Home() {
   const [targetLanguage, setTargetLanguage] = useState("English");
   const [draftText, setDraftText] = useState("");
   const [polishGoal, setPolishGoal] = useState("Fix grammar, typos & improve flow");
+  const [replyStrategy, setReplyStrategy] = useState("Value & ROI Reframing (Turn price into value)");
+  const [incomingEmailText, setIncomingEmailText] = useState("");
   const [docuSignLink, setDocuSignLink] = useState("");
   const [brandVoice, setBrandVoice] = useState("");
+  const [includeSignature, setIncludeSignature] = useState(false);
+  const [senderTitle, setSenderTitle] = useState("");
 
   const [subjectLines, setSubjectLines] = useState<SubjectLine[]>([]);
   const [variations, setVariations] = useState<EmailVariation[]>([]);
@@ -152,7 +162,7 @@ export default function Home() {
     const primaryBody = vars[0]?.body || "";
     const newRecord: SavedEmailRecord = {
       id: Date.now().toString(), created_at: new Date().toISOString(),
-      email_type: studioMode === "sequence" ? "3-Step Sequence" : (studioMode === "create" ? emailType : "Magic Polish"),
+      email_type: studioMode === "sequence" ? "3-Step Sequence" : studioMode === "reply" ? "Objection Response" : (studioMode === "create" ? emailType : "Magic Polish"),
       subject_line: primarySubject, body: primaryBody, language: targetLanguage,
     };
 
@@ -160,7 +170,7 @@ export default function Home() {
       try {
         await supabase.from("emails").insert({
           user_id: user.id, email_type: newRecord.email_type,
-          context: studioMode === "create" || studioMode === "sequence" ? context : draftText,
+          context: studioMode === "create" || studioMode === "sequence" ? context : studioMode === "reply" ? incomingEmailText : draftText,
           recipient: primarySubject, sender: sender || "User", tone: targetLanguage, generated_email: primaryBody,
         });
         fetchUserHistory(user.id);
@@ -234,9 +244,10 @@ export default function Home() {
     } catch (err) { console.error(err); }
   };
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isPro) {
+  const handleGenerate = async (e?: React.FormEvent, overrideTone?: string) => {
+    if (e) e.preventDefault();
+
+    if (!isPro && !overrideTone) {
       if (!user && guestUsage >= 2) {
         setAuthModalOpen(true);
         return;
@@ -263,12 +274,15 @@ export default function Home() {
             context,
             recipient,
             sender,
-            tone,
+            tone: overrideTone || tone,
             targetLanguage,
             draftText,
             polishGoal,
+            replyStrategy,
+            incomingEmailText,
             docuSignLink,
             brandVoice: isPro ? brandVoice : "",
+            senderTitle: includeSignature ? senderTitle : "",
           }),
         });
         const data = await response.json();
@@ -277,7 +291,7 @@ export default function Home() {
           setVariations(data.variations || []);
           setSelectedTab(0);
           success = true;
-          await saveToHistory(data.subjectLines || [], data.variations || []);
+          if (!overrideTone) await saveToHistory(data.subjectLines || [], data.variations || []);
           break;
         }
       } catch (err) {
@@ -288,9 +302,15 @@ export default function Home() {
 
     setLoading(false);
     if (success) {
-      await incrementUsageAfterSuccess();
+      if (!overrideTone) await incrementUsageAfterSuccess();
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
     }
+  };
+
+  const detectSpamTriggers = (text: string) => {
+    if (!text) return [];
+    const lower = text.toLowerCase();
+    return COMMON_SPAM_WORDS.filter((word) => lower.includes(word));
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -343,6 +363,9 @@ export default function Home() {
     window.location.href = `mailto:?subject=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`;
   };
 
+  const currentBody = variations[selectedTab]?.body || "";
+  const activeSpamTriggers = detectSpamTriggers(currentBody);
+
   const filteredHistory = savedHistory.filter(
     (item) =>
       item.subject_line.toLowerCase().includes(historySearch.toLowerCase()) ||
@@ -353,7 +376,7 @@ export default function Home() {
   const faqs = [
     {
       q: "What is WriteYourEmail?",
-      a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), polishes drafts, and sends e-signature pitch requests.",
+      a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), polishes drafts, handles prospect objections, and embeds DocuSign requests.",
     },
     {
       q: "Is there a free tier?",
@@ -361,7 +384,7 @@ export default function Home() {
     },
     {
       q: "What is included in the Pro plan?",
-      a: "The Pro plan ($9/mo) gives you unlimited email generations, 3-step follow-up sequences, custom brand voice DNA, DocuSign pitch tools, and CSV/TXT history exports.",
+      a: "The Pro plan ($9/mo) gives you unlimited email generations, 3-step follow-up sequences, custom brand voice DNA, AI objection handler, live spam risk audit, and CSV/TXT history exports.",
     },
     {
       q: "How do I cancel my subscription?",
@@ -561,8 +584,7 @@ export default function Home() {
           Intelligence that closes deals.
         </h1>
         <p className="text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium">
-          Generate sales pitches, 3-step outreach sequences, e-signature requests with DocuSign, and multi-language emails
-          instantly.
+          Generate sales pitches, 3-step outreach sequences, objection replies, e-signature requests with DocuSign, and multi-language emails instantly.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
           <a
@@ -585,8 +607,8 @@ export default function Home() {
         <div className="bg-[#1c1c1e]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio v3.5</h2>
-              <p className="text-sm text-[#86868b] mt-1">Includes DocuSign & 3-Step Sequence support.</p>
+              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio v4.0 Pro</h2>
+              <p className="text-sm text-[#86868b] mt-1">Includes Objection Handler & Deliverability Spam Audit.</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <button
@@ -605,10 +627,10 @@ export default function Home() {
           </div>
 
           {/* Segmented Control */}
-          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-fit mb-8 overflow-x-auto">
+          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-fit mb-8 overflow-x-auto max-w-full">
             <button
               onClick={() => setStudioMode("create")}
-              className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
                 studioMode === "create" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
               }`}
             >
@@ -616,11 +638,19 @@ export default function Home() {
             </button>
             <button
               onClick={() => setStudioMode("polish")}
-              className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
                 studioMode === "polish" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
               }`}
             >
               Magic Polish
+            </button>
+            <button
+              onClick={() => setStudioMode("reply")}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+                studioMode === "reply" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              🥊 Objection Reply
             </button>
             <button
               onClick={() => {
@@ -630,7 +660,7 @@ export default function Home() {
                   setStudioMode("sequence");
                 }
               }}
-              className={`text-sm font-medium px-5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
                 studioMode === "sequence"
                   ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm"
                   : "text-[#86868b] hover:text-[#f5f5f7]"
@@ -702,7 +732,38 @@ export default function Home() {
               />
             </div>
 
-            {studioMode === "polish" ? (
+            {studioMode === "reply" ? (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    Paste Prospect Email / Objection Received
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="e.g. 'Thanks for reaching out, but your solution is way too expensive for our Q3 budget right now.'"
+                    value={incomingEmailText}
+                    onChange={(e) => setIncomingEmailText(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    Select Rebuttal / Reply Strategy
+                  </label>
+                  <select
+                    value={replyStrategy}
+                    onChange={(e) => setReplyStrategy(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="Value & ROI Reframing (Turn price into value)">Value & ROI Reframing (Turn cost into ROI)</option>
+                    <option value="Soft 5-Minute Nudge (Low-friction short chat ask)">Soft 5-Minute Nudge (Low friction ask)</option>
+                    <option value="Polite Breakup & Future Pivot (Ask for referral or later touchpoint)">Polite Breakup & Future Touchpoint</option>
+                  </select>
+                </div>
+              </>
+            ) : studioMode === "polish" ? (
               <>
                 <div>
                   <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
@@ -794,18 +855,37 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* DocuSign URL Input Field */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                    🖋️ DocuSign / e-Signature URL (Optional)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://app.docusign.com/signing/..."
-                    value={docuSignLink}
-                    onChange={(e) => setDocuSignLink(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]"
-                  />
+                {/* Signature Embed Controls */}
+                <div className="bg-[#2c2c2e]/60 p-4 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider flex items-center gap-2">
+                      <span>🖋️ HTML Email Signature Generator</span>
+                    </label>
+                    <input
+                      type="checkbox"
+                      checked={includeSignature}
+                      onChange={(e) => setIncludeSignature(e.target.checked)}
+                      className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer"
+                    />
+                  </div>
+                  {includeSignature && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <input
+                        type="text"
+                        placeholder="Sender Title (e.g. VP of Business Development)"
+                        value={senderTitle}
+                        onChange={(e) => setSenderTitle(e.target.value)}
+                        className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                      />
+                      <input
+                        type="url"
+                        placeholder="DocuSign / Pitch Link (Optional)"
+                        value={docuSignLink}
+                        onChange={(e) => setDocuSignLink(e.target.value)}
+                        className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -850,6 +930,8 @@ export default function Home() {
                   <span>
                     {studioMode === "sequence"
                       ? "Generate 3-Step Sequence"
+                      : studioMode === "reply"
+                      ? "Generate Rebuttal"
                       : studioMode === "create"
                       ? "Generate Emails"
                       : "Magic Polish Draft"}
@@ -862,6 +944,30 @@ export default function Home() {
           {/* Result Output Display */}
           {variations.length > 0 && (
             <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8">
+              {/* Deliverability & Spam Trigger Live Audit */}
+              <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🛡️</span>
+                  <div>
+                    <p className="text-xs font-semibold text-[#f5f5f7]">Inbox Deliverability Audit</p>
+                    <p className="text-xs text-[#86868b]">
+                      {activeSpamTriggers.length === 0
+                        ? "0 Spam Trigger Words Found. High Inbox Primary Rate."
+                        : `Warning: ${activeSpamTriggers.length} spam trigger phrase(s) detected: [${activeSpamTriggers.join(", ")}]`}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${
+                    activeSpamTriggers.length === 0
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  }`}
+                >
+                  {activeSpamTriggers.length === 0 ? "Inbox Ready (98/100)" : "Risk Detected"}
+                </span>
+              </div>
+
               {/* Subject Lines */}
               {subjectLines.length > 0 && (
                 <div className="space-y-3">
@@ -923,6 +1029,29 @@ export default function Home() {
                       {v.title}
                     </button>
                   ))}
+                </div>
+
+                {/* 1-Click Persona Rewriter Bar */}
+                <div className="flex items-center gap-2 overflow-x-auto pt-2">
+                  <span className="text-xs text-[#86868b] font-medium shrink-0">Rewrite Persona:</span>
+                  <button
+                    onClick={() => handleGenerate(undefined, "Executive C-Suite Short & Concise")}
+                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                  >
+                    ⚡ C-Suite Brief (3 Sentences)
+                  </button>
+                  <button
+                    onClick={() => handleGenerate(undefined, "Warm, Friendly & Casual")}
+                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                  >
+                    ☕ Warm & Casual
+                  </button>
+                  <button
+                    onClick={() => handleGenerate(undefined, "Direct Response Aggressive Call to Action")}
+                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                  >
+                    🎯 Direct-Response CTA
+                  </button>
                 </div>
 
                 <div className="relative bg-[#2c2c2e] rounded-2xl p-6 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px] shadow-inner mt-4">

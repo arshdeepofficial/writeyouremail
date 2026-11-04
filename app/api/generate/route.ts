@@ -1,200 +1,140 @@
 import { NextResponse } from "next/server";
 import Groq from "groq-sdk";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const GROQ_MODELS = [
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
-  "mixtral-8x7b-32768",
+  "mixtral-8x7b-32768"
 ];
 
 export async function POST(req: Request) {
   try {
-    const { 
-      mode, 
-      emailType, 
-      context, 
-      recipient, 
-      sender, 
-      tone, 
-      targetLanguage, 
-      draftText, 
-      polishGoal, 
+    const {
+      mode,
+      emailType,
+      context,
+      recipient,
+      sender,
+      tone,
+      targetLanguage,
+      draftText,
+      polishGoal,
+      replyStrategy,
+      incomingEmailText,
       docuSignLink,
-      brandVoice 
+      brandVoice,
+      senderTitle,
     } = await req.json();
 
     const lang = targetLanguage || "English";
-    let prompt = "";
+    let promptInstructions = "";
 
-    if (mode === "sequence") {
-      if (!context || !context.trim()) {
-        return NextResponse.json({ error: "Context is required for sequences." }, { status: 400 });
-      }
-
-      prompt = `You are a world-class executive sales strategist.
-Create a high-converting 3-step email outreach sequence written natively in ${lang}.
-- Goal/Context: ${context}
-- Target Recipient: ${recipient || "Partner"}
-- Sender Name: ${sender || "Best Regards"}
-- Target Language: ${lang}
-${brandVoice ? `- CUSTOM BRAND VOICE DNA INSTRUCTIONS: ${brandVoice}` : ""}
-${docuSignLink ? `- Include DocuSign link in Email 1 or 2: ${docuSignLink}` : ""}
-
-Requirements:
-1. Generate 3 high-converting subject line options written in ${lang} with spam risk ratings.
-2. Generate 3 sequence steps written natively in ${lang}:
-   - Step 1: Initial Pitch / Outreach (Day 1)
-   - Step 2: Gentle Follow-Up Nudge (Day 3)
-   - Step 3: Polite Breakup / Final Call (Day 7)`;
-
+    if (mode === "reply") {
+      promptInstructions = `
+You are replying to a prospect's email / objection.
+PROSPECT EMAIL RECEIVED: "${incomingEmailText}"
+REPLY STRATEGY: "${replyStrategy}"
+TARGET TONE: "${tone}"
+RECIPIENT NAME: "${recipient || "Prospect"}"
+SENDER NAME: "${sender || "User"}"
+${senderTitle ? `SENDER TITLE: "${senderTitle}"` : ""}
+${docuSignLink ? `EMBED DOCUSIGN URL: "${docuSignLink}"` : ""}
+${brandVoice ? `BRAND VOICE STYLISTIC DNA RULES: "${brandVoice}"` : ""}
+LANGUAGE: Output MUST be written completely in ${lang}.
+`;
     } else if (mode === "polish") {
-      if (!draftText || !draftText.trim()) {
-        return NextResponse.json({ error: "Draft text is required for polishing." }, { status: 400 });
-      }
-
-      prompt = `You are a world-class executive editor and email copywriter.
-Task: Polish and rewrite the user's rough email draft.
-- Target Output Language: ${lang}
-- Polish Goal: ${polishGoal || "Fix grammar and improve professional clarity"}
-- Original Draft: "${draftText}"
-${brandVoice ? `- CUSTOM BRAND VOICE DNA: ${brandVoice}` : ""}
-${docuSignLink ? `- Include e-signature CTA with DocuSign link: ${docuSignLink}` : ""}
-
-Requirements:
-1. Generate 3 subject line options in ${lang} with spam risk ratings.
-2. Generate 3 distinct polished body variations natively in ${lang}:
-   - Option 1: Direct & Concise
-   - Option 2: Confident & High Impact
-   - Option 3: Warm & Collaborative`;
-
+      promptInstructions = `
+You are polishing and rewriting a user's raw draft.
+DRAFT TEXT: "${draftText}"
+GOAL: "${polishGoal}"
+TARGET TONE: "${tone}"
+SENDER NAME: "${sender || "User"}"
+${senderTitle ? `SENDER TITLE: "${senderTitle}"` : ""}
+${docuSignLink ? `EMBED DOCUSIGN URL: "${docuSignLink}"` : ""}
+${brandVoice ? `BRAND VOICE STYLISTIC DNA RULES: "${brandVoice}"` : ""}
+LANGUAGE: Output MUST be written completely in ${lang}.
+`;
+    } else if (mode === "sequence") {
+      promptInstructions = `
+Generate a 3-step automated sales sequence:
+Email 1: High-converting initial outreach / hook.
+Email 2: Gentle bump + value-add proposition (Day 3).
+Email 3: Soft-close / polite breakup email (Day 7).
+CONTEXT: "${context}"
+RECIPIENT NAME: "${recipient || "Prospect"}"
+SENDER NAME: "${sender || "User"}"
+${senderTitle ? `SENDER TITLE: "${senderTitle}"` : ""}
+${docuSignLink ? `EMBED DOCUSIGN URL: "${docuSignLink}"` : ""}
+${brandVoice ? `BRAND VOICE STYLISTIC DNA RULES: "${brandVoice}"` : ""}
+LANGUAGE: Output MUST be written completely in ${lang}.
+Set variation titles strictly to "Email 1 (Day 1)", "Email 2 (Day 3)", and "Email 3 (Day 7)".
+`;
     } else {
-      if (!context || !context.trim()) {
-        return NextResponse.json({ error: "Context is required." }, { status: 400 });
-      }
-
-      const isContract = emailType === "contract_pitch";
-
-      prompt = `You are a world-class email copywriting engine specializing in executive communication.
-Create 3 subject lines with spam scores and 3 email body variations in ${lang}:
-- Target Language: ${lang}
-- Email Type: ${emailType} ${isContract ? "(Contract/Proposal Pitch for e-Signature)" : ""}
-- Tone: ${tone}
-- Recipient: ${recipient || "Not specified"}
-- Sender Signature: ${sender || "Not specified"}
-- Context & Goals: ${context}
-${brandVoice ? `- CUSTOM BRAND VOICE DNA: ${brandVoice}` : ""}
-${docuSignLink ? `- e-Signature / DocuSign Link: ${docuSignLink}` : ""}
-
-Requirements:
-1. Generate 3 subject lines in ${lang} with spam risk ratings.
-2. Generate 3 email body variations in ${lang}:
-   - Option 1: Direct & Concise
-   - Option 2: Persuasive & Detailed
-   - Option 3: Casual & Warm`;
+      promptInstructions = `
+Generate emails for:
+EMAIL TYPE: "${emailType}"
+CONTEXT & KEY POINTS: "${context}"
+RECIPIENT NAME: "${recipient || "Prospect"}"
+SENDER NAME: "${sender || "User"}"
+TARGET TONE: "${tone}"
+${senderTitle ? `SENDER TITLE: "${senderTitle}"` : ""}
+${docuSignLink ? `EMBED DOCUSIGN URL: "${docuSignLink}"` : ""}
+${brandVoice ? `BRAND VOICE STYLISTIC DNA RULES: "${brandVoice}"` : ""}
+LANGUAGE: Output MUST be written completely in ${lang}.
+`;
     }
 
-    if (mode === "sequence") {
-      prompt += `\n\nRespond ONLY with valid, strict JSON matching this exact structure:
+    const systemPrompt = `You are an elite executive AI copywriting engine. 
+Respond strictly with a valid JSON object. No Markdown code fences, no extra text outside the JSON.
+
+Return format MUST be:
 {
   "subjectLines": [
-    { "subject": "Subject 1 in ${lang}", "spamRisk": "Low Risk", "score": 98 },
-    { "subject": "Subject 2 in ${lang}", "spamRisk": "Low Risk", "score": 94 },
-    { "subject": "Subject 3 in ${lang}", "spamRisk": "Medium Risk", "score": 82 }
+    { "subject": "String", "spamRisk": "Low Risk | Medium Risk", "score": 95 }
   ],
   "variations": [
-    {
-      "id": "seq-1",
-      "title": "Email 1: Initial Pitch (Day 1)",
-      "readingTime": "45 sec read",
-      "body": "Full body text for Step 1 in ${lang}..."
-    },
-    {
-      "id": "seq-2",
-      "title": "Email 2: Gentle Nudge (Day 3)",
-      "readingTime": "25 sec read",
-      "body": "Full body text for Step 2 in ${lang}..."
-    },
-    {
-      "id": "seq-3",
-      "title": "Email 3: Polite Breakup (Day 7)",
-      "readingTime": "30 sec read",
-      "body": "Full body text for Step 3 in ${lang}..."
-    }
+    { "id": "v1", "title": "Option Title", "readingTime": "30 sec read", "body": "Full body text" }
   ]
-}`;
-    } else {
-      prompt += `\n\nRespond ONLY with valid, strict JSON matching this exact structure:
-{
-  "subjectLines": [
-    { "subject": "Subject line 1 in ${lang}", "spamRisk": "Low Risk", "score": 98 },
-    { "subject": "Subject line 2 in ${lang}", "spamRisk": "Low Risk", "score": 94 },
-    { "subject": "Subject line 3 in ${lang}", "spamRisk": "Medium Risk", "score": 82 }
-  ],
-  "variations": [
-    {
-      "id": "v1",
-      "title": "Direct & Concise",
-      "readingTime": "20 sec read",
-      "body": "Full body text in ${lang}..."
-    },
-    {
-      "id": "v2",
-      "title": "Confident & High Impact",
-      "readingTime": "40 sec read",
-      "body": "Full body text in ${lang}..."
-    },
-    {
-      "id": "v3",
-      "title": "Warm & Collaborative",
-      "readingTime": "30 sec read",
-      "body": "Full body text in ${lang}..."
-    }
-  ]
-}`;
-    }
+}
 
-    prompt += `\nDO NOT include markdown codeblocks (like \`\`\`json). Output pure JSON string only.`;
+Provide 3 distinct subject line options and 3 email variations (or 3 sequence steps if mode is sequence).`;
 
-    let generatedData = null;
-    let lastError = null;
+    let completion = null;
+    let modelUsed = "";
 
     for (const model of GROQ_MODELS) {
       try {
-        const completion = await groq.chat.completions.create({
+        completion = await groq.chat.completions.create({
           messages: [
-            { role: "system", content: "You are an AI assistant that outputs clean JSON only." },
-            { role: "user", content: prompt },
+            { role: "system", content: systemPrompt },
+            { role: "user", content: promptInstructions },
           ],
-          model: model,
-          temperature: 0.7,
+          model,
+          temperature: 0.6,
           max_tokens: 2200,
+          response_format: { type: "json_object" },
         });
-
-        const rawText = completion.choices[0]?.message?.content || "";
-        const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-
-        const parsed = JSON.parse(cleanJson);
-        if (parsed.variations && parsed.variations.length > 0) {
-          generatedData = parsed;
-          break;
-        }
+        modelUsed = model;
+        if (completion?.choices?.[0]?.message?.content) break;
       } catch (err) {
-        console.warn(`Model ${model} failed, trying next fallback...`, err);
-        lastError = err;
+        console.warn(`Model ${model} failed, switching to fallback...`);
       }
     }
 
-    if (!generatedData) {
-      throw lastError || new Error("All active Groq models failed to respond.");
+    if (!completion?.choices?.[0]?.message?.content) {
+      return NextResponse.json({ error: "AI failed to respond" }, { status: 500 });
     }
 
-    return NextResponse.json(generatedData);
-  } catch (error: any) {
-    console.error("Groq Generation Error:", error);
-    return NextResponse.json({ error: "Failed to generate output." }, { status: 500 });
+    let raw = completion.choices[0].message.content.trim();
+    raw = raw.replace(/^```json\s*/i, "").replace(/\s*```$/, "");
+
+    const parsedData = JSON.parse(raw);
+    return NextResponse.json({ ...parsedData, modelUsed });
+
+  } catch (err: any) {
+    console.error("API Error:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
