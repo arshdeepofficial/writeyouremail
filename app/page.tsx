@@ -8,6 +8,19 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+interface SubjectLine {
+  subject: string;
+  spamRisk: string;
+  score: number;
+}
+
+interface EmailVariation {
+  id: string;
+  title: string;
+  readingTime: string;
+  body: string;
+}
+
 export default function Home() {
   // Generator State
   const [emailType, setEmailType] = useState("cold_outreach");
@@ -15,7 +28,11 @@ export default function Home() {
   const [recipient, setRecipient] = useState("");
   const [sender, setSender] = useState("");
   const [tone, setTone] = useState("professional");
-  const [generatedEmail, setGeneratedEmail] = useState("");
+
+  // Output State (Phase 2)
+  const [subjectLines, setSubjectLines] = useState<SubjectLine[]>([]);
+  const [variations, setVariations] = useState<EmailVariation[]>([]);
+  const [selectedTab, setSelectedTab] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
   // Auth & Usage State
@@ -25,7 +42,8 @@ export default function Home() {
   const [guestUsage, setGuestUsage] = useState<number>(0);
 
   // UI state
-  const [copied, setCopied] = useState(false);
+  const [copiedSubject, setCopiedSubject] = useState<number | null>(null);
+  const [copiedBody, setCopiedBody] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -36,7 +54,6 @@ export default function Home() {
   // FAQ State
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  // Result Anchor Ref for Auto-Scroll
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,7 +129,7 @@ export default function Home() {
 
     if (!isPro) {
       if (!user && guestUsage >= 2) {
-        alert("You have reached your 2 free guest emails! Please log in or sign up to get 5 free emails every day.");
+        alert("You have reached your 2 free guest emails! Log in or sign up to get 5 free emails every day.");
         setAuthModalOpen(true);
         return;
       }
@@ -126,9 +143,7 @@ export default function Home() {
 
     let attempts = 0;
     let success = false;
-    let finalEmailText = "";
 
-    // Automatic silent retry loop (up to 3 attempts)
     while (attempts < 3 && !success) {
       try {
         attempts++;
@@ -140,32 +155,29 @@ export default function Home() {
 
         const data = await response.json();
 
-        if (response.ok && data.email && data.email.trim().length > 10) {
-          finalEmailText = data.email.trim();
+        if (response.ok && data.variations && data.variations.length > 0) {
+          setSubjectLines(data.subjectLines || []);
+          setVariations(data.variations || []);
+          setSelectedTab(0);
           success = true;
           break;
         }
       } catch (err) {
-        console.warn(`Generation attempt ${attempts} encountered an issue. Retrying silently...`);
+        console.warn(`Attempt ${attempts} retrying...`);
       }
 
       if (!success && attempts < 3) {
-        // Wait 1 second before silent retry
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
     setLoading(false);
 
-    // ONLY DEDUCT CREDIT AND SHOW RESULT IF IT ACTUALLY SUCCEEDED
-    if (success && finalEmailText) {
-      setGeneratedEmail(finalEmailText);
+    if (success) {
       await incrementUsageAfterSuccess();
-
-      // Smooth auto-scroll to the generated result
       setTimeout(() => {
-        resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 150);
+        resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 200);
     }
   };
 
@@ -196,17 +208,23 @@ export default function Home() {
     setMobileMenuOpen(false);
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedEmail);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copySubject = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedSubject(index);
+    setTimeout(() => setCopiedSubject(null), 2000);
+  };
+
+  const copyBody = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedBody(true);
+    setTimeout(() => setCopiedBody(false), 2000);
   };
 
   const faqs = [
-    { q: "What is WriteYourEmail?", a: "WriteYourEmail is an AI-powered infrastructure designed to generate high-converting, professional emails in seconds using advanced LLMs." },
-    { q: "Is there a free tier?", a: "Yes. Guests can generate 2 emails for free. Registered users get 5 free emails every single day." },
-    { q: "What is included in the Pro plan?", a: "The Pro plan gives you unlimited email generations, priority processing speed, and unrestricted access to all tones and templates." },
-    { q: "How do I cancel my subscription?", a: "You can securely manage or cancel your subscription at any time through our payment provider, Lemon Squeezy." }
+    { q: "What is WriteYourEmail?", a: "WriteYourEmail is an AI-powered email studio that generates 3 high-converting email variations and spam-tested subject lines instantly." },
+    { q: "Is there a free tier?", a: "Yes. Unregistered guests get 2 free emails. Registered users get 5 free emails every single day." },
+    { q: "What is included in the Pro plan?", a: "The Pro plan ($9/mo) gives you unlimited email generations, priority speed, and full multi-variation support." },
+    { q: "How do I cancel my subscription?", a: "You can manage or cancel your subscription anytime via Lemon Squeezy with one click." }
   ];
 
   return (
@@ -214,7 +232,7 @@ export default function Home() {
       {/* Background Glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-[800px] h-[350px] bg-gradient-to-b from-zinc-700/20 via-zinc-900/10 to-transparent blur-3xl pointer-events-none rounded-full" />
 
-      {/* Navigation Bar */}
+      {/* Navigation Header */}
       <header className={`sticky top-0 z-50 border-b border-zinc-900 transition-colors duration-300 ${mobileMenuOpen ? 'bg-black' : 'bg-black/70 backdrop-blur-xl'}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-8">
@@ -223,7 +241,6 @@ export default function Home() {
               <span>WriteYourEmail</span>
             </Link>
             
-            {/* Desktop Links */}
             <nav className="hidden md:flex items-center space-x-6 text-sm text-zinc-400">
               <a href="#generator" className="hover:text-white transition">Products</a>
               <a href="#faq" className="hover:text-white transition">Resources</a>
@@ -232,7 +249,6 @@ export default function Home() {
             </nav>
           </div>
 
-          {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-3">
             <a href="#generator" className="text-xs font-medium text-zinc-300 hover:text-white px-3.5 py-2 rounded-full border border-zinc-800 hover:border-zinc-700 transition">
               Get a Demo
@@ -254,7 +270,6 @@ export default function Home() {
             )}
           </div>
 
-          {/* Mobile Menu Toggle */}
           <button 
             className="md:hidden text-zinc-400 hover:text-white z-50 p-2 -mr-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -268,7 +283,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Mobile Slide-out Menu */}
+      {/* Mobile Overlay Menu */}
       <div className={`fixed inset-0 z-40 bg-black md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
         <nav className="flex flex-col text-sm font-medium text-zinc-300">
           <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Products</a>
@@ -300,11 +315,11 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8">
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white leading-[1.05]">
-              Agentic <br /> Infrastructure
+              Agentic <br /> Email Intelligence
             </h1>
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
               <a href="#generator" className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-3 rounded-full text-sm transition shadow-lg shadow-white/5 w-full sm:w-auto text-center">
-                Start Writing
+                Start Writing (3 Variations)
               </a>
               <Link href="/pricing" className="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-white font-medium px-6 py-3 rounded-full text-sm transition backdrop-blur-md w-full sm:w-auto text-center">
                 View Pricing
@@ -314,8 +329,8 @@ export default function Home() {
 
           <div className="lg:col-span-5 relative">
             <div className="relative z-10 space-y-4 text-zinc-300 font-medium text-lg sm:text-xl border-l border-zinc-800 pl-6">
-              <p className="hover:text-white transition">For coding agents</p>
-              <p className="hover:text-white transition">To ship apps and emails</p>
+              <p className="hover:text-white transition">3 Variations generated in parallel</p>
+              <p className="hover:text-white transition">Subject line spam risk score</p>
               <p className="hover:text-white transition">Automated by AI agents</p>
             </div>
             <div className="mt-12 relative flex justify-center items-center">
@@ -333,8 +348,8 @@ export default function Home() {
           
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-4 border-b border-zinc-900 gap-4">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">Email Studio</h2>
-              <p className="text-xs text-zinc-400 mt-1">Fill in the details below to generate your professional email instantly.</p>
+              <h2 className="text-xl font-semibold tracking-tight text-white">Email Studio v2.0</h2>
+              <p className="text-xs text-zinc-400 mt-1">Generates 3 tailored email options + spam-rated subject lines.</p>
             </div>
             {!isPro && (
               <div className="shrink-0">
@@ -381,28 +396,92 @@ export default function Home() {
               <input type="text" placeholder="Your Name (Sender Signature)" value={sender} onChange={(e) => setSender(e.target.value)} className="bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 w-full sm:w-1/2" />
               <button type="submit" disabled={loading} className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 font-semibold px-8 py-3 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2">
                 {loading ? (
-                  <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /><span>Optimizing AI...</span></>
+                  <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /><span>Generating 3 Variations...</span></>
                 ) : (
-                  <span>Generate Email ▲</span>
+                  <span>Generate Emails ▲</span>
                 )}
               </button>
             </div>
           </form>
 
-          {/* Generated Result Output with Auto-Scroll Target */}
-          {generatedEmail && (
-            <div ref={resultRef} className="mt-8 pt-6 border-t border-zinc-900 transition-all duration-500">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-mono uppercase tracking-wider text-green-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" /> Generated Successfully
-                </span>
-                <button onClick={copyToClipboard} className="text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-3.5 py-1.5 rounded-full text-zinc-300 transition flex items-center gap-1">
-                  {copied ? "Copied to Clipboard!" : "Copy Text"}
-                </button>
+          {/* Phase 2 Multi-Variation & Subject Line Display */}
+          {variations.length > 0 && (
+            <div ref={resultRef} className="mt-10 pt-8 border-t border-zinc-900 space-y-8">
+              
+              {/* Subject Line Studio Section */}
+              {subjectLines.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
+                      🎯 Subject Line Studio (Spam Risk Tested)
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {subjectLines.map((subj, idx) => (
+                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-zinc-900/80 border border-zinc-800 p-3 rounded-xl gap-2">
+                        <span className="text-sm font-medium text-zinc-200">{subj.subject}</span>
+                        <div className="flex items-center space-x-3 shrink-0">
+                          <span className={`text-[10px] font-semibold uppercase px-2.5 py-1 rounded-full border ${
+                            subj.score >= 90 
+                              ? 'bg-emerald-950/60 border-emerald-800 text-emerald-400' 
+                              : 'bg-amber-950/60 border-amber-800 text-amber-400'
+                          }`}>
+                            {subj.spamRisk} ({subj.score}/100)
+                          </span>
+                          <button 
+                            onClick={() => copySubject(subj.subject, idx)}
+                            className="text-xs text-zinc-400 hover:text-white bg-zinc-800 px-3 py-1 rounded-lg transition"
+                          >
+                            {copiedSubject === idx ? "Copied!" : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Variation Tabs */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
+                    ⚡ Select Email Variation
+                  </span>
+                  <span className="text-xs text-zinc-500 font-mono">
+                    {variations[selectedTab]?.readingTime}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {variations.map((v, i) => (
+                    <button
+                      key={v.id || i}
+                      onClick={() => setSelectedTab(i)}
+                      className={`text-xs font-medium px-4 py-2 rounded-full border transition ${
+                        selectedTab === i
+                          ? "bg-white text-black border-white"
+                          : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white"
+                      }`}
+                    >
+                      Option {i + 1}: {v.title}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Active Variation Output */}
+                <div className="relative bg-zinc-900/90 border border-zinc-700/80 rounded-xl p-5 text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap text-sm shadow-xl mt-4">
+                  <div className="flex justify-end mb-3">
+                    <button 
+                      onClick={() => copyBody(variations[selectedTab]?.body)} 
+                      className="text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3.5 py-1.5 rounded-full text-zinc-200 transition"
+                    >
+                      {copiedBody ? "Copied Selected Email!" : "Copy Email Body"}
+                    </button>
+                  </div>
+                  {variations[selectedTab]?.body}
+                </div>
               </div>
-              <div className="bg-zinc-900/90 border border-zinc-700/80 rounded-xl p-5 text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap text-sm shadow-xl">
-                {generatedEmail}
-              </div>
+
             </div>
           )}
         </div>
