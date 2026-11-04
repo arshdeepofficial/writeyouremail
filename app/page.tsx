@@ -13,13 +13,14 @@ const LEMON_SQUEEZY_CHECKOUT = "https://writeyouremail.lemonsqueezy.com/checkout
 const COMMON_SPAM_WORDS = [
   "100% free", "free", "guaranteed", "no cost", "risk-free", "act now",
   "click here", "urgent", "make money", "winner", "cash", "no obligation",
-  "special promotion", "congratulations", "credit card", "order now"
+  "special promotion", "congratulations", "credit card", "order now", "$$$"
 ];
 
 interface SubjectLine {
   subject: string;
   spamRisk: string;
   score: number;
+  openRateForecast?: string;
 }
 
 interface EmailVariation {
@@ -38,64 +39,101 @@ interface SavedEmailRecord {
   language: string;
 }
 
+interface PromptPreset {
+  id: string;
+  name: string;
+  context: string;
+  emailType: string;
+  tone: string;
+  icpPersona: string;
+}
+
 const LANGUAGES = [
   "English", "Spanish", "French", "German", "Italian", "Portuguese",
   "Dutch", "Japanese", "Chinese (Simplified)", "Hindi", "Arabic",
   "Korean", "Russian", "Turkish", "Vietnamese", "Polish"
 ];
 
+const ICP_PERSONAS = [
+  "Default / General",
+  "CEO / Founder (Focus on Vision & Growth)",
+  "CFO / Finance (Focus on ROI & Cost Savings)",
+  "CTO / Engineering (Focus on Tech & Efficiency)",
+  "HR / Ops (Focus on Team & Culture)",
+  "Marketing / Sales (Focus on Leads & Revenue)"
+];
+
 export default function Home() {
-  const [studioMode, setStudioMode] = useState<"create" | "polish" | "sequence" | "reply">("create");
+  const [studioMode, setStudioMode] = useState<"create" | "polish" | "sequence" | "reply" | "ab_test" | "batch">("create");
+
+  // Form State
   const [emailType, setEmailType] = useState("cold_outreach");
   const [context, setContext] = useState("");
   const [recipient, setRecipient] = useState("");
   const [sender, setSender] = useState("");
   const [tone, setTone] = useState("professional");
   const [targetLanguage, setTargetLanguage] = useState("English");
+
+  // Advanced Targeting State
+  const [icpPersona, setIcpPersona] = useState(ICP_PERSONAS[0]);
+  const [prospectBio, setProspectBio] = useState("");
+  const [crmTags, setCrmTags] = useState(false);
+  const [targetIndustries, setTargetIndustries] = useState("");
+
+  // Mode Specific Inputs
   const [draftText, setDraftText] = useState("");
   const [polishGoal, setPolishGoal] = useState("Fix grammar, typos & improve flow");
   const [replyStrategy, setReplyStrategy] = useState("Value & ROI Reframing (Turn price into value)");
   const [incomingEmailText, setIncomingEmailText] = useState("");
+
+  // Signature & Brand Voice
   const [docuSignLink, setDocuSignLink] = useState("");
   const [brandVoice, setBrandVoice] = useState("");
   const [includeSignature, setIncludeSignature] = useState(false);
   const [senderTitle, setSenderTitle] = useState("");
 
+  // Generation Output
   const [subjectLines, setSubjectLines] = useState<SubjectLine[]>([]);
   const [variations, setVariations] = useState<EmailVariation[]>([]);
+  const [analytics, setAnalytics] = useState<{ readingLevel: string; sentiment: string } | null>(null);
   const [selectedTab, setSelectedTab] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
-  const [historyModalOpen, setHistoryModalOpen] = useState(false);
-  const [proModalOpen, setProModalOpen] = useState(false);
-  const [proReason, setProReason] = useState("");
-  const [savedHistory, setSavedHistory] = useState<SavedEmailRecord[]>([]);
-  const [historySearch, setHistorySearch] = useState("");
-
+  // App & User State
   const [user, setUser] = useState<any>(null);
   const [dailyUsage, setDailyUsage] = useState<number>(0);
   const [isPro, setIsPro] = useState<boolean>(false);
   const [guestUsage, setGuestUsage] = useState<number>(0);
 
-  const [copiedSubject, setCopiedSubject] = useState<number | null>(null);
-  const [copiedBody, setCopiedBody] = useState(false);
+  const [savedHistory, setSavedHistory] = useState<SavedEmailRecord[]>([]);
+  const [presets, setPresets] = useState<PromptPreset[]>([]);
+  const [historySearch, setHistorySearch] = useState("");
+
+  // Modals & Navigation
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [proModalOpen, setProModalOpen] = useState(false);
+  const [proReason, setProReason] = useState("");
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const [copiedSubject, setCopiedSubject] = useState<number | null>(null);
+  const [copiedBody, setCopiedBody] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (mobileMenuOpen || historyModalOpen || proModalOpen) {
+    if (mobileMenuOpen || historyModalOpen || proModalOpen || authModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
     }
-  }, [mobileMenuOpen, historyModalOpen, proModalOpen]);
+  }, [mobileMenuOpen, historyModalOpen, proModalOpen, authModalOpen]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -109,6 +147,11 @@ export default function Home() {
         loadGuestHistory();
       }
     });
+
+    const localPresets = localStorage.getItem("email_presets");
+    if (localPresets) {
+      try { setPresets(JSON.parse(localPresets)); } catch (e) { console.error(e); }
+    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
@@ -143,8 +186,12 @@ export default function Home() {
       const { data, error } = await supabase.from("emails").select("*").eq("user_id", userId).order("created_at", { ascending: false });
       if (!error && data) {
         setSavedHistory(data.map((item: any) => ({
-          id: item.id, created_at: item.created_at, email_type: item.email_type,
-          subject_line: item.recipient || "Generated Email", body: item.generated_email, language: item.tone || "English",
+          id: item.id,
+          created_at: item.created_at,
+          email_type: item.email_type,
+          subject_line: item.recipient || "Generated Email",
+          body: item.generated_email,
+          language: item.tone || "English",
         })));
       }
     } catch (e) { console.error(e); }
@@ -160,18 +207,27 @@ export default function Home() {
   const saveToHistory = async (subjects: SubjectLine[], vars: EmailVariation[]) => {
     const primarySubject = subjects[0]?.subject || "Generated Email";
     const primaryBody = vars[0]?.body || "";
+    let typeLabel = studioMode === "sequence" ? "3-Step Sequence" : studioMode === "reply" ? "Objection Response" : studioMode === "ab_test" ? "A/B Split Test" : studioMode === "batch" ? "Multi-Vertical Batch" : (studioMode === "create" ? emailType : "Magic Polish");
+
     const newRecord: SavedEmailRecord = {
-      id: Date.now().toString(), created_at: new Date().toISOString(),
-      email_type: studioMode === "sequence" ? "3-Step Sequence" : studioMode === "reply" ? "Objection Response" : (studioMode === "create" ? emailType : "Magic Polish"),
-      subject_line: primarySubject, body: primaryBody, language: targetLanguage,
+      id: Date.now().toString(),
+      created_at: new Date().toISOString(),
+      email_type: typeLabel,
+      subject_line: primarySubject,
+      body: primaryBody,
+      language: targetLanguage,
     };
 
     if (user) {
       try {
         await supabase.from("emails").insert({
-          user_id: user.id, email_type: newRecord.email_type,
-          context: studioMode === "create" || studioMode === "sequence" ? context : studioMode === "reply" ? incomingEmailText : draftText,
-          recipient: primarySubject, sender: sender || "User", tone: targetLanguage, generated_email: primaryBody,
+          user_id: user.id,
+          email_type: newRecord.email_type,
+          context: context || incomingEmailText || draftText,
+          recipient: primarySubject,
+          sender: sender || "User",
+          tone: targetLanguage,
+          generated_email: primaryBody,
         });
         fetchUserHistory(user.id);
       } catch (e) { console.error(e); }
@@ -239,7 +295,10 @@ export default function Home() {
     setDailyUsage(nextUsage);
     try {
       await supabase.from("usage_tracking").upsert({
-        user_id: user.id, count: nextUsage, last_reset: new Date().toISOString().split("T")[0], is_pro: isPro,
+        user_id: user.id,
+        count: nextUsage,
+        last_reset: new Date().toISOString().split("T")[0],
+        is_pro: isPro,
       });
     } catch (err) { console.error(err); }
   };
@@ -283,12 +342,17 @@ export default function Home() {
             docuSignLink,
             brandVoice: isPro ? brandVoice : "",
             senderTitle: includeSignature ? senderTitle : "",
+            icpPersona,
+            prospectBio,
+            crmTags,
+            targetIndustries,
           }),
         });
         const data = await response.json();
         if (response.ok && data.variations && data.variations.length > 0) {
           setSubjectLines(data.subjectLines || []);
           setVariations(data.variations || []);
+          setAnalytics(data.analytics || null);
           setSelectedTab(0);
           success = true;
           if (!overrideTone) await saveToHistory(data.subjectLines || [], data.variations || []);
@@ -311,6 +375,28 @@ export default function Home() {
     if (!text) return [];
     const lower = text.toLowerCase();
     return COMMON_SPAM_WORDS.filter((word) => lower.includes(word));
+  };
+
+  const savePreset = () => {
+    if (!isPro) return triggerProModal("Saving Custom Prompt Presets is a Pro feature.");
+    const name = prompt("Enter a name for this custom preset (e.g. 'SaaS Agency Pitch'):");
+    if (name) {
+      const newPreset: PromptPreset = { id: Date.now().toString(), name, context, emailType, tone, icpPersona };
+      const updated = [...presets, newPreset];
+      setPresets(updated);
+      localStorage.setItem("email_presets", JSON.stringify(updated));
+      alert("Preset saved successfully!");
+    }
+  };
+
+  const loadPreset = (presetId: string) => {
+    const p = presets.find((x) => x.id === presetId);
+    if (p) {
+      setContext(p.context);
+      setEmailType(p.emailType);
+      setTone(p.tone);
+      setIcpPersona(p.icpPersona);
+    }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -384,7 +470,7 @@ export default function Home() {
     },
     {
       q: "What is included in the Pro plan?",
-      a: "The Pro plan ($9/mo) gives you unlimited email generations, 3-step follow-up sequences, custom brand voice DNA, AI objection handler, live spam risk audit, and CSV/TXT history exports.",
+      a: "The Pro plan ($9/mo) gives you unlimited email generations, 3-step follow-up sequences, A/B split testing, custom brand voice DNA, AI objection handler, live spam risk audit, and CSV/TXT history exports.",
     },
     {
       q: "How do I cancel my subscription?",
@@ -513,7 +599,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Mobile Menu */}
+      {/* Mobile Drawer */}
       <div
         className={`fixed inset-0 z-40 bg-[#000000] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${
           mobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
@@ -584,7 +670,7 @@ export default function Home() {
           Intelligence that closes deals.
         </h1>
         <p className="text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium">
-          Generate sales pitches, 3-step outreach sequences, objection replies, e-signature requests with DocuSign, and multi-language emails instantly.
+          Generate A/B split tests, 3-step outreach sequences, objection replies, e-signature requests, and CRM-ready pitches instantly.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
           <a
@@ -607,17 +693,23 @@ export default function Home() {
         <div className="bg-[#1c1c1e]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio v4.0 Pro</h2>
-              <p className="text-sm text-[#86868b] mt-1">Includes Objection Handler & Deliverability Spam Audit.</p>
+              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio v5.0 Pro</h2>
+              <p className="text-sm text-[#86868b] mt-1">Includes A/B Testing, Presets & CRM Tags.</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setHistoryModalOpen(true)}
-                className="text-sm px-4 py-2 bg-[#2c2c2e] hover:bg-[#3a3a3c] rounded-full text-[#f5f5f7] transition font-medium"
-              >
-                History ({savedHistory.length})
-              </button>
+              {presets.length > 0 && (
+                <select
+                  onChange={(e) => loadPreset(e.target.value)}
+                  className="text-sm px-4 py-2 bg-[#2c2c2e] text-[#f5f5f7] rounded-full outline-none border-none cursor-pointer"
+                >
+                  <option value="">Load Preset...</option>
+                  {presets.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               {!isPro && (
                 <span className="text-sm px-4 py-2 bg-[#2c2c2e] rounded-full text-[#86868b] font-medium">
                   {user ? `${dailyUsage}/5 Free` : `${guestUsage}/2 Free`}
@@ -626,9 +718,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Segmented Control */}
-          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-fit mb-8 overflow-x-auto max-w-full">
+          {/* Segmented Mode Selector Bar */}
+          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-full mb-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
             <button
+              type="button"
               onClick={() => setStudioMode("create")}
               className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
                 studioMode === "create" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
@@ -637,6 +730,7 @@ export default function Home() {
               Create New
             </button>
             <button
+              type="button"
               onClick={() => setStudioMode("polish")}
               className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
                 studioMode === "polish" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
@@ -645,6 +739,7 @@ export default function Home() {
               Magic Polish
             </button>
             <button
+              type="button"
               onClick={() => setStudioMode("reply")}
               className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
                 studioMode === "reply" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
@@ -653,20 +748,50 @@ export default function Home() {
               🥊 Objection Reply
             </button>
             <button
+              type="button"
               onClick={() => {
-                if (!isPro) {
-                  triggerProModal("3-Step Outreach Sequence generator is a Pro exclusive feature.");
-                } else {
-                  setStudioMode("sequence");
-                }
+                if (!isPro) triggerProModal("3-Step Outreach Sequence generator is a Pro exclusive feature.");
+                else setStudioMode("sequence");
               }}
               className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                studioMode === "sequence"
-                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm"
-                  : "text-[#86868b] hover:text-[#f5f5f7]"
+                studioMode === "sequence" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
               }`}
             >
-              <span>🔁 3-Step Sequence</span>
+              <span>🔁 Sequence</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPro) triggerProModal("A/B Split Test generator is a Pro exclusive feature.");
+                else setStudioMode("ab_test");
+              }}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                studioMode === "ab_test" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>⚖️ A/B Split</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPro) triggerProModal("Multi-Vertical Batch generator is a Pro exclusive feature.");
+                else setStudioMode("batch");
+              }}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                studioMode === "batch" ? "bg-emerald-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>📦 Batch</span>
               {!isPro && (
                 <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
                   PRO
@@ -676,61 +801,111 @@ export default function Home() {
           </div>
 
           <form onSubmit={handleGenerate} className="space-y-6">
-            <div className="max-w-xs">
-              <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                Output Language
-              </label>
-              <select
-                value={targetLanguage}
-                onChange={(e) => setTargetLanguage(e.target.value)}
-                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
-              >
-                {LANGUAGES.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  Output Language
+                </label>
+                <select
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                >
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  ICP Persona Targeting
+                </label>
+                <select
+                  value={icpPersona}
+                  onChange={(e) => setIcpPersona(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                >
+                  {ICP_PERSONAS.map((icp) => (
+                    <option key={icp} value={icp}>
+                      {icp}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Custom Brand Voice DNA Input (Pro Feature) */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider flex items-center gap-1.5">
-                  <span>✍️ Custom Brand Voice DNA</span>
-                  {!isPro && (
-                    <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
-                      PRO
-                    </span>
-                  )}
+            {/* Advanced Campaign Tools Panel */}
+            <div className="bg-[#2c2c2e]/40 p-5 rounded-xl border border-white/5 space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-[#f5f5f7] uppercase tracking-wider flex items-center gap-2">
+                  ⚙️ Advanced Campaign Engine
                 </label>
-                {!isPro && (
-                  <button
-                    type="button"
-                    onClick={() => triggerProModal("Custom Brand Voice DNA is a Pro feature.")}
-                    className="text-xs text-amber-400 hover:underline"
-                  >
-                    Unlock Pro
-                  </button>
-                )}
               </div>
-              <input
-                type="text"
-                disabled={!isPro}
-                placeholder={
-                  isPro
-                    ? "e.g. Direct Silicon Valley executive, max 3 bullet points, sign off 'Warmly'"
-                    : "🔒 Upgrade to Pro to enforce your unique personal brand voice"
-                }
-                value={brandVoice}
-                onChange={(e) => setBrandVoice(e.target.value)}
-                className={`w-full border-none rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none ${
-                  isPro
-                    ? "bg-[#2c2c2e] text-[#f5f5f7] placeholder-[#86868b]"
-                    : "bg-[#2c2c2e]/50 text-[#86868b] cursor-not-allowed"
-                }`}
-              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-[#86868b] mb-2 flex justify-between">
+                    <span>Brand Voice DNA</span>
+                    {!isPro && <span className="text-[10px] text-amber-400 font-bold">PRO</span>}
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!isPro}
+                    placeholder={isPro ? "e.g. Direct Silicon Valley executive" : "🔒 Pro Required"}
+                    value={brandVoice}
+                    onChange={(e) => setBrandVoice(e.target.value)}
+                    className={`w-full border-none rounded-xl p-3 text-sm outline-none ${
+                      isPro ? "bg-[#2c2c2e] text-[#f5f5f7]" : "bg-[#2c2c2e]/50 text-[#86868b] cursor-not-allowed"
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#86868b] mb-2 flex justify-between">
+                    <span>Prospect Bio / URL Icebreaker</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. https://stripe.com or 'VP of Sales'"
+                    value={prospectBio}
+                    onChange={(e) => setProspectBio(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                <input
+                  type="checkbox"
+                  id="crmTagsCheckbox"
+                  checked={crmTags}
+                  onChange={(e) => setCrmTags(e.target.checked)}
+                  className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer"
+                />
+                <label htmlFor="crmTagsCheckbox" className="text-sm text-[#86868b] cursor-pointer">
+                  Use CRM Merge Tags{" "}
+                  <code className="text-xs bg-[#1c1c1e] px-1.5 py-0.5 rounded text-[#f5f5f7] ml-1">{`{{first_name}}`}</code>
+                </label>
+              </div>
             </div>
+
+            {/* Mode-Specific Fields */}
+            {studioMode === "batch" && (
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  Target Industries (Comma Separated)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. SaaS, Real Estate, Healthcare"
+                  value={targetIndustries}
+                  onChange={(e) => setTargetIndustries(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
+                />
+              </div>
+            )}
 
             {studioMode === "reply" ? (
               <>
@@ -744,10 +919,9 @@ export default function Home() {
                     placeholder="e.g. 'Thanks for reaching out, but your solution is way too expensive for our Q3 budget right now.'"
                     value={incomingEmailText}
                     onChange={(e) => setIncomingEmailText(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none"
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
                     Select Rebuttal / Reply Strategy
@@ -755,11 +929,11 @@ export default function Home() {
                   <select
                     value={replyStrategy}
                     onChange={(e) => setReplyStrategy(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
                   >
-                    <option value="Value & ROI Reframing (Turn price into value)">Value & ROI Reframing (Turn cost into ROI)</option>
-                    <option value="Soft 5-Minute Nudge (Low-friction short chat ask)">Soft 5-Minute Nudge (Low friction ask)</option>
-                    <option value="Polite Breakup & Future Pivot (Ask for referral or later touchpoint)">Polite Breakup & Future Touchpoint</option>
+                    <option value="Value & ROI Reframing">Value & ROI Reframing (Turn cost into ROI)</option>
+                    <option value="Soft 5-Minute Nudge">Soft 5-Minute Nudge (Low friction ask)</option>
+                    <option value="Polite Breakup">Polite Breakup & Future Touchpoint</option>
                   </select>
                 </div>
               </>
@@ -772,13 +946,12 @@ export default function Home() {
                   <textarea
                     rows={5}
                     required
-                    placeholder="Paste your messy draft, notes, or contract text here..."
+                    placeholder="Paste your draft or raw notes here..."
                     value={draftText}
                     onChange={(e) => setDraftText(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none"
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
                   />
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
                     Select Polish Goal
@@ -816,14 +989,11 @@ export default function Home() {
                     <select
                       value={emailType}
                       onChange={(e) => setEmailType(e.target.value)}
-                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
                     >
                       <option value="cold_outreach">Cold Outreach / Sales</option>
-                      <option value="contract_pitch">Contract / Proposal Pitch (DocuSign)</option>
-                      <option value="job_application">Job Application / Pitch</option>
+                      <option value="contract_pitch">Contract / Proposal Pitch</option>
                       <option value="follow_up">Follow Up</option>
-                      <option value="resignation">Resignation / Transition</option>
-                      <option value="custom">Custom Email</option>
                     </select>
                   </div>
                   <div>
@@ -833,12 +1003,11 @@ export default function Home() {
                     <select
                       value={tone}
                       onChange={(e) => setTone(e.target.value)}
-                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
                     >
                       <option value="professional">Professional & Direct</option>
                       <option value="persuasive">Persuasive & Confident</option>
                       <option value="friendly">Friendly & Warm</option>
-                      <option value="urgent">Urgent & High Priority</option>
                     </select>
                   </div>
                   <div>
@@ -847,19 +1016,19 @@ export default function Home() {
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Tim Cook"
+                      disabled={crmTags}
+                      placeholder={crmTags ? "{{first_name}}" : "Recipient Name"}
                       value={recipient}
                       onChange={(e) => setRecipient(e.target.value)}
-                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]"
+                      className="w-full bg-[#2c2c2e] disabled:opacity-50 border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
                     />
                   </div>
                 </div>
 
-                {/* Signature Embed Controls */}
                 <div className="bg-[#2c2c2e]/60 p-4 rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider flex items-center gap-2">
-                      <span>🖋️ HTML Email Signature Generator</span>
+                    <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                      🖋️ HTML Signature & DocuSign
                     </label>
                     <input
                       type="checkbox"
@@ -872,14 +1041,14 @@ export default function Home() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                       <input
                         type="text"
-                        placeholder="Sender Title (e.g. VP of Business Development)"
+                        placeholder="Sender Title (e.g. VP of Sales)"
                         value={senderTitle}
                         onChange={(e) => setSenderTitle(e.target.value)}
                         className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
                       />
                       <input
                         type="url"
-                        placeholder="DocuSign / Pitch Link (Optional)"
+                        placeholder="DocuSign / Pitch Link"
                         value={docuSignLink}
                         onChange={(e) => setDocuSignLink(e.target.value)}
                         className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
@@ -889,20 +1058,21 @@ export default function Home() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                    {studioMode === "sequence" ? "Sequence Context & Pitch Goal" : "Context & Main Points"}
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                      Context & Pitch Goal
+                    </label>
+                    <button type="button" onClick={savePreset} className="text-xs text-[#0a84ff] font-medium hover:underline">
+                      Save as Preset
+                    </button>
+                  </div>
                   <textarea
                     rows={4}
                     required
-                    placeholder={
-                      studioMode === "sequence"
-                        ? "Pitching SaaS tool to Head of Marketing. Goal is to book a 15-min call."
-                        : "What is the key goal of this email or contract request?"
-                    }
+                    placeholder="Pitching SaaS tool. Goal is to book a 15-min demo call."
                     value={context}
                     onChange={(e) => setContext(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none"
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
                   />
                 </div>
               </>
@@ -911,10 +1081,11 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
               <input
                 type="text"
-                placeholder="Your Name (Sender Signature)"
+                disabled={crmTags}
+                placeholder={crmTags ? "{{sender_name}}" : "Your Name"}
                 value={sender}
                 onChange={(e) => setSender(e.target.value)}
-                className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] w-full sm:w-1/2"
+                className="bg-[#2c2c2e] disabled:opacity-50 border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] w-full sm:w-1/2"
               />
               <button
                 type="submit"
@@ -930,11 +1101,13 @@ export default function Home() {
                   <span>
                     {studioMode === "sequence"
                       ? "Generate 3-Step Sequence"
+                      : studioMode === "ab_test"
+                      ? "Generate A/B Test"
+                      : studioMode === "batch"
+                      ? "Generate Batch Campaign"
                       : studioMode === "reply"
                       ? "Generate Rebuttal"
-                      : studioMode === "create"
-                      ? "Generate Emails"
-                      : "Magic Polish Draft"}
+                      : "Generate Email"}
                   </span>
                 )}
               </button>
@@ -944,28 +1117,22 @@ export default function Home() {
           {/* Result Output Display */}
           {variations.length > 0 && (
             <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8">
-              {/* Deliverability & Spam Trigger Live Audit */}
-              <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🛡️</span>
-                  <div>
-                    <p className="text-xs font-semibold text-[#f5f5f7]">Inbox Deliverability Audit</p>
-                    <p className="text-xs text-[#86868b]">
-                      {activeSpamTriggers.length === 0
-                        ? "0 Spam Trigger Words Found. High Inbox Primary Rate."
-                        : `Warning: ${activeSpamTriggers.length} spam trigger phrase(s) detected: [${activeSpamTriggers.join(", ")}]`}
-                    </p>
-                  </div>
+              {/* Analytics Dashboard */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
+                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Deliverability Audit</p>
+                  <p className={`text-sm font-bold ${activeSpamTriggers.length === 0 ? "text-emerald-400" : "text-amber-400"}`}>
+                    {activeSpamTriggers.length === 0 ? "Inbox Ready (0 Triggers)" : `${activeSpamTriggers.length} Spam Words Found`}
+                  </p>
                 </div>
-                <span
-                  className={`text-xs font-bold px-3 py-1 rounded-full shrink-0 ${
-                    activeSpamTriggers.length === 0
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                      : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                  }`}
-                >
-                  {activeSpamTriggers.length === 0 ? "Inbox Ready (98/100)" : "Risk Detected"}
-                </span>
+                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
+                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Reading Grade</p>
+                  <p className="text-sm font-bold text-[#f5f5f7]">{analytics?.readingLevel || "5th Grade (Optimal)"}</p>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
+                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Tone Sentiment</p>
+                  <p className="text-sm font-bold text-[#0a84ff]">{analytics?.sentiment || "Assertive"}</p>
+                </div>
               </div>
 
               {/* Subject Lines */}
@@ -982,11 +1149,14 @@ export default function Home() {
                       >
                         <span className="text-sm font-medium text-[#f5f5f7]">{subj.subject}</span>
                         <div className="flex items-center space-x-3 shrink-0">
+                          {subj.openRateForecast && (
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              Forecast: {subj.openRateForecast}
+                            </span>
+                          )}
                           <span
                             className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
-                              subj.score >= 90
-                                ? "bg-[#34c759]/20 text-[#34c759]"
-                                : "bg-[#ff9f0a]/20 text-[#ff9f0a]"
+                              subj.score >= 90 ? "bg-[#34c759]/20 text-[#34c759]" : "bg-[#ff9f0a]/20 text-[#ff9f0a]"
                             }`}
                           >
                             {subj.spamRisk}
@@ -1004,11 +1174,11 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Variations / Sequence steps */}
+              {/* Variations */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2">
                   <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
-                    {targetLanguage} Output Options
+                    Output Options
                   </span>
                   <span className="text-xs text-[#86868b] font-medium">
                     {variations[selectedTab]?.readingTime}
@@ -1021,9 +1191,7 @@ export default function Home() {
                       key={v.id || i}
                       onClick={() => setSelectedTab(i)}
                       className={`text-sm font-medium px-5 py-2 rounded-full transition ${
-                        selectedTab === i
-                          ? "bg-[#f5f5f7] text-black"
-                          : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
+                        selectedTab === i ? "bg-[#f5f5f7] text-black" : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
                       }`}
                     >
                       {v.title}
@@ -1032,19 +1200,25 @@ export default function Home() {
                 </div>
 
                 {/* 1-Click Persona Rewriter Bar */}
-                <div className="flex items-center gap-2 overflow-x-auto pt-2">
-                  <span className="text-xs text-[#86868b] font-medium shrink-0">Rewrite Persona:</span>
+                <div className="flex items-center gap-2 overflow-x-auto pt-2 scrollbar-hide">
+                  <span className="text-xs text-[#86868b] font-medium shrink-0">1-Click Rewrite:</span>
+                  <button
+                    onClick={() => handleGenerate(undefined, "Compress to less than 75 words exactly.")}
+                    className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 px-3 py-1.5 rounded-full transition shrink-0"
+                  >
+                    ✂️ Compress &lt;75 Words
+                  </button>
                   <button
                     onClick={() => handleGenerate(undefined, "Executive C-Suite Short & Concise")}
                     className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
                   >
-                    ⚡ C-Suite Brief (3 Sentences)
+                    ⚡ C-Suite Brief
                   </button>
                   <button
                     onClick={() => handleGenerate(undefined, "Warm, Friendly & Casual")}
                     className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
                   >
-                    ☕ Warm & Casual
+                    ☕ Casual
                   </button>
                   <button
                     onClick={() => handleGenerate(undefined, "Direct Response Aggressive Call to Action")}
@@ -1066,23 +1240,19 @@ export default function Home() {
                           rel="noopener noreferrer"
                           className="text-xs font-medium bg-[#ff9f0a]/10 hover:bg-[#ff9f0a]/20 text-[#ff9f0a] px-4 py-2 rounded-full transition flex items-center gap-1"
                         >
-                          🖋️ Test DocuSign Link
+                          🖋️ Test DocuSign
                         </a>
                       )}
 
                       <button
-                        onClick={() =>
-                          openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)
-                        }
+                        onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
                         className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition"
                       >
-                        Open in Gmail
+                        Gmail
                       </button>
 
                       <button
-                        onClick={() =>
-                          openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)
-                        }
+                        onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
                         className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition"
                       >
                         Mail App
@@ -1142,13 +1312,13 @@ export default function Home() {
               <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
                 <span className="text-[#0a84ff] font-bold">✓</span>
                 <span>
-                  <strong>Custom Brand Voice DNA Preset</strong>
+                  <strong>A/B Split Testing & Multi-Vertical Batching</strong>
                 </span>
               </div>
               <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
                 <span className="text-amber-400 font-bold">✓</span>
                 <span>
-                  <strong>1-Click CSV/TXT Email History Export</strong>
+                  <strong>Custom Presets & 1-Click CRM Exports</strong>
                 </span>
               </div>
             </div>
@@ -1170,7 +1340,7 @@ export default function Home() {
       {/* History Modal */}
       {historyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-md p-0 sm:p-4">
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-6 max-w-2xl w-full h-[85vh] sm:max-h-[80vh] flex flex-col relative shadow-2xl transform transition-transform">
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-6 max-w-2xl w-full h-[85vh] sm:max-h-[80vh] flex flex-col relative shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <div>
                 <h3 className="text-xl font-semibold text-[#f5f5f7]">Saved History</h3>
@@ -1184,7 +1354,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* Export Toolbar */}
             <div className="py-3 flex items-center justify-between border-b border-white/5 text-xs text-[#86868b]">
               <span>{savedHistory.length} saved records</span>
               <div className="flex items-center gap-2">
@@ -1209,7 +1378,7 @@ export default function Home() {
                 placeholder="Search history..."
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]"
+                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
               />
             </div>
 
@@ -1259,29 +1428,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* FAQ */}
-      <section id="faq" className="py-24 px-6 max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold tracking-tight text-[#f5f5f7] mb-10 text-center">
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-3">
-          {faqs.map((faq, index) => (
-            <div key={index} className="bg-[#1c1c1e] rounded-2xl overflow-hidden transition-all">
-              <button
-                onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
-              >
-                <span className="font-semibold text-[#f5f5f7]">{faq.q}</span>
-                <span className="text-[#86868b] ml-4 text-xl font-light">{openFaq === index ? "−" : "+"}</span>
-              </button>
-              {openFaq === index && (
-                <div className="px-6 pb-6 text-[15px] text-[#86868b] leading-relaxed">{faq.a}</div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* Auth Modal */}
       {authModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
@@ -1293,7 +1439,7 @@ export default function Home() {
               ✕
             </button>
             <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
-            <p className="text-sm text-[#86868b] mb-8">Get 5 free AI email generations every day.</p>
+            <p className="text-sm text-[#86868b] mb-6">Get 5 free AI email generations every day.</p>
             <form onSubmit={handleAuth} className="space-y-4">
               <div>
                 <input
@@ -1302,7 +1448,7 @@ export default function Home() {
                   placeholder="Email"
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm focus:ring-2 focus:ring-[#0a84ff] outline-none placeholder-[#86868b]"
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b]"
                 />
               </div>
               <div>
@@ -1312,7 +1458,7 @@ export default function Home() {
                   placeholder="Password"
                   value={authPassword}
                   onChange={(e) => setAuthPassword(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm focus:ring-2 focus:ring-[#0a84ff] outline-none placeholder-[#86868b]"
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b]"
                 />
               </div>
               {authMessage && (
@@ -1339,6 +1485,29 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-24 px-6 max-w-3xl mx-auto">
+        <h2 className="text-3xl font-bold tracking-tight text-[#f5f5f7] mb-10 text-center">
+          Frequently Asked Questions
+        </h2>
+        <div className="space-y-3">
+          {faqs.map((faq, index) => (
+            <div key={index} className="bg-[#1c1c1e] rounded-2xl overflow-hidden transition-all">
+              <button
+                onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
+              >
+                <span className="font-semibold text-[#f5f5f7]">{faq.q}</span>
+                <span className="text-[#86868b] ml-4 text-xl font-light">{openFaq === index ? "−" : "+"}</span>
+              </button>
+              {openFaq === index && (
+                <div className="px-6 pb-6 text-[15px] text-[#86868b] leading-relaxed">{faq.a}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* Footer */}
       <footer className="border-t border-white/10 py-12 text-center text-sm font-medium text-[#86868b]">
