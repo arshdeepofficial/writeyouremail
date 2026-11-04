@@ -1,796 +1,1528 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 
-// Initialize Supabase Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const PRO_CHECKOUT_BASE_URL =
-  "https://writeyouremail.lemonsqueezy.com/checkout/buy/8de4d383-5177-4977-8066-de6872cdb69d";
+const LEMON_SQUEEZY_CHECKOUT = "https://writeyouremail.lemonsqueezy.com/checkout/buy/8de4d383-5177-4977-8066-de6872cdb69d";
 
-// Deliverability Spam Word Dictionary
-const SPAM_TRIGGER_DICTIONARY: Record<string, string> = {
-  "100% free": "complimentary",
-  "act now": "at your earliest convenience",
-  "guaranteed results": "proven outcomes",
-  "make money": "generate revenue",
-  "no risk": "low risk",
-  "click here": "view details here",
-  "buy now": "get started",
-  "special promotion": "exclusive opportunity",
-  "risk-free": "seamless trial",
-  "earn extra cash": "increase revenue",
-};
+const COMMON_SPAM_WORDS = [
+  "100% free", "free", "guaranteed", "no cost", "risk-free", "act now",
+  "click here", "urgent", "make money", "winner", "cash", "no obligation",
+  "special promotion", "congratulations", "credit card", "order now", "$$$"
+];
 
-interface Preset {
+interface SubjectLine {
+  subject: string;
+  spamRisk: string;
+  score: number;
+  openRateForecast?: string;
+}
+
+interface EmailVariation {
   id: string;
   title: string;
+  readingTime: string;
+  body: string;
+}
+
+interface SavedEmailRecord {
+  id: string;
+  created_at: string;
+  email_type: string;
+  subject_line: string;
+  body: string;
+  language: string;
+}
+
+interface PromptPreset {
+  id: string;
+  name: string;
+  context: string;
   emailType: string;
   tone: string;
-  context: string;
+  icpPersona: string;
 }
 
-interface SavedEmail {
-  id: string;
-  subject: string;
-  body: string;
-  type: string;
-  created_at: string;
-}
+const LANGUAGES = [
+  "English", "Spanish", "French", "German", "Italian", "Portuguese",
+  "Dutch", "Japanese", "Chinese (Simplified)", "Hindi", "Arabic",
+  "Korean", "Russian", "Turkish", "Vietnamese", "Polish"
+];
+
+const ICP_PERSONAS = [
+  "Default / General",
+  "CEO / Founder (Focus on Vision & Growth)",
+  "CFO / Finance (Focus on ROI & Cost Savings)",
+  "CTO / Engineering (Focus on Tech & Efficiency)",
+  "HR / Ops (Focus on Team & Culture)",
+  "Marketing / Sales (Focus on Leads & Revenue)"
+];
 
 export default function Home() {
-  // Auth & User States
+  const [studioMode, setStudioMode] = useState<"create" | "polish" | "sequence" | "reply" | "ab_test" | "batch">("create");
+
+  // Form State
+  const [emailType, setEmailType] = useState("cold_outreach");
+  const [context, setContext] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [sender, setSender] = useState("");
+  const [tone, setTone] = useState("professional");
+  const [targetLanguage, setTargetLanguage] = useState("English");
+
+  // Advanced Targeting State
+  const [icpPersona, setIcpPersona] = useState(ICP_PERSONAS[0]);
+  const [prospectBio, setProspectBio] = useState("");
+  const [crmTags, setCrmTags] = useState(false);
+  const [targetIndustries, setTargetIndustries] = useState("");
+
+  // Mode Specific Inputs
+  const [draftText, setDraftText] = useState("");
+  const [polishGoal, setPolishGoal] = useState("Fix grammar, typos & improve flow");
+  const [replyStrategy, setReplyStrategy] = useState("Value & ROI Reframing (Turn price into value)");
+  const [incomingEmailText, setIncomingEmailText] = useState("");
+
+  // Signature & Brand Voice
+  const [docuSignLink, setDocuSignLink] = useState("");
+  const [brandVoice, setBrandVoice] = useState("");
+  const [includeSignature, setIncludeSignature] = useState(false);
+  const [senderTitle, setSenderTitle] = useState("");
+
+  // Generation Output
+  const [subjectLines, setSubjectLines] = useState<SubjectLine[]>([]);
+  const [variations, setVariations] = useState<EmailVariation[]>([]);
+  const [analytics, setAnalytics] = useState<{ readingLevel: string; sentiment: string } | null>(null);
+  const [selectedTab, setSelectedTab] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
+
+  // App & User State
   const [user, setUser] = useState<any>(null);
+  const [dailyUsage, setDailyUsage] = useState<number>(0);
   const [isPro, setIsPro] = useState<boolean>(false);
-  const [usageCount, setUsageCount] = useState<number>(0);
   const [guestUsage, setGuestUsage] = useState<number>(0);
-  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
-  const [authEmail, setAuthEmail] = useState<string>("");
-  const [authPassword, setAuthPassword] = useState<string>("");
-  const [isSignUp, setIsSignUp] = useState<boolean>(false);
-  const [authLoading, setAuthLoading] = useState<boolean>(false);
-  const [authMessage, setAuthMessage] = useState<string>("");
 
-  // Studio Mode State
-  const [mode, setMode] = useState<
-    "create" | "polish" | "reply" | "sequence" | "ab_test" | "batch" | "csv_bulk" | "classifier"
-  >("create");
+  const [savedHistory, setSavedHistory] = useState<SavedEmailRecord[]>([]);
+  const [presets, setPresets] = useState<PromptPreset[]>([]);
+  const [historySearch, setHistorySearch] = useState("");
 
-  // Advanced Form Inputs
-  const [emailType, setEmailType] = useState<string>("Cold Outreach / Sales");
-  const [tone, setTone] = useState<string>("Professional & Direct");
-  const [recipientName, setRecipientName] = useState<string>("");
-  const [prospectBio, setProspectBio] = useState<string>("");
-  const [brandVoice, setBrandVoice] = useState<string>("");
-  const [targetIcp, setTargetIcp] = useState<string>("CEO / Founder");
-  const [context, setContext] = useState<string>(
-    "Pitching SaaS tool. Goal is to book a 15-min demo call."
-  );
-  const [existingDraft, setExistingDraft] = useState<string>("");
-  const [incomingReply, setIncomingReply] = useState<string>("");
-  const [csvLeadsInput, setCsvLeadsInput] = useState<string>(
-    "John Doe, CEO, Acme Corp, Scaled ARR to 10M\nSarah Smith, CTO, TechLabs, Hiring AI Engineers"
-  );
-  const [includeSignature, setIncludeSignature] = useState<boolean>(false);
-  const [useCrmTags, setUseCrmTags] = useState<boolean>(false);
-  const [language, setLanguage] = useState<string>("English (US)");
+  // Modals & Navigation
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [proModalOpen, setProModalOpen] = useState(false);
+  const [proReason, setProReason] = useState("");
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Preset & History States
-  const [presets, setPresets] = useState<Preset[]>([]);
-  const [presetTitle, setPresetTitle] = useState<string>("");
-  const [showSavePresetModal, setShowSavePresetModal] = useState<boolean>(false);
-  const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([]);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
 
-  // Generation & Output States
-  const [loading, setLoading] = useState<boolean>(false);
-  const [outputSubject, setOutputSubject] = useState<string>("");
-  const [outputBody, setOutputBody] = useState<string>("");
-  const [outputSequence, setOutputSequence] = useState<{ day1: string; day3: string; day7: string } | null>(null);
-  const [outputAbTest, setOutputAbTest] = useState<{ variantA: string; variantB: string } | null>(null);
-  const [outputBatch, setOutputBatch] = useState<{ saas: string; agency: string; ecom: string } | null>(null);
-  const [outputBulkLeads, setOutputBulkLeads] = useState<{ lead: string; email: string }[] | null>(null);
-  const [outputClassification, setOutputClassification] = useState<{
-    intent: string;
-    sentimentScore: number;
-    recommendedAction: string;
-    replyStrategy: string;
-  } | null>(null);
+  const [copiedSubject, setCopiedSubject] = useState<number | null>(null);
+  const [copiedBody, setCopiedBody] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  // Quality Engine Metrics
-  const [spamScore, setSpamScore] = useState<number>(0);
-  const [detectedSpamWords, setDetectedSpamWords] = useState<string[]>([]);
-  const [readingGrade, setReadingGrade] = useState<string>("Grade 6");
-  const [copiedSubject, setCopiedSubject] = useState<boolean>(false);
-  const [copiedBody, setCopiedBody] = useState<boolean>(false);
-  const [showProUpgradeModal, setShowProUpgradeModal] = useState<boolean>(false);
+  const resultRef = useRef<HTMLDivElement>(null);
 
-  const outputRef = useRef<HTMLDivElement>(null);
-
-  // Load User Session & Quotas
   useEffect(() => {
-    const localGuest = localStorage.getItem("guest_email_usage");
-    if (localGuest) setGuestUsage(parseInt(localGuest, 10));
-
-    if (supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          setUser(session.user);
-          fetchUserData(session.user.id);
-        }
-      });
-
-      const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          setUser(session.user);
-          fetchUserData(session.user.id);
-        } else {
-          setUser(null);
-          setIsPro(false);
-        }
-      });
-
-      return () => {
-        authListener.subscription.unsubscribe();
-      };
+    if (mobileMenuOpen || historyModalOpen || proModalOpen || authModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
     }
+  }, [mobileMenuOpen, historyModalOpen, proModalOpen, authModalOpen]);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserUsage(session.user.id);
+        fetchUserHistory(session.user.id);
+      } else {
+        const storedGuestUsage = localStorage.getItem("guest_usage");
+        setGuestUsage(storedGuestUsage ? parseInt(storedGuestUsage, 10) : 0);
+        loadGuestHistory();
+      }
+    });
+
+    const localPresets = localStorage.getItem("email_presets");
+    if (localPresets) {
+      try { setPresets(JSON.parse(localPresets)); } catch (e) { console.error(e); }
+    }
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserUsage(session.user.id);
+        fetchUserHistory(session.user.id);
+      } else {
+        loadGuestHistory();
+      }
+    });
+
+    return () => authListener.subscription.unsubscribe();
   }, []);
 
-  const fetchUserData = async (userId: string) => {
-    if (!supabase) return;
-    const { data: usage } = await supabase.from("usage_tracking").select("count, is_pro").eq("user_id", userId).single();
-    if (usage) {
-      setUsageCount(usage.count || 0);
-      setIsPro(usage.is_pro || false);
-    }
-    const { data: history } = await supabase.from("emails").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(10);
-    if (history) setSavedEmails(history);
-    const { data: userPresets } = await supabase.from("email_presets").select("*").eq("user_id", userId);
-    if (userPresets) setPresets(userPresets);
+  const triggerProModal = (reason: string) => {
+    setProReason(reason);
+    setProModalOpen(true);
   };
 
-  useEffect(() => {
-    const textToAnalyze = `${outputSubject} ${outputBody}`;
-    const foundSpam: string[] = [];
-    Object.keys(SPAM_TRIGGER_DICTIONARY).forEach((word) => {
-      if (textToAnalyze.toLowerCase().includes(word.toLowerCase())) foundSpam.push(word);
-    });
-    setDetectedSpamWords(foundSpam);
-    setSpamScore(Math.min(100, foundSpam.length * 25));
-
-    const words = textToAnalyze.trim().split(/\s+/).length;
-    if (words < 30) setReadingGrade("Grade 4 (Very Easy)");
-    else if (words < 80) setReadingGrade("Grade 6 (Optimal Sales)");
-    else setReadingGrade("Grade 9 (Formal)");
-  }, [outputSubject, outputBody]);
-
-  const handleAutoSanitize = () => {
-    let sanitizedSubject = outputSubject;
-    let sanitizedBody = outputBody;
-    Object.entries(SPAM_TRIGGER_DICTIONARY).forEach(([badWord, cleanWord]) => {
-      const regex = new RegExp(badWord, "gi");
-      sanitizedSubject = sanitizedSubject.replace(regex, cleanWord);
-      sanitizedBody = sanitizedBody.replace(regex, cleanWord);
-    });
-    setOutputSubject(sanitizedSubject);
-    setOutputBody(sanitizedBody);
-  };
-
-  const checkCanGenerate = (): boolean => {
-    if (isPro) return true;
-    if (!user) {
-      if (guestUsage >= 2) {
-        setShowProUpgradeModal(true);
-        return false;
+  const fetchUserUsage = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from("usage_tracking").select("count, is_pro, last_reset").eq("user_id", userId).single();
+      if (!error && data) {
+        setIsPro(data.is_pro || false);
+        setDailyUsage(data.count || 0);
       }
-      return true;
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchUserHistory = async (userId: string) => {
+    try {
+      const { data, error } = await supabase.from("emails").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+      if (!error && data) {
+        setSavedHistory(data.map((item: any) => ({
+          id: item.id,
+          created_at: item.created_at,
+          email_type: item.email_type,
+          subject_line: item.recipient || "Generated Email",
+          body: item.generated_email,
+          language: item.tone || "English",
+        })));
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const loadGuestHistory = () => {
+    const raw = localStorage.getItem("guest_email_history");
+    if (raw) {
+      try { setSavedHistory(JSON.parse(raw)); } catch (e) { console.error(e); }
     }
-    if (usageCount >= 5) {
-      setShowProUpgradeModal(true);
-      return false;
+  };
+
+  const saveToHistory = async (subjects: SubjectLine[], vars: EmailVariation[]) => {
+    const primarySubject = subjects[0]?.subject || "Generated Email";
+    const primaryBody = vars[0]?.body || "";
+    let typeLabel = studioMode === "sequence" ? "3-Step Sequence" : studioMode === "reply" ? "Objection Response" : studioMode === "ab_test" ? "A/B Split Test" : studioMode === "batch" ? "Multi-Vertical Batch" : (studioMode === "create" ? emailType : "Magic Polish");
+
+    const newRecord: SavedEmailRecord = {
+      id: Date.now().toString(),
+      created_at: new Date().toISOString(),
+      email_type: typeLabel,
+      subject_line: primarySubject,
+      body: primaryBody,
+      language: targetLanguage,
+    };
+
+    if (user) {
+      try {
+        await supabase.from("emails").insert({
+          user_id: user.id,
+          email_type: newRecord.email_type,
+          context: context || incomingEmailText || draftText,
+          recipient: primarySubject,
+          sender: sender || "User",
+          tone: targetLanguage,
+          generated_email: primaryBody,
+        });
+        fetchUserHistory(user.id);
+      } catch (e) { console.error(e); }
+    } else {
+      const updated = [newRecord, ...savedHistory];
+      setSavedHistory(updated);
+      localStorage.setItem("guest_email_history", JSON.stringify(updated.slice(0, 20)));
     }
-    return true;
+  };
+
+  const deleteHistoryItem = async (id: string) => {
+    if (user) {
+      await supabase.from("emails").delete().eq("id", id);
+      fetchUserHistory(user.id);
+    } else {
+      const updated = savedHistory.filter((item) => item.id !== id);
+      setSavedHistory(updated);
+      localStorage.setItem("guest_email_history", JSON.stringify(updated));
+    }
+  };
+
+  const exportHistory = (format: "txt" | "csv") => {
+    if (!isPro) {
+      triggerProModal("1-Click Email History Export is a Pro feature.");
+      return;
+    }
+    if (savedHistory.length === 0) return;
+
+    if (format === "txt") {
+      const content = savedHistory.map((item, idx) => (
+        `=== EMAIL #${idx + 1} (${new Date(item.created_at).toLocaleDateString()}) ===\nType: ${item.email_type}\nSubject: ${item.subject_line}\n\nBODY:\n${item.body}\n\n`
+      )).join("\n---\n\n");
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "WriteYourEmail_History.txt";
+      a.click();
+    } else {
+      const csvRows = [
+        ["Date", "Type", "Subject", "Body"],
+        ...savedHistory.map((item) => [
+          new Date(item.created_at).toLocaleDateString(),
+          `"${item.email_type.replace(/"/g, '""')}"`,
+          `"${item.subject_line.replace(/"/g, '""')}"`,
+          `"${item.body.replace(/"/g, '""')}"`,
+        ]),
+      ];
+      const blob = new Blob([csvRows.map((e) => e.join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "WriteYourEmail_History.csv";
+      a.click();
+    }
   };
 
   const incrementUsageAfterSuccess = async () => {
     if (isPro) return;
     if (!user) {
-      const newGuest = guestUsage + 1;
-      setGuestUsage(newGuest);
-      localStorage.setItem("guest_email_usage", newGuest.toString());
-    } else if (supabase) {
-      const newCount = usageCount + 1;
-      setUsageCount(newCount);
-      await supabase.from("usage_tracking").update({ count: newCount }).eq("user_id", user.id);
+      const nextGuestCount = guestUsage + 1;
+      setGuestUsage(nextGuestCount);
+      localStorage.setItem("guest_usage", nextGuestCount.toString());
+      return;
+    }
+    const nextUsage = dailyUsage + 1;
+    setDailyUsage(nextUsage);
+    try {
+      await supabase.from("usage_tracking").upsert({
+        user_id: user.id,
+        count: nextUsage,
+        last_reset: new Date().toISOString().split("T")[0],
+        is_pro: isPro,
+      });
+    } catch (err) { console.error(err); }
+  };
+
+  const handleGenerate = async (e?: React.FormEvent, overrideTone?: string) => {
+    if (e) e.preventDefault();
+
+    if (!isPro && !overrideTone) {
+      if (!user && guestUsage >= 2) {
+        setAuthModalOpen(true);
+        return;
+      }
+      if (user && dailyUsage >= 5) {
+        triggerProModal("You have reached your 5 daily free emails! Upgrade to Pro for unlimited email generations.");
+        return;
+      }
+    }
+
+    setLoading(true);
+    let attempts = 0;
+    let success = false;
+
+    while (attempts < 3 && !success) {
+      try {
+        attempts++;
+        const response = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: studioMode,
+            emailType,
+            context,
+            recipient,
+            sender,
+            tone: overrideTone || tone,
+            targetLanguage,
+            draftText,
+            polishGoal,
+            replyStrategy,
+            incomingEmailText,
+            docuSignLink,
+            brandVoice: isPro ? brandVoice : "",
+            senderTitle: includeSignature ? senderTitle : "",
+            icpPersona,
+            prospectBio,
+            crmTags,
+            targetIndustries,
+          }),
+        });
+        const data = await response.json();
+        if (response.ok && data.variations && data.variations.length > 0) {
+          setSubjectLines(data.subjectLines || []);
+          setVariations(data.variations || []);
+          setAnalytics(data.analytics || null);
+          setSelectedTab(0);
+          success = true;
+          if (!overrideTone) await saveToHistory(data.subjectLines || [], data.variations || []);
+          break;
+        }
+      } catch (err) {
+        console.warn(`Attempt ${attempts} retrying...`);
+      }
+      if (!success && attempts < 3) await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    setLoading(false);
+    if (success) {
+      if (!overrideTone) await incrementUsageAfterSuccess();
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
     }
   };
 
-  const handleGenerate = async () => {
-    if (!checkCanGenerate()) return;
+  const detectSpamTriggers = (text: string) => {
+    if (!text) return [];
+    const lower = text.toLowerCase();
+    return COMMON_SPAM_WORDS.filter((word) => lower.includes(word));
+  };
 
-    setLoading(true);
-    setOutputSubject("");
-    setOutputBody("");
-    setOutputSequence(null);
-    setOutputAbTest(null);
-    setOutputBatch(null);
-    setOutputBulkLeads(null);
-    setOutputClassification(null);
+  const savePreset = () => {
+    if (!isPro) return triggerProModal("Saving Custom Prompt Presets is a Pro feature.");
+    const name = prompt("Enter a name for this custom preset (e.g. 'SaaS Agency Pitch'):");
+    if (name) {
+      const newPreset: PromptPreset = { id: Date.now().toString(), name, context, emailType, tone, icpPersona };
+      const updated = [...presets, newPreset];
+      setPresets(updated);
+      localStorage.setItem("email_presets", JSON.stringify(updated));
+      alert("Preset saved successfully!");
+    }
+  };
 
-    try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode,
-          emailType,
-          tone,
-          recipientName: useCrmTags ? "{{first_name}}" : recipientName,
-          prospectBio,
-          brandVoice: isPro ? brandVoice : "",
-          targetIcp,
-          context,
-          existingDraft,
-          incomingReply,
-          csvLeadsInput,
-          includeSignature,
-          language,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.error) throw new Error(data.error);
-
-      if (mode === "sequence") setOutputSequence(data.sequence);
-      else if (mode === "ab_test") setOutputAbTest(data.abTest);
-      else if (mode === "batch") setOutputBatch(data.batch);
-      else if (mode === "csv_bulk") setOutputBulkLeads(data.bulkLeads);
-      else if (mode === "classifier") {
-        setOutputClassification(data.classification);
-        setOutputSubject(data.subject || "Re: Prospect Inquiry");
-        setOutputBody(data.body || "");
-      } else {
-        setOutputSubject(data.subject || "");
-        setOutputBody(data.body || "");
-      }
-
-      await incrementUsageAfterSuccess();
-
-      if (user && supabase && (data.subject || data.body)) {
-        const { data: savedRecord } = await supabase
-          .from("emails")
-          .insert({
-            user_id: user.id,
-            subject: data.subject || `${mode.toUpperCase()} Email Result`,
-            body: data.body || JSON.stringify(data),
-            type: emailType,
-          })
-          .select()
-          .single();
-        if (savedRecord) setSavedEmails([savedRecord, ...savedEmails.slice(0, 9)]);
-      }
-
-      setTimeout(() => outputRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
-    } catch (err: any) {
-      console.error("AI Generation Failed silently:", err);
-    } finally {
-      setLoading(false);
+  const loadPreset = (presetId: string) => {
+    const p = presets.find((x) => x.id === presetId);
+    if (p) {
+      setContext(p.context);
+      setEmailType(p.emailType);
+      setTone(p.tone);
+      setIcpPersona(p.icpPersona);
     }
   };
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return;
-    setAuthLoading(true);
     setAuthMessage("");
     try {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
         if (error) throw error;
-        setAuthMessage("Account created! Check email or log in.");
+        setAuthMessage("Account created! Check your email to confirm.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
         if (error) throw error;
-        setShowAuthModal(false);
+        setAuthModalOpen(false);
+        setMobileMenuOpen(false);
       }
     } catch (err: any) {
-      setAuthMessage(err.message || "Authentication error.");
-    } finally {
-      setAuthLoading(false);
+      setAuthMessage(err.message);
     }
   };
 
   const handleLogout = async () => {
-    if (supabase) await supabase.auth.signOut();
+    await supabase.auth.signOut();
     setUser(null);
     setIsPro(false);
+    setDailyUsage(0);
+    setMobileMenuOpen(false);
   };
 
-  const handleSavePreset = async () => {
-    if (!presetTitle) return;
-    const newPreset: Preset = { id: Date.now().toString(), title: presetTitle, emailType, tone, context };
-    if (user && supabase) {
-      await supabase.from("email_presets").insert({
-        user_id: user.id, title: presetTitle, email_type: emailType, tone, context,
-      });
-    }
-    setPresets([...presets, newPreset]);
-    setPresetTitle("");
-    setShowSavePresetModal(false);
+  const copySubject = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedSubject(index);
+    setTimeout(() => setCopiedSubject(null), 2000);
   };
 
-  const exportHistoryCSV = () => {
-    if (!isPro) {
-      setShowProUpgradeModal(true);
-      return;
-    }
-    const headers = ["Subject", "Body", "Type", "Date"];
-    const rows = savedEmails.map((e) => [
-      `"${e.subject.replace(/"/g, '""')}"`, `"${e.body.replace(/"/g, '""')}"`, `"${e.type}"`, `"${e.created_at}"`,
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `WriteYourEmail_History_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const copyBody = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedBody(true);
+    setTimeout(() => setCopiedBody(false), 2000);
   };
 
-  const getProCheckoutUrl = () => {
-    if (user?.id) {
-      return `${PRO_CHECKOUT_BASE_URL}?checkout[custom][user_id]=${user.id}&checkout[email]=${encodeURIComponent(user.email || "")}`;
-    }
-    return PRO_CHECKOUT_BASE_URL;
+  const openInGmail = (subjectText: string, bodyText: string) => {
+    window.open(
+      `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`,
+      "_blank"
+    );
   };
+
+  const openInMailClient = (subjectText: string, bodyText: string) => {
+    window.location.href = `mailto:?subject=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`;
+  };
+
+  const currentBody = variations[selectedTab]?.body || "";
+  const activeSpamTriggers = detectSpamTriggers(currentBody);
+
+  const filteredHistory = savedHistory.filter(
+    (item) =>
+      item.subject_line.toLowerCase().includes(historySearch.toLowerCase()) ||
+      item.body.toLowerCase().includes(historySearch.toLowerCase()) ||
+      item.email_type.toLowerCase().includes(historySearch.toLowerCase())
+  );
+
+  const faqs = [
+    {
+      q: "What is WriteYourEmail?",
+      a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), polishes drafts, handles prospect objections, and embeds DocuSign requests.",
+    },
+    {
+      q: "Is there a free tier?",
+      a: "Yes. Unregistered guests get 2 free emails. Registered users get 5 free emails every single day.",
+    },
+    {
+      q: "What is included in the Pro plan?",
+      a: "The Pro plan ($9/mo) gives you unlimited email generations, 3-step follow-up sequences, A/B split testing, custom brand voice DNA, AI objection handler, live spam risk audit, and CSV/TXT history exports.",
+    },
+    {
+      q: "How do I cancel my subscription?",
+      a: "You can manage or cancel your subscription anytime via Lemon Squeezy with one click.",
+    },
+  ];
 
   return (
-    <div className="relative w-full overflow-x-hidden min-h-screen bg-[#000000] text-[#f5f5f7] selection:bg-[#0a84ff] selection:text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-      <div className="absolute top-[-5%] left-1/2 -translate-x-1/2 w-full max-w-[1200px] h-[600px] bg-gradient-to-b from-[#0a84ff]/15 via-purple-600/5 to-transparent blur-[140px] pointer-events-none rounded-full" />
+    <div
+      className="relative w-full overflow-x-hidden min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white"
+      style={{
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      }}
+    >
+      {/* Apple Ambient Glow */}
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[100px] pointer-events-none rounded-full" />
 
-      <header className="sticky top-0 z-50 bg-[#000000]/70 backdrop-blur-2xl border-b border-white/10 saturate-150">
+      {/* Header */}
+      <header
+        className={`sticky top-0 z-50 border-b border-white/10 transition-colors duration-300 ${
+          mobileMenuOpen ? "bg-[#000000]" : "bg-[#000000]/70 backdrop-blur-2xl saturate-150"
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2 font-semibold tracking-tight text-lg">
-            <span className="w-7 h-7 bg-gradient-to-br from-[#0a84ff] to-purple-600 text-white flex items-center justify-center font-bold text-sm rounded-lg shadow-md">✉️</span>
-            <span className="text-[#f5f5f7]">WriteYourEmail</span>
-            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-white/10 text-white border border-white/20">v6.0 Ultra</span>
-          </Link>
+          <div className="flex items-center space-x-8">
+            <Link
+              href="/"
+              className="flex items-center space-x-2 font-semibold tracking-tight text-lg z-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
+                ✉️
+              </span>
+              <span>WriteYourEmail</span>
+            </Link>
 
-          <nav className="hidden md:flex items-center space-x-6 text-sm text-[#86868b] font-medium">
-            <a href="#generator" className="hover:text-[#f5f5f7] transition">Studio</a>
-            <a href="#presets" className="hover:text-[#f5f5f7] transition">Presets</a>
-            <Link href="/pricing" className="hover:text-[#f5f5f7] transition">Pricing</Link>
-          </nav>
+            <nav className="hidden md:flex items-center space-x-6 text-sm text-[#86868b] font-medium">
+              <a href="#generator" className="hover:text-[#f5f5f7] transition-colors">
+                Products
+              </a>
+              <a href="#faq" className="hover:text-[#f5f5f7] transition-colors">
+                Resources
+              </a>
+              <Link href="/pricing" className="hover:text-[#f5f5f7] transition-colors">
+                Pricing
+              </Link>
+            </nav>
+          </div>
 
-          <div className="flex items-center space-x-3">
+          <div className="hidden md:flex items-center space-x-4">
             {isPro ? (
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-purple-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
-                <span>⚡ PRO UNLIMITED</span>
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-300">
+                ⚡ PRO MEMBER
               </span>
             ) : (
-              <button onClick={() => setShowProUpgradeModal(true)} className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#0a84ff] hover:bg-[#0071e3] text-white transition shadow-sm">
-                Upgrade ($9/mo)
+              <button
+                onClick={() =>
+                  triggerProModal(
+                    "Upgrade to Pro to unlock unlimited daily generations, 3-step outreach sequences, and custom brand voice."
+                  )
+                }
+                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1"
+              >
+                <span>🚀 Free Plan</span> — <span className="text-[#0a84ff] underline">Upgrade ($9/mo)</span>
               </button>
             )}
+
+            <button
+              onClick={() => setHistoryModalOpen(true)}
+              className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition flex items-center gap-1.5"
+            >
+              <span>History</span>
+              {savedHistory.length > 0 && (
+                <span className="bg-[#2c2c2e] text-[#f5f5f7] text-[10px] px-1.5 py-0.5 rounded-full">
+                  {savedHistory.length}
+                </span>
+              )}
+            </button>
+
             {user ? (
-              <div className="flex items-center space-x-3 pl-2 border-l border-white/10">
-                <span className="text-xs text-[#86868b] hidden sm:inline">{user.email}</span>
-                <button onClick={handleLogout} className="text-xs font-medium text-[#86868b] hover:text-[#f5f5f7] transition">Log Out</button>
+              <div className="flex items-center space-x-4 ml-2 border-l border-white/10 pl-4">
+                <span className="text-sm text-[#86868b]">{user.email}</span>
+                <button onClick={handleLogout} className="text-sm text-[#86868b] hover:text-[#f5f5f7] transition">
+                  Log out
+                </button>
               </div>
             ) : (
-              <button onClick={() => setShowAuthModal(true)} className="text-xs font-semibold px-3.5 py-1.5 rounded-full bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#f5f5f7] border border-white/10 transition">Sign In</button>
+              <div className="flex items-center space-x-3 ml-2 border-l border-white/10 pl-4">
+                <button
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setAuthModalOpen(true);
+                  }}
+                  className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition"
+                >
+                  Log In
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSignUp(true);
+                    setAuthModalOpen(true);
+                  }}
+                  className="text-sm font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-1.5 rounded-full transition shadow-sm"
+                >
+                  Sign Up
+                </button>
+              </div>
             )}
           </div>
+
+          <button
+            className="md:hidden text-[#86868b] hover:text-[#f5f5f7] z-50 p-2 -mr-2"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
         </div>
       </header>
 
-      <section className="pt-16 pb-10 px-6 max-w-4xl mx-auto text-center relative z-10">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-medium text-[#86868b] mb-6 shadow-sm">
-          <span>🔥 World's Most Advanced AI Sales Communication Studio</span>
-        </div>
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#f5f5f7] mb-6 leading-tight">
-          Write emails that get <br />
-          <span className="bg-gradient-to-r from-[#0a84ff] via-purple-400 to-amber-300 bg-clip-text text-transparent">opened, read & replied to.</span>
-        </h1>
-        <p className="text-[#86868b] text-base sm:text-lg max-w-2xl mx-auto font-medium leading-relaxed">
-          Generates high-converting cold outreach, 3-step sequences, A/B tests, bulk lead personalizations, and AI rebuttal handlers engineered to land in the inbox.
-        </p>
+      {/* Mobile Drawer */}
+      <div
+        className={`fixed inset-0 z-40 bg-[#000000] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${
+          mobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
+        }`}
+      >
+        <nav className="flex flex-col text-lg font-medium text-[#f5f5f7]">
+          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
+            Products
+          </a>
+          <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
+            Resources
+          </a>
+          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
+            Pricing
+          </Link>
 
-        <div className="mt-6 inline-flex items-center gap-4 px-4 py-2 rounded-2xl bg-[#1c1c1e] border border-white/10 text-xs font-semibold text-[#86868b]">
-          {isPro ? (
-            <span className="text-amber-300 flex items-center gap-1.5"><span>⚡</span> Unlimited Executive Generations Active</span>
-          ) : user ? (
-            <span>Daily Usage: <strong className="text-white">{usageCount} / 5</strong> Free Credits Used</span>
-          ) : (
-            <span>Guest Usage: <strong className="text-white">{guestUsage} / 2</strong> Free Preview Credits</span>
-          )}
+          <div className="pt-8 flex flex-col space-y-4">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setHistoryModalOpen(true);
+              }}
+              className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold"
+            >
+              Saved History ({savedHistory.length})
+            </button>
+            {user ? (
+              <>
+                <span className="text-sm text-[#86868b] text-center">{user.email}</span>
+                <button
+                  onClick={handleLogout}
+                  className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold"
+                >
+                  Log Out
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setAuthModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold"
+                >
+                  Log In
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSignUp(true);
+                    setAuthModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold"
+                >
+                  Sign Up
+                </button>
+              </>
+            )}
+          </div>
+        </nav>
+      </div>
+
+      {/* Hero */}
+      <section className="relative pt-24 pb-20 px-6 max-w-5xl mx-auto text-center">
+        <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#f5f5f7] leading-tight mb-6">
+          Intelligence that closes deals.
+        </h1>
+        <p className="text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium">
+          Generate A/B split tests, 3-step outreach sequences, objection replies, e-signature requests, and CRM-ready pitches instantly.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <a
+            href="#generator"
+            className="bg-[#f5f5f7] text-black hover:bg-white font-semibold px-8 py-3.5 rounded-full text-base transition shadow-sm w-full sm:w-auto"
+          >
+            Start Writing
+          </a>
+          <Link
+            href="/pricing"
+            className="bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#f5f5f7] font-semibold px-8 py-3.5 rounded-full text-base transition w-full sm:w-auto"
+          >
+            View Pricing ($9/mo)
+          </Link>
         </div>
       </section>
 
-      <section id="generator" className="pb-20 px-4 sm:px-6 max-w-5xl mx-auto relative z-10">
-        <div className="bg-[#1c1c1e]/90 border border-white/10 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl backdrop-blur-3xl">
-          
-          <div className="flex flex-wrap items-center justify-center gap-2 mb-8 bg-[#000000]/60 p-2 rounded-2xl border border-white/5">
-            {[
-              { id: "create", label: "✨ Cold Email" },
-              { id: "sequence", label: "🔄 3-Step Sequence", pro: true },
-              { id: "csv_bulk", label: "📊 Bulk CSV Leads", pro: true },
-              { id: "classifier", label: "🎯 Reply Classifier", pro: true },
-              { id: "ab_test", label: "🧪 A/B Split Test" },
-              { id: "batch", label: "🏢 Multi-Vertical" },
-              { id: "reply", label: "🥊 Rebuttal Studio" },
-              { id: "polish", label: "🪄 Magic Polish" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  if (tab.pro && !isPro) setShowProUpgradeModal(true);
-                  else setMode(tab.id as any);
-                }}
-                className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                  mode === tab.id ? "bg-[#0a84ff] text-white shadow-md" : "text-[#86868b] hover:text-[#f5f5f7] hover:bg-white/5"
-                }`}
-              >
-                <span>{tab.label}</span>
-                {tab.pro && !isPro && <span className="text-[10px] text-amber-300 font-bold">PRO</span>}
-              </button>
-            ))}
+      {/* Generator Workspace */}
+      <section id="generator" className="py-12 px-4 sm:px-6 max-w-4xl mx-auto">
+        <div className="bg-[#1c1c1e]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio v5.0 Pro</h2>
+              <p className="text-sm text-[#86868b] mt-1">Includes A/B Testing, Presets & CRM Tags.</p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {presets.length > 0 && (
+                <select
+                  onChange={(e) => loadPreset(e.target.value)}
+                  className="text-sm px-4 py-2 bg-[#2c2c2e] text-[#f5f5f7] rounded-full outline-none border-none cursor-pointer"
+                >
+                  <option value="">Load Preset...</option>
+                  {presets.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {!isPro && (
+                <span className="text-sm px-4 py-2 bg-[#2c2c2e] rounded-full text-[#86868b] font-medium">
+                  {user ? `${dailyUsage}/5 Free` : `${guestUsage}/2 Free`}
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="space-y-6">
-            {mode === "csv_bulk" && (
-              <div className="bg-[#000000]/40 p-5 rounded-2xl border border-white/10 space-y-3">
-                <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold uppercase tracking-wider text-amber-400">Bulk Leads Input (CSV / Lines)</label>
-                  <span className="text-[11px] text-[#86868b]">Format: Name, Title, Company, Bio</span>
-                </div>
-                <textarea rows={4} value={csvLeadsInput} onChange={(e) => setCsvLeadsInput(e.target.value)} placeholder="John Doe, CEO, Acme Corp, Scaled ARR to 10M&#10;Sarah Smith, CTO, TechLabs, Hiring AI Engineers" className="w-full bg-[#1c1c1e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff]" />
-              </div>
-            )}
-
-            {mode === "classifier" && (
-              <div className="bg-[#000000]/40 p-5 rounded-2xl border border-white/10 space-y-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-purple-400">Paste Incoming Prospect Email / Objection</label>
-                <textarea rows={4} value={incomingReply} onChange={(e) => setIncomingReply(e.target.value)} placeholder="e.g., 'Sounds interesting, but we don't have budget for this until Q4. Send me pricing breakdown later.'" className="w-full bg-[#1c1c1e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff]" />
-              </div>
-            )}
-
-            {mode === "polish" && (
-              <div className="bg-[#000000]/40 p-5 rounded-2xl border border-white/10 space-y-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#0a84ff]">Existing Raw Email Draft</label>
-                <textarea rows={4} value={existingDraft} onChange={(e) => setExistingDraft(e.target.value)} placeholder="Paste your existing messy draft here to optimize tone, clarity, and deliverability..." className="w-full bg-[#1c1c1e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff]" />
-              </div>
-            )}
-
-            {mode !== "csv_bulk" && mode !== "classifier" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#86868b] mb-2">Target ICP Persona</label>
-                  <select value={targetIcp} onChange={(e) => setTargetIcp(e.target.value)} className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff]">
-                    <option value="CEO / Founder">CEO / Founder / Managing Director</option>
-                    <option value="CTO / VP of Engineering">CTO / VP of Engineering</option>
-                    <option value="CFO / Finance Director">CFO / Finance Director</option>
-                    <option value="Head of Sales / CRO">Head of Sales / CRO</option>
-                    <option value="HR / Talent Director">HR / Talent Acquisition Director</option>
-                    <option value="Marketing Executive">CMO / Marketing Director</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#86868b] mb-2">Email Purpose</label>
-                  <select value={emailType} onChange={(e) => setEmailType(e.target.value)} className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff]">
-                    <option value="Cold Outreach / Sales">Cold Outreach / Sales Pitch</option>
-                    <option value="Meeting Request / Booking">Meeting Request / Demo Booking</option>
-                    <option value="Partnership / Co-Marketing">Partnership & Collaboration</option>
-                    <option value="Job Inquiry / Executive Referral">Job Inquiry & Candidate Pitch</option>
-                    <option value="Investor Pitch / Raising Capital">Investor Pitch & Fundraising</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#86868b] mb-2">Tone of Voice</label>
-                  <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff]">
-                    <option value="Professional & Direct">Professional & Direct</option>
-                    <option value="C-Suite Brief (<75 words)">C-Suite Brief (&lt;75 words)</option>
-                    <option value="Casual & Conversational">Casual & Conversational</option>
-                    <option value="High-Converting Aggressive">Direct Response / High Converting</option>
-                    <option value="Warm & Consultative">Warm & Consultative</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {mode !== "csv_bulk" && mode !== "classifier" && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-[#86868b] mb-2">Recipient Name / Tag</label>
-                  <input type="text" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} disabled={useCrmTags} placeholder="e.g. Alex Rivera" className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff] disabled:opacity-50" />
-                  <div className="mt-2 flex items-center gap-2">
-                    <input type="checkbox" id="crmTagToggle" checked={useCrmTags} onChange={(e) => setUseCrmTags(e.target.checked)} className="rounded bg-[#2c2c2e] border-white/10 text-[#0a84ff] focus:ring-0" />
-                    <label htmlFor="crmTagToggle" className="text-xs text-[#86868b]">Use CRM Tag <code className="text-[#0a84ff] bg-white/5 px-1.5 py-0.5 rounded">{"{{first_name}}"}</code></label>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-[#86868b]">Brand Voice DNA</label>
-                    {!isPro && <span className="text-[10px] text-amber-300 font-bold">PRO REQUIRED</span>}
-                  </div>
-                  <input type="text" value={brandVoice} onChange={(e) => setBrandVoice(e.target.value)} disabled={!isPro} placeholder={isPro ? "e.g. Concise, data-driven, casual tone" : "🔒 Pro Mode Feature"} className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff] disabled:opacity-40" />
-                </div>
-              </div>
-            )}
-
-            {mode !== "csv_bulk" && mode !== "classifier" && (
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-[#86868b]">Context & Value Pitch Goal</label>
-                  <button onClick={() => setShowSavePresetModal(true)} className="text-xs font-semibold text-[#0a84ff] hover:underline">Save as Preset</button>
-                </div>
-                <textarea rows={3} value={context} onChange={(e) => setContext(e.target.value)} placeholder="State your offer, social proof, key metrics, and call to action..." className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3.5 text-sm text-[#f5f5f7] focus:outline-none focus:border-[#0a84ff]" />
-              </div>
-            )}
-
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2 border-t border-white/5">
-              <div className="flex items-center space-x-3 w-full sm:w-auto">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#86868b]">Output Language:</span>
-                <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-[#2c2c2e] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#f5f5f7] focus:outline-none">
-                  <option value="English (US)">English (US)</option>
-                  <option value="English (UK)">English (UK)</option>
-                  <option value="German (Direct)">German (Formal)</option>
-                  <option value="Spanish">Spanish</option>
-                  <option value="French">French</option>
-                  <option value="Japanese (Keigo)">Japanese (Formal)</option>
-                </select>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input type="checkbox" id="sigCheck" checked={includeSignature} onChange={(e) => setIncludeSignature(e.target.checked)} className="rounded bg-[#2c2c2e] border-white/10 text-[#0a84ff]" />
-                <label htmlFor="sigCheck" className="text-xs text-[#86868b]">Attach HTML Signature & DocuSign Embed</label>
-              </div>
-            </div>
-
-            <button onClick={handleGenerate} disabled={loading} className="w-full bg-gradient-to-r from-[#0a84ff] to-purple-600 hover:opacity-95 text-white font-bold py-4 rounded-2xl text-base transition shadow-xl flex items-center justify-center gap-2 transform active:scale-[0.99]">
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
-                  <span>Engaging AI Pipeline...</span>
-                </>
-              ) : (
-                <span>🚀 Generate Sales Communication</span>
+          {/* Segmented Mode Selector Bar */}
+          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-full mb-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
+            <button
+              type="button"
+              onClick={() => setStudioMode("create")}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+                studioMode === "create" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              Create New
+            </button>
+            <button
+              type="button"
+              onClick={() => setStudioMode("polish")}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+                studioMode === "polish" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              Magic Polish
+            </button>
+            <button
+              type="button"
+              onClick={() => setStudioMode("reply")}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
+                studioMode === "reply" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              🥊 Objection Reply
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPro) triggerProModal("3-Step Outreach Sequence generator is a Pro exclusive feature.");
+                else setStudioMode("sequence");
+              }}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                studioMode === "sequence" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>🔁 Sequence</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPro) triggerProModal("A/B Split Test generator is a Pro exclusive feature.");
+                else setStudioMode("ab_test");
+              }}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                studioMode === "ab_test" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>⚖️ A/B Split</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPro) triggerProModal("Multi-Vertical Batch generator is a Pro exclusive feature.");
+                else setStudioMode("batch");
+              }}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                studioMode === "batch" ? "bg-emerald-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>📦 Batch</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
               )}
             </button>
           </div>
-        </div>
-      </section>
 
-      <section ref={outputRef} className="pb-24 px-4 sm:px-6 max-w-5xl mx-auto relative z-10">
-        {(outputSubject || outputBody || outputSequence || outputAbTest || outputBatch || outputBulkLeads || outputClassification) && (
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl relative">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-6 border-b border-white/10">
+          <form onSubmit={handleGenerate} className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <h3 className="text-xl font-bold text-[#f5f5f7] flex items-center gap-2">
-                  <span>✨ AI Generated Result</span>
-                  <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Ready to Send</span>
-                </h3>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  Output Language
+                </label>
+                <select
+                  value={targetLanguage}
+                  onChange={(e) => setTargetLanguage(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                >
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang} value={lang}>
+                      {lang}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div className="flex items-center space-x-4 text-xs font-medium">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[#86868b]">Deliverability Risk:</span>
-                  <span className={`font-bold px-2 py-0.5 rounded-md ${spamScore === 0 ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-300"}`}>
-                    {spamScore === 0 ? "0% (Inbox Safe)" : `${spamScore}% Risk (${detectedSpamWords.length} triggers)`}
-                  </span>
-                </div>
-                <div className="hidden sm:flex items-center gap-1.5">
-                  <span className="text-[#86868b]">Readability:</span>
-                  <span className="text-[#f5f5f7] font-semibold">{readingGrade}</span>
-                </div>
-                {detectedSpamWords.length > 0 && (
-                  <button onClick={handleAutoSanitize} className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1">
-                    ⚡ Auto-Sanitize Draft
-                  </button>
-                )}
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  ICP Persona Targeting
+                </label>
+                <select
+                  value={icpPersona}
+                  onChange={(e) => setIcpPersona(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                >
+                  {ICP_PERSONAS.map((icp) => (
+                    <option key={icp} value={icp}>
+                      {icp}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {outputClassification && (
-              <div className="mb-6 p-5 rounded-2xl bg-[#000000]/60 border border-purple-500/30 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-purple-400">AI Intent Analysis</span>
-                  <span className="text-xs text-[#86868b]">Sentiment Score: <strong className="text-white">{outputClassification.sentimentScore}/100</strong></span>
+            {/* Advanced Campaign Tools Panel */}
+            <div className="bg-[#2c2c2e]/40 p-5 rounded-xl border border-white/5 space-y-4">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-[#f5f5f7] uppercase tracking-wider flex items-center gap-2">
+                  ⚙️ Advanced Campaign Engine
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-[#86868b] mb-2 flex justify-between">
+                    <span>Brand Voice DNA</span>
+                    {!isPro && <span className="text-[10px] text-amber-400 font-bold">PRO</span>}
+                  </label>
+                  <input
+                    type="text"
+                    disabled={!isPro}
+                    placeholder={isPro ? "e.g. Direct Silicon Valley executive" : "🔒 Pro Required"}
+                    value={brandVoice}
+                    onChange={(e) => setBrandVoice(e.target.value)}
+                    className={`w-full border-none rounded-xl p-3 text-sm outline-none ${
+                      isPro ? "bg-[#2c2c2e] text-[#f5f5f7]" : "bg-[#2c2c2e]/50 text-[#86868b] cursor-not-allowed"
+                    }`}
+                  />
                 </div>
-                <h4 className="text-lg font-bold text-white">{outputClassification.intent}</h4>
-                <p className="text-xs text-[#86868b] leading-relaxed"><strong>Recommended Action:</strong> {outputClassification.recommendedAction}</p>
+                <div>
+                  <label className="text-xs font-semibold text-[#86868b] mb-2 flex justify-between">
+                    <span>Prospect Bio / URL Icebreaker</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. https://stripe.com or 'VP of Sales'"
+                    value={prospectBio}
+                    onChange={(e) => setProspectBio(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2 border-t border-white/5">
+                <input
+                  type="checkbox"
+                  id="crmTagsCheckbox"
+                  checked={crmTags}
+                  onChange={(e) => setCrmTags(e.target.checked)}
+                  className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer"
+                />
+                <label htmlFor="crmTagsCheckbox" className="text-sm text-[#86868b] cursor-pointer">
+                  Use CRM Merge Tags{" "}
+                  <code className="text-xs bg-[#1c1c1e] px-1.5 py-0.5 rounded text-[#f5f5f7] ml-1">{`{{first_name}}`}</code>
+                </label>
+              </div>
+            </div>
+
+            {/* Mode-Specific Fields */}
+            {studioMode === "batch" && (
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  Target Industries (Comma Separated)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. SaaS, Real Estate, Healthcare"
+                  value={targetIndustries}
+                  onChange={(e) => setTargetIndustries(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
+                />
               </div>
             )}
 
-            {(outputSubject || outputBody) && !outputSequence && !outputAbTest && !outputBatch && !outputBulkLeads && (
-              <div className="space-y-6">
+            {studioMode === "reply" ? (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    Paste Prospect Email / Objection Received
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="e.g. 'Thanks for reaching out, but your solution is way too expensive for our Q3 budget right now.'"
+                    value={incomingEmailText}
+                    onChange={(e) => setIncomingEmailText(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    Select Rebuttal / Reply Strategy
+                  </label>
+                  <select
+                    value={replyStrategy}
+                    onChange={(e) => setReplyStrategy(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="Value & ROI Reframing">Value & ROI Reframing (Turn cost into ROI)</option>
+                    <option value="Soft 5-Minute Nudge">Soft 5-Minute Nudge (Low friction ask)</option>
+                    <option value="Polite Breakup">Polite Breakup & Future Touchpoint</option>
+                  </select>
+                </div>
+              </>
+            ) : studioMode === "polish" ? (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    Paste Your Existing Draft
+                  </label>
+                  <textarea
+                    rows={5}
+                    required
+                    placeholder="Paste your draft or raw notes here..."
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    Select Polish Goal
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      "Fix grammar, typos & improve flow",
+                      "Make shorter & punchier",
+                      "Make strong & confident",
+                      "Make politely firm (set boundaries)",
+                    ].map((goal) => (
+                      <button
+                        type="button"
+                        key={goal}
+                        onClick={() => setPolishGoal(goal)}
+                        className={`text-sm px-4 py-2 rounded-full transition font-medium ${
+                          polishGoal === goal
+                            ? "bg-[#0a84ff] text-white"
+                            : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
+                        }`}
+                      >
+                        {goal}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                      Email Type
+                    </label>
+                    <select
+                      value={emailType}
+                      onChange={(e) => setEmailType(e.target.value)}
+                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="cold_outreach">Cold Outreach / Sales</option>
+                      <option value="contract_pitch">Contract / Proposal Pitch</option>
+                      <option value="follow_up">Follow Up</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                      Tone of Voice
+                    </label>
+                    <select
+                      value={tone}
+                      onChange={(e) => setTone(e.target.value)}
+                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="professional">Professional & Direct</option>
+                      <option value="persuasive">Persuasive & Confident</option>
+                      <option value="friendly">Friendly & Warm</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                      Recipient Name
+                    </label>
+                    <input
+                      type="text"
+                      disabled={crmTags}
+                      placeholder={crmTags ? "{{first_name}}" : "Recipient Name"}
+                      value={recipient}
+                      onChange={(e) => setRecipient(e.target.value)}
+                      className="w-full bg-[#2c2c2e] disabled:opacity-50 border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-[#2c2c2e]/60 p-4 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                      🖋️ HTML Signature & DocuSign
+                    </label>
+                    <input
+                      type="checkbox"
+                      checked={includeSignature}
+                      onChange={(e) => setIncludeSignature(e.target.checked)}
+                      className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer"
+                    />
+                  </div>
+                  {includeSignature && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <input
+                        type="text"
+                        placeholder="Sender Title (e.g. VP of Sales)"
+                        value={senderTitle}
+                        onChange={(e) => setSenderTitle(e.target.value)}
+                        className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                      />
+                      <input
+                        type="url"
+                        placeholder="DocuSign / Pitch Link"
+                        value={docuSignLink}
+                        onChange={(e) => setDocuSignLink(e.target.value)}
+                        className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#86868b]">Subject Line</span>
-                    <button onClick={() => { navigator.clipboard.writeText(outputSubject); setCopiedSubject(true); setTimeout(() => setCopiedSubject(false), 2000); }} className="text-xs text-[#0a84ff] font-semibold hover:underline">
-                      {copiedSubject ? "Copied!" : "Copy Subject"}
+                    <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                      Context & Pitch Goal
+                    </label>
+                    <button type="button" onClick={savePreset} className="text-xs text-[#0a84ff] font-medium hover:underline">
+                      Save as Preset
                     </button>
                   </div>
-                  <div className="p-4 rounded-xl bg-[#2c2c2e] text-[#f5f5f7] font-semibold text-sm border border-white/5">{outputSubject}</div>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder="Pitching SaaS tool. Goal is to book a 15-min demo call."
+                    value={context}
+                    onChange={(e) => setContext(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                  />
                 </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#86868b]">Email Body</span>
-                    <button onClick={() => { navigator.clipboard.writeText(outputBody); setCopiedBody(true); setTimeout(() => setCopiedBody(false), 2000); }} className="text-xs text-[#0a84ff] font-semibold hover:underline">
-                      {copiedBody ? "Copied!" : "Copy Body"}
-                    </button>
-                  </div>
-                  <div className="p-5 rounded-xl bg-[#2c2c2e] text-[#f5f5f7] text-sm whitespace-pre-wrap leading-relaxed border border-white/5 font-sans">{outputBody}</div>
-                </div>
-              </div>
+              </>
             )}
 
-            {/* RESTORED: A/B Test Output UI */}
-            {outputAbTest && (
-              <div className="space-y-6">
-                <div className="p-5 rounded-2xl bg-[#2c2c2e] border border-white/5 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[#0a84ff]">Variant A: Metrics & Social Proof</span>
-                    <button onClick={() => navigator.clipboard.writeText(outputAbTest.variantA)} className="text-xs text-[#86868b] hover:text-white">Copy Variant A</button>
-                  </div>
-                  <div className="text-sm text-[#f5f5f7] whitespace-pre-wrap leading-relaxed">{outputAbTest.variantA}</div>
-                </div>
-                <div className="p-5 rounded-2xl bg-[#2c2c2e] border border-white/5 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold uppercase tracking-wider text-purple-400">Variant B: Pain-Point & Agitation</span>
-                    <button onClick={() => navigator.clipboard.writeText(outputAbTest.variantB)} className="text-xs text-[#86868b] hover:text-white">Copy Variant B</button>
-                  </div>
-                  <div className="text-sm text-[#f5f5f7] whitespace-pre-wrap leading-relaxed">{outputAbTest.variantB}</div>
-                </div>
-              </div>
-            )}
-
-            {/* RESTORED: Multi-Vertical Batch Output UI */}
-            {outputBatch && (
-              <div className="space-y-6">
-                {[
-                  { title: "SaaS / Tech Vertical", content: outputBatch.saas, color: "text-[#0a84ff]" },
-                  { title: "Agency / Services Vertical", content: outputBatch.agency, color: "text-purple-400" },
-                  { title: "E-Commerce / Retail Vertical", content: outputBatch.ecom, color: "text-amber-400" },
-                ].map((batch, idx) => (
-                  <div key={idx} className="p-5 rounded-2xl bg-[#2c2c2e] border border-white/5 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className={`text-xs font-bold uppercase tracking-wider ${batch.color}`}>{batch.title}</span>
-                      <button onClick={() => navigator.clipboard.writeText(batch.content)} className="text-xs text-[#86868b] hover:text-white">Copy Version</button>
-                    </div>
-                    <div className="text-sm text-[#f5f5f7] whitespace-pre-wrap leading-relaxed">{batch.content}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {outputSequence && (
-              <div className="space-y-6">
-                {[
-                  { step: "Day 1: Initial Touchpoint", content: outputSequence.day1 },
-                  { step: "Day 3: Value Add Follow-up", content: outputSequence.day3 },
-                  { step: "Day 7: Breakup / Final Call", content: outputSequence.day7 },
-                ].map((seq, idx) => (
-                  <div key={idx} className="p-5 rounded-2xl bg-[#2c2c2e] border border-white/5 space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[#0a84ff]">{seq.step}</span>
-                      <button onClick={() => navigator.clipboard.writeText(seq.content)} className="text-xs text-[#86868b] hover:text-white">Copy Step</button>
-                    </div>
-                    <div className="text-sm text-[#f5f5f7] whitespace-pre-wrap leading-relaxed">{seq.content}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {outputBulkLeads && (
-              <div className="space-y-4">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Bulk Personalization Results ({outputBulkLeads.length} Leads)</span>
-                {outputBulkLeads.map((item, idx) => (
-                  <div key={idx} className="p-4 rounded-xl bg-[#2c2c2e] border border-white/5 space-y-2">
-                    <span className="text-xs font-bold text-[#0a84ff]">{item.lead}</span>
-                    <p className="text-xs text-[#f5f5f7] whitespace-pre-wrap">{item.email}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-8 pt-6 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
-              <span className="text-xs text-[#86868b]">Save emails to export CRM campaign packages.</span>
-              <button onClick={exportHistoryCSV} className="text-xs font-semibold px-4 py-2 rounded-xl bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] border border-white/10 transition flex items-center gap-1.5">
-                <span>📥 Export History (CSV)</span>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+              <input
+                type="text"
+                disabled={crmTags}
+                placeholder={crmTags ? "{{sender_name}}" : "Your Name"}
+                value={sender}
+                onChange={(e) => setSender(e.target.value)}
+                className="bg-[#2c2c2e] disabled:opacity-50 border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] w-full sm:w-1/2"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2 shadow-md"
+              >
+                {loading ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <span>
+                    {studioMode === "sequence"
+                      ? "Generate 3-Step Sequence"
+                      : studioMode === "ab_test"
+                      ? "Generate A/B Test"
+                      : studioMode === "batch"
+                      ? "Generate Batch Campaign"
+                      : studioMode === "reply"
+                      ? "Generate Rebuttal"
+                      : "Generate Email"}
+                  </span>
+                )}
               </button>
             </div>
-          </div>
-        )}
-      </section>
+          </form>
 
-      <section id="presets" className="pb-20 px-6 max-w-5xl mx-auto relative z-10">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-[#f5f5f7]">Saved Context Presets</h3>
-          <span className="text-xs text-[#86868b]">{presets.length} Presets Available</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {presets.length === 0 ? (
-            <div className="col-span-3 p-8 text-center bg-[#1c1c1e] rounded-2xl border border-white/5 text-xs text-[#86868b]">
-              No custom presets saved yet. Click "Save as Preset" in the generator context box to save your workflow.
-            </div>
-          ) : (
-            presets.map((preset) => (
-              <div key={preset.id} onClick={() => { setEmailType(preset.emailType); setTone(preset.tone); setContext(preset.context); }} className="p-4 bg-[#1c1c1e] hover:bg-[#2c2c2e] border border-white/5 rounded-2xl cursor-pointer transition">
-                <h4 className="text-sm font-bold text-[#f5f5f7] mb-1">{preset.title}</h4>
-                <p className="text-xs text-[#86868b] line-clamp-2">{preset.context}</p>
+          {/* Result Output Display */}
+          {variations.length > 0 && (
+            <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8">
+              {/* Analytics Dashboard */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
+                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Deliverability Audit</p>
+                  <p className={`text-sm font-bold ${activeSpamTriggers.length === 0 ? "text-emerald-400" : "text-amber-400"}`}>
+                    {activeSpamTriggers.length === 0 ? "Inbox Ready (0 Triggers)" : `${activeSpamTriggers.length} Spam Words Found`}
+                  </p>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
+                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Reading Grade</p>
+                  <p className="text-sm font-bold text-[#f5f5f7]">{analytics?.readingLevel || "5th Grade (Optimal)"}</p>
+                </div>
+                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
+                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Tone Sentiment</p>
+                  <p className="text-sm font-bold text-[#0a84ff]">{analytics?.sentiment || "Assertive"}</p>
+                </div>
               </div>
-            ))
+
+              {/* Subject Lines */}
+              {subjectLines.length > 0 && (
+                <div className="space-y-3">
+                  <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                    Subject Line Studio
+                  </span>
+                  <div className="space-y-2">
+                    {subjectLines.map((subj, idx) => (
+                      <div
+                        key={idx}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#2c2c2e] p-4 rounded-2xl gap-3"
+                      >
+                        <span className="text-sm font-medium text-[#f5f5f7]">{subj.subject}</span>
+                        <div className="flex items-center space-x-3 shrink-0">
+                          {subj.openRateForecast && (
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              Forecast: {subj.openRateForecast}
+                            </span>
+                          )}
+                          <span
+                            className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
+                              subj.score >= 90 ? "bg-[#34c759]/20 text-[#34c759]" : "bg-[#ff9f0a]/20 text-[#ff9f0a]"
+                            }`}
+                          >
+                            {subj.spamRisk}
+                          </span>
+                          <button
+                            onClick={() => copySubject(subj.subject, idx)}
+                            className="text-xs font-medium text-[#0a84ff] hover:text-[#0071e3] bg-[#0a84ff]/10 px-3 py-1.5 rounded-full transition"
+                          >
+                            {copiedSubject === idx ? "Copied" : "Copy"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Variations */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-2">
+                  <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                    Output Options
+                  </span>
+                  <span className="text-xs text-[#86868b] font-medium">
+                    {variations[selectedTab]?.readingTime}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {variations.map((v, i) => (
+                    <button
+                      key={v.id || i}
+                      onClick={() => setSelectedTab(i)}
+                      className={`text-sm font-medium px-5 py-2 rounded-full transition ${
+                        selectedTab === i ? "bg-[#f5f5f7] text-black" : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
+                      }`}
+                    >
+                      {v.title}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 1-Click Persona Rewriter Bar */}
+                <div className="flex items-center gap-2 overflow-x-auto pt-2 scrollbar-hide">
+                  <span className="text-xs text-[#86868b] font-medium shrink-0">1-Click Rewrite:</span>
+                  <button
+                    onClick={() => handleGenerate(undefined, "Compress to less than 75 words exactly.")}
+                    className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 px-3 py-1.5 rounded-full transition shrink-0"
+                  >
+                    ✂️ Compress &lt;75 Words
+                  </button>
+                  <button
+                    onClick={() => handleGenerate(undefined, "Executive C-Suite Short & Concise")}
+                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                  >
+                    ⚡ C-Suite Brief
+                  </button>
+                  <button
+                    onClick={() => handleGenerate(undefined, "Warm, Friendly & Casual")}
+                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                  >
+                    ☕ Casual
+                  </button>
+                  <button
+                    onClick={() => handleGenerate(undefined, "Direct Response Aggressive Call to Action")}
+                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                  >
+                    🎯 Direct-Response CTA
+                  </button>
+                </div>
+
+                <div className="relative bg-[#2c2c2e] rounded-2xl p-6 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px] shadow-inner mt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-5 pb-4 border-b border-white/10">
+                    <span className="text-xs font-medium text-[#34c759] flex items-center gap-1">✓ Auto-saved</span>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {docuSignLink && (
+                        <a
+                          href={docuSignLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-medium bg-[#ff9f0a]/10 hover:bg-[#ff9f0a]/20 text-[#ff9f0a] px-4 py-2 rounded-full transition flex items-center gap-1"
+                        >
+                          🖋️ Test DocuSign
+                        </a>
+                      )}
+
+                      <button
+                        onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
+                        className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition"
+                      >
+                        Gmail
+                      </button>
+
+                      <button
+                        onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
+                        className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition"
+                      >
+                        Mail App
+                      </button>
+
+                      <button
+                        onClick={() => copyBody(variations[selectedTab]?.body)}
+                        className="text-xs font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-2 rounded-full transition shadow-sm"
+                      >
+                        {copiedBody ? "Copied!" : "Copy Text"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {variations[selectedTab]?.body}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </section>
 
-      <footer className="border-t border-white/10 py-12 text-center text-xs text-[#86868b]">
+      {/* PRO UPGRADE MODAL */}
+      {proModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full relative shadow-2xl overflow-hidden">
+            <button
+              onClick={() => setProModalOpen(false)}
+              className="absolute top-6 right-6 bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
+            >
+              ✕
+            </button>
+
+            <div className="text-center mb-6 pt-2">
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-block mb-3">
+                ⚡ UNLOCK EXECUTIVE PRO
+              </span>
+              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">Upgrade to Pro ($9/mo)</h3>
+              <p className="text-sm text-[#86868b]">
+                {proReason || "Unlock all executive tools and unlimited generations."}
+              </p>
+            </div>
+
+            <div className="space-y-3 mb-8 text-sm text-[#f5f5f7]">
+              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+                <span className="text-emerald-400 font-bold">✓</span>
+                <span>
+                  <strong>Unlimited Email Generations</strong> (No 5/day limit)
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+                <span className="text-purple-400 font-bold">✓</span>
+                <span>
+                  <strong>3-Step Outreach Sequence Generator</strong>
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+                <span className="text-[#0a84ff] font-bold">✓</span>
+                <span>
+                  <strong>A/B Split Testing & Multi-Vertical Batching</strong>
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+                <span className="text-amber-400 font-bold">✓</span>
+                <span>
+                  <strong>Custom Presets & 1-Click CRM Exports</strong>
+                </span>
+              </div>
+            </div>
+
+            <a
+              href={LEMON_SQUEEZY_CHECKOUT}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-4 bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold rounded-2xl text-center block transition shadow-lg"
+            >
+              Get Pro Access — $9/mo (Cards & PayPal)
+            </a>
+
+            <p className="text-[11px] text-center text-[#86868b] mt-3">Powered by Lemon Squeezy • Cancel anytime</p>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {historyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-md p-0 sm:p-4">
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-6 max-w-2xl w-full h-[85vh] sm:max-h-[80vh] flex flex-col relative shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div>
+                <h3 className="text-xl font-semibold text-[#f5f5f7]">Saved History</h3>
+                <p className="text-sm text-[#86868b]">Search, copy, or export past emails.</p>
+              </div>
+              <button
+                onClick={() => setHistoryModalOpen(false)}
+                className="bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="py-3 flex items-center justify-between border-b border-white/5 text-xs text-[#86868b]">
+              <span>{savedHistory.length} saved records</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => exportHistory("txt")}
+                  className="px-3 py-1.5 rounded-full bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] font-medium transition"
+                >
+                  Export TXT {!isPro && "🔒"}
+                </button>
+                <button
+                  onClick={() => exportHistory("csv")}
+                  className="px-3 py-1.5 rounded-full bg-[#0a84ff]/20 text-[#0a84ff] font-medium transition"
+                >
+                  Export CSV {!isPro && "🔒"}
+                </button>
+              </div>
+            </div>
+
+            <div className="py-4">
+              <input
+                type="text"
+                placeholder="Search history..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
+              />
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-4 pr-2">
+              {filteredHistory.length === 0 ? (
+                <div className="text-center py-12 text-[#86868b] text-sm font-medium">No saved emails found.</div>
+              ) : (
+                filteredHistory.map((item) => (
+                  <div key={item.id} className="bg-[#2c2c2e] rounded-2xl p-5 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-[#86868b] border-b border-white/5 pb-2">
+                      <span className="font-semibold uppercase tracking-wider">
+                        {item.email_type} ({item.language})
+                      </span>
+                      <span>{new Date(item.created_at).toLocaleDateString()}</span>
+                    </div>
+
+                    <p className="text-sm font-semibold text-[#f5f5f7] truncate">{item.subject_line}</p>
+                    <p className="text-sm text-[#86868b] line-clamp-3 whitespace-pre-wrap">{item.body}</p>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => openInGmail(item.subject_line, item.body)}
+                          className="text-xs font-medium bg-[#ff3b30]/10 text-[#ff3b30] px-3 py-1.5 rounded-full"
+                        >
+                          Gmail
+                        </button>
+                        <button
+                          onClick={() => copyBody(item.body)}
+                          className="text-xs font-medium bg-[#f5f5f7] text-black px-3 py-1.5 rounded-full"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => deleteHistoryItem(item.id)}
+                        className="text-xs font-medium text-[#86868b] hover:text-[#ff3b30] transition"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auth Modal */}
+      {authModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full relative shadow-2xl">
+            <button
+              onClick={() => setAuthModalOpen(false)}
+              className="absolute top-6 right-6 bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
+            >
+              ✕
+            </button>
+            <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
+            <p className="text-sm text-[#86868b] mb-6">Get 5 free AI email generations every day.</p>
+            <form onSubmit={handleAuth} className="space-y-4">
+              <div>
+                <input
+                  type="email"
+                  required
+                  placeholder="Email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b]"
+                />
+              </div>
+              <div>
+                <input
+                  type="password"
+                  required
+                  placeholder="Password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b]"
+                />
+              </div>
+              {authMessage && (
+                <p className="text-sm text-[#ff3b30] bg-[#ff3b30]/10 p-3 rounded-xl">{authMessage}</p>
+              )}
+              <button
+                type="submit"
+                className="w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-4 rounded-xl text-sm transition shadow-md mt-2"
+              >
+                {isSignUp ? "Sign Up" : "Log In"}
+              </button>
+            </form>
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setAuthMessage("");
+                }}
+                className="text-sm font-medium text-[#0a84ff] hover:text-[#0071e3] transition"
+              >
+                {isSignUp ? "Already have an account? Log In" : "Need an account? Sign Up"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-24 px-6 max-w-3xl mx-auto">
+        <h2 className="text-3xl font-bold tracking-tight text-[#f5f5f7] mb-10 text-center">
+          Frequently Asked Questions
+        </h2>
+        <div className="space-y-3">
+          {faqs.map((faq, index) => (
+            <div key={index} className="bg-[#1c1c1e] rounded-2xl overflow-hidden transition-all">
+              <button
+                onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
+              >
+                <span className="font-semibold text-[#f5f5f7]">{faq.q}</span>
+                <span className="text-[#86868b] ml-4 text-xl font-light">{openFaq === index ? "−" : "+"}</span>
+              </button>
+              {openFaq === index && (
+                <div className="px-6 pb-6 text-[15px] text-[#86868b] leading-relaxed">{faq.a}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-12 text-center text-sm font-medium text-[#86868b]">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 WriteYourEmail. Built for High Performers.</p>
+          <p>© 2026 WriteYourEmail. All rights reserved.</p>
           <div className="flex space-x-6">
-            <Link href="/pricing" className="hover:text-white transition">Pricing Plans</Link>
-            <a href="#generator" className="hover:text-white transition">Back to Studio</a>
+            <Link href="/terms" className="hover:text-[#f5f5f7] transition">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">
+              Privacy
+            </Link>
           </div>
         </div>
       </footer>
-
-      {showSavePresetModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-3xl p-6 max-w-md w-full space-y-4">
-            <h3 className="text-lg font-bold text-[#f5f5f7]">Save Context Preset</h3>
-            <input type="text" placeholder="Preset Title (e.g., SaaS Demo Pitch)" value={presetTitle} onChange={(e) => setPresetTitle(e.target.value)} className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none" />
-            <div className="flex space-x-3 pt-2">
-              <button onClick={() => setShowSavePresetModal(false)} className="w-full bg-[#2c2c2e] text-[#86868b] font-semibold py-2.5 rounded-xl text-xs">Cancel</button>
-              <button onClick={handleSavePreset} className="w-full bg-[#0a84ff] text-white font-semibold py-2.5 rounded-xl text-xs">Save Preset</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showProUpgradeModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#1c1c1e] border-2 border-[#0a84ff] rounded-[2.5rem] p-8 max-w-lg w-full text-center relative shadow-2xl space-y-6">
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 inline-block">⚡ UNLOCK GOD MODE</span>
-            <h3 className="text-3xl font-bold text-[#f5f5f7]">Upgrade to Executive Pro</h3>
-            <p className="text-sm text-[#86868b] leading-relaxed">You've reached your free usage quota limit. Upgrade now to unlock unlimited generations, 3-step follow-up sequences, bulk CSV personalization, and custom Brand Voice DNA.</p>
-            <div className="space-y-3 text-left text-xs text-[#f5f5f7] bg-[#000000]/40 p-4 rounded-2xl border border-white/5">
-              <div className="flex items-center gap-2"><span className="text-[#34c759] font-bold">✓</span> Unlimited Daily AI Generations</div>
-              <div className="flex items-center gap-2"><span className="text-purple-400 font-bold">✓</span> 3-Step Follow-Up Sequence Engine</div>
-              <div className="flex items-center gap-2"><span className="text-amber-300 font-bold">✓</span> Bulk Lead CSV Personalization Generator</div>
-              <div className="flex items-center gap-2"><span className="text-[#0a84ff] font-bold">✓</span> AI Reply Intent & Objection Classifier</div>
-            </div>
-            <a href={getProCheckoutUrl()} target="_blank" rel="noopener noreferrer" className="block w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-bold py-4 rounded-2xl text-sm transition shadow-lg">Upgrade Now ($9/month)</a>
-            <button onClick={() => setShowProUpgradeModal(false)} className="text-xs text-[#86868b] hover:text-white">Continue with Free Features</button>
-          </div>
-        </div>
-      )}
-
-      {showAuthModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-3xl p-8 max-w-sm w-full space-y-5">
-            <div className="text-center">
-              <h3 className="text-xl font-bold text-[#f5f5f7]">{isSignUp ? "Create Account" : "Welcome Back"}</h3>
-              <p className="text-xs text-[#86868b] mt-1">{isSignUp ? "Sign up to unlock 5 free daily generations" : "Sign in to access your saved presets"}</p>
-            </div>
-            <form onSubmit={handleAuth} className="space-y-4">
-              <input type="email" placeholder="Work Email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none" />
-              <input type="password" placeholder="Password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-[#2c2c2e] border border-white/10 rounded-xl p-3 text-sm text-[#f5f5f7] focus:outline-none" />
-              {authMessage && <p className="text-xs text-amber-300 text-center">{authMessage}</p>}
-              <button type="submit" disabled={authLoading} className="w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-3 rounded-xl text-sm transition">{authLoading ? "Processing..." : isSignUp ? "Sign Up Free" : "Sign In"}</button>
-            </form>
-            <div className="text-center pt-2">
-              <button onClick={() => setIsSignUp(!isSignUp)} className="text-xs text-[#86868b] hover:text-white">{isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up Free"}</button>
-            </div>
-            <div className="text-center">
-              <button onClick={() => setShowAuthModal(false)} className="text-xs text-[#55555d] hover:text-[#86868b]">Close</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
