@@ -13,12 +13,45 @@ const GROQ_MODELS = [
 
 export async function POST(req: Request) {
   try {
-    const { mode, emailType, context, recipient, sender, tone, targetLanguage, draftText, polishGoal, docuSignLink } = await req.json();
+    const { 
+      mode, 
+      emailType, 
+      context, 
+      recipient, 
+      sender, 
+      tone, 
+      targetLanguage, 
+      draftText, 
+      polishGoal, 
+      docuSignLink,
+      brandVoice 
+    } = await req.json();
 
     const lang = targetLanguage || "English";
     let prompt = "";
 
-    if (mode === "polish") {
+    if (mode === "sequence") {
+      if (!context || !context.trim()) {
+        return NextResponse.json({ error: "Context is required for sequences." }, { status: 400 });
+      }
+
+      prompt = `You are a world-class executive sales strategist.
+Create a high-converting 3-step email outreach sequence written natively in ${lang}.
+- Goal/Context: ${context}
+- Target Recipient: ${recipient || "Partner"}
+- Sender Name: ${sender || "Best Regards"}
+- Target Language: ${lang}
+${brandVoice ? `- CUSTOM BRAND VOICE DNA INSTRUCTIONS: ${brandVoice}` : ""}
+${docuSignLink ? `- Include DocuSign link in Email 1 or 2: ${docuSignLink}` : ""}
+
+Requirements:
+1. Generate 3 high-converting subject line options written in ${lang} with spam risk ratings.
+2. Generate 3 sequence steps written natively in ${lang}:
+   - Step 1: Initial Pitch / Outreach (Day 1)
+   - Step 2: Gentle Follow-Up Nudge (Day 3)
+   - Step 3: Polite Breakup / Final Call (Day 7)`;
+
+    } else if (mode === "polish") {
       if (!draftText || !draftText.trim()) {
         return NextResponse.json({ error: "Draft text is required for polishing." }, { status: 400 });
       }
@@ -28,14 +61,16 @@ Task: Polish and rewrite the user's rough email draft.
 - Target Output Language: ${lang}
 - Polish Goal: ${polishGoal || "Fix grammar and improve professional clarity"}
 - Original Draft: "${draftText}"
-${docuSignLink ? `- Include a professional e-signature Call To Action pointing to this DocuSign link: ${docuSignLink}` : ""}
+${brandVoice ? `- CUSTOM BRAND VOICE DNA: ${brandVoice}` : ""}
+${docuSignLink ? `- Include e-signature CTA with DocuSign link: ${docuSignLink}` : ""}
 
 Requirements:
-1. Generate 3 improved subject line variations written in ${lang} with spam risk ratings.
-2. Generate 3 distinct polished versions of the body written natively in ${lang}:
-   - Variation 1: Direct & Concise
-   - Variation 2: Confident & High Impact
-   - Variation 3: Warm & Collaborative`;
+1. Generate 3 subject line options in ${lang} with spam risk ratings.
+2. Generate 3 distinct polished body variations natively in ${lang}:
+   - Option 1: Direct & Concise
+   - Option 2: Confident & High Impact
+   - Option 3: Warm & Collaborative`;
+
     } else {
       if (!context || !context.trim()) {
         return NextResponse.json({ error: "Context is required." }, { status: 400 });
@@ -43,30 +78,56 @@ Requirements:
 
       const isContract = emailType === "contract_pitch";
 
-      prompt = `You are a world-class email copywriting engine specializing in executive communication and high-stakes deals.
-Create 3 subject lines with spam scores and 3 distinct email body variations based on these inputs:
-- Target Language: Output EVERYTHING natively in ${lang}
+      prompt = `You are a world-class email copywriting engine specializing in executive communication.
+Create 3 subject lines with spam scores and 3 email body variations in ${lang}:
+- Target Language: ${lang}
 - Email Type: ${emailType} ${isContract ? "(Contract/Proposal Pitch for e-Signature)" : ""}
 - Tone: ${tone}
 - Recipient: ${recipient || "Not specified"}
 - Sender Signature: ${sender || "Not specified"}
 - Context & Goals: ${context}
+${brandVoice ? `- CUSTOM BRAND VOICE DNA: ${brandVoice}` : ""}
 ${docuSignLink ? `- e-Signature / DocuSign Link: ${docuSignLink}` : ""}
 
-${isContract ? `SPECIAL INSTRUCTIONS FOR CONTRACT / DOCUSIGN PITCHING:
-- Clear instructions guiding the recipient to review and electronically sign via the provided link.
-- Friendly, professional tone assuring security and ease of signing.
-- Optional subtle deadline or call-to-action to complete agreement.` : ""}
-
 Requirements:
-1. Generate 3 high-converting subject line variations written natively in ${lang} with spam risk ratings.
-2. Generate 3 distinct email body variations written natively in ${lang}:
+1. Generate 3 subject lines in ${lang} with spam risk ratings.
+2. Generate 3 email body variations in ${lang}:
    - Option 1: Direct & Concise
    - Option 2: Persuasive & Detailed
    - Option 3: Casual & Warm`;
     }
 
-    prompt += `\n\nRespond ONLY with valid, strict JSON matching this exact structure:
+    if (mode === "sequence") {
+      prompt += `\n\nRespond ONLY with valid, strict JSON matching this exact structure:
+{
+  "subjectLines": [
+    { "subject": "Subject 1 in ${lang}", "spamRisk": "Low Risk", "score": 98 },
+    { "subject": "Subject 2 in ${lang}", "spamRisk": "Low Risk", "score": 94 },
+    { "subject": "Subject 3 in ${lang}", "spamRisk": "Medium Risk", "score": 82 }
+  ],
+  "variations": [
+    {
+      "id": "seq-1",
+      "title": "Email 1: Initial Pitch (Day 1)",
+      "readingTime": "45 sec read",
+      "body": "Full body text for Step 1 in ${lang}..."
+    },
+    {
+      "id": "seq-2",
+      "title": "Email 2: Gentle Nudge (Day 3)",
+      "readingTime": "25 sec read",
+      "body": "Full body text for Step 2 in ${lang}..."
+    },
+    {
+      "id": "seq-3",
+      "title": "Email 3: Polite Breakup (Day 7)",
+      "readingTime": "30 sec read",
+      "body": "Full body text for Step 3 in ${lang}..."
+    }
+  ]
+}`;
+    } else {
+      prompt += `\n\nRespond ONLY with valid, strict JSON matching this exact structure:
 {
   "subjectLines": [
     { "subject": "Subject line 1 in ${lang}", "spamRisk": "Low Risk", "score": 98 },
@@ -93,9 +154,10 @@ Requirements:
       "body": "Full body text in ${lang}..."
     }
   ]
-}
+}`;
+    }
 
-DO NOT include markdown codeblocks (like \`\`\`json). Output pure JSON string only.`;
+    prompt += `\nDO NOT include markdown codeblocks (like \`\`\`json). Output pure JSON string only.`;
 
     let generatedData = null;
     let lastError = null;
@@ -109,7 +171,7 @@ DO NOT include markdown codeblocks (like \`\`\`json). Output pure JSON string on
           ],
           model: model,
           temperature: 0.7,
-          max_tokens: 1600,
+          max_tokens: 2200,
         });
 
         const rawText = completion.choices[0]?.message?.content || "";

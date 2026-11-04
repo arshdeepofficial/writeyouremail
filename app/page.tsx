@@ -8,6 +8,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+const LEMON_SQUEEZY_CHECKOUT = "https://writeyouremail.lemonsqueezy.com/checkout/buy/8de4d383-5177-4977-8066-de6872cdb69d";
+
 interface SubjectLine {
   subject: string;
   spamRisk: string;
@@ -37,7 +39,7 @@ const LANGUAGES = [
 ];
 
 export default function Home() {
-  const [studioMode, setStudioMode] = useState<"create" | "polish">("create");
+  const [studioMode, setStudioMode] = useState<"create" | "polish" | "sequence">("create");
   const [emailType, setEmailType] = useState("cold_outreach");
   const [context, setContext] = useState("");
   const [recipient, setRecipient] = useState("");
@@ -47,6 +49,7 @@ export default function Home() {
   const [draftText, setDraftText] = useState("");
   const [polishGoal, setPolishGoal] = useState("Fix grammar, typos & improve flow");
   const [docuSignLink, setDocuSignLink] = useState("");
+  const [brandVoice, setBrandVoice] = useState("");
 
   const [subjectLines, setSubjectLines] = useState<SubjectLine[]>([]);
   const [variations, setVariations] = useState<EmailVariation[]>([]);
@@ -54,6 +57,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
 
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [proModalOpen, setProModalOpen] = useState(false);
+  const [proReason, setProReason] = useState("");
   const [savedHistory, setSavedHistory] = useState<SavedEmailRecord[]>([]);
   const [historySearch, setHistorySearch] = useState("");
 
@@ -75,12 +80,12 @@ export default function Home() {
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (mobileMenuOpen || historyModalOpen) {
+    if (mobileMenuOpen || historyModalOpen || proModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
     }
-  }, [mobileMenuOpen, historyModalOpen]);
+  }, [mobileMenuOpen, historyModalOpen, proModalOpen]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -107,6 +112,11 @@ export default function Home() {
 
     return () => authListener.subscription.unsubscribe();
   }, []);
+
+  const triggerProModal = (reason: string) => {
+    setProReason(reason);
+    setProModalOpen(true);
+  };
 
   const fetchUserUsage = async (userId: string) => {
     try {
@@ -142,16 +152,16 @@ export default function Home() {
     const primaryBody = vars[0]?.body || "";
     const newRecord: SavedEmailRecord = {
       id: Date.now().toString(), created_at: new Date().toISOString(),
-      email_type: studioMode === "create" ? emailType : "Magic Polish",
+      email_type: studioMode === "sequence" ? "3-Step Sequence" : (studioMode === "create" ? emailType : "Magic Polish"),
       subject_line: primarySubject, body: primaryBody, language: targetLanguage,
     };
 
     if (user) {
       try {
         await supabase.from("emails").insert({
-          user_id: user.id, email_type: studioMode === "create" ? emailType : "Magic Polish",
-          context: studioMode === "create" ? context : draftText, recipient: primarySubject,
-          sender: sender || "User", tone: targetLanguage, generated_email: primaryBody,
+          user_id: user.id, email_type: newRecord.email_type,
+          context: studioMode === "create" || studioMode === "sequence" ? context : draftText,
+          recipient: primarySubject, sender: sender || "User", tone: targetLanguage, generated_email: primaryBody,
         });
         fetchUserHistory(user.id);
       } catch (e) { console.error(e); }
@@ -170,6 +180,40 @@ export default function Home() {
       const updated = savedHistory.filter((item) => item.id !== id);
       setSavedHistory(updated);
       localStorage.setItem("guest_email_history", JSON.stringify(updated));
+    }
+  };
+
+  const exportHistory = (format: "txt" | "csv") => {
+    if (!isPro) {
+      triggerProModal("1-Click Email History Export is a Pro feature.");
+      return;
+    }
+    if (savedHistory.length === 0) return;
+
+    if (format === "txt") {
+      const content = savedHistory.map((item, idx) => (
+        `=== EMAIL #${idx + 1} (${new Date(item.created_at).toLocaleDateString()}) ===\nType: ${item.email_type}\nSubject: ${item.subject_line}\n\nBODY:\n${item.body}\n\n`
+      )).join("\n---\n\n");
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "WriteYourEmail_History.txt";
+      a.click();
+    } else {
+      const csvRows = [
+        ["Date", "Type", "Subject", "Body"],
+        ...savedHistory.map((item) => [
+          new Date(item.created_at).toLocaleDateString(),
+          `"${item.email_type.replace(/"/g, '""')}"`,
+          `"${item.subject_line.replace(/"/g, '""')}"`,
+          `"${item.body.replace(/"/g, '""')}"`,
+        ]),
+      ];
+      const blob = new Blob([csvRows.map((e) => e.join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "WriteYourEmail_History.csv";
+      a.click();
     }
   };
 
@@ -194,11 +238,11 @@ export default function Home() {
     e.preventDefault();
     if (!isPro) {
       if (!user && guestUsage >= 2) {
-        alert("You have reached your 2 free guest emails! Log in or sign up to get 5 free emails every day.");
-        setAuthModalOpen(true); return;
+        setAuthModalOpen(true);
+        return;
       }
       if (user && dailyUsage >= 5) {
-        alert("You have reached your 5 daily free emails! Upgrade to Pro for unlimited emails.");
+        triggerProModal("You have reached your 5 daily free emails! Upgrade to Pro for unlimited email generations.");
         return;
       }
     }
@@ -211,8 +255,21 @@ export default function Home() {
       try {
         attempts++;
         const response = await fetch("/api/generate", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: studioMode, emailType, context, recipient, sender, tone, targetLanguage, draftText, polishGoal, docuSignLink }),
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: studioMode,
+            emailType,
+            context,
+            recipient,
+            sender,
+            tone,
+            targetLanguage,
+            draftText,
+            polishGoal,
+            docuSignLink,
+            brandVoice: isPro ? brandVoice : "",
+          }),
         });
         const data = await response.json();
         if (response.ok && data.variations && data.variations.length > 0) {
@@ -223,7 +280,9 @@ export default function Home() {
           await saveToHistory(data.subjectLines || [], data.variations || []);
           break;
         }
-      } catch (err) { console.warn(`Attempt ${attempts} retrying...`); }
+      } catch (err) {
+        console.warn(`Attempt ${attempts} retrying...`);
+      }
       if (!success && attempts < 3) await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
@@ -245,68 +304,132 @@ export default function Home() {
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
         if (error) throw error;
-        setAuthModalOpen(false); setMobileMenuOpen(false);
+        setAuthModalOpen(false);
+        setMobileMenuOpen(false);
       }
-    } catch (err: any) { setAuthMessage(err.message); }
+    } catch (err: any) {
+      setAuthMessage(err.message);
+    }
   };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setUser(null); setIsPro(false); setDailyUsage(0); setMobileMenuOpen(false);
+    setUser(null);
+    setIsPro(false);
+    setDailyUsage(0);
+    setMobileMenuOpen(false);
   };
 
   const copySubject = (text: string, index: number) => {
-    navigator.clipboard.writeText(text); setCopiedSubject(index); setTimeout(() => setCopiedSubject(null), 2000);
+    navigator.clipboard.writeText(text);
+    setCopiedSubject(index);
+    setTimeout(() => setCopiedSubject(null), 2000);
   };
 
   const copyBody = (text: string) => {
-    navigator.clipboard.writeText(text); setCopiedBody(true); setTimeout(() => setCopiedBody(false), 2000);
+    navigator.clipboard.writeText(text);
+    setCopiedBody(true);
+    setTimeout(() => setCopiedBody(false), 2000);
   };
 
   const openInGmail = (subjectText: string, bodyText: string) => {
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`, "_blank");
+    window.open(
+      `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`,
+      "_blank"
+    );
   };
 
   const openInMailClient = (subjectText: string, bodyText: string) => {
     window.location.href = `mailto:?subject=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`;
   };
 
-  const filteredHistory = savedHistory.filter((item) =>
-    item.subject_line.toLowerCase().includes(historySearch.toLowerCase()) ||
-    item.body.toLowerCase().includes(historySearch.toLowerCase()) ||
-    item.email_type.toLowerCase().includes(historySearch.toLowerCase())
+  const filteredHistory = savedHistory.filter(
+    (item) =>
+      item.subject_line.toLowerCase().includes(historySearch.toLowerCase()) ||
+      item.body.toLowerCase().includes(historySearch.toLowerCase()) ||
+      item.email_type.toLowerCase().includes(historySearch.toLowerCase())
   );
 
   const faqs = [
-    { q: "What is WriteYourEmail?", a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), polishes drafts, and sends e-signature pitch requests." },
-    { q: "Is there a free tier?", a: "Yes. Unregistered guests get 2 free emails. Registered users get 5 free emails every single day." },
-    { q: "What is included in the Pro plan?", a: "The Pro plan ($9/mo) gives you unlimited email generations, priority speed, DocuSign pitch tools, and multi-language support." },
-    { q: "How do I cancel my subscription?", a: "You can manage or cancel your subscription anytime via Lemon Squeezy with one click." }
+    {
+      q: "What is WriteYourEmail?",
+      a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), polishes drafts, and sends e-signature pitch requests.",
+    },
+    {
+      q: "Is there a free tier?",
+      a: "Yes. Unregistered guests get 2 free emails. Registered users get 5 free emails every single day.",
+    },
+    {
+      q: "What is included in the Pro plan?",
+      a: "The Pro plan ($9/mo) gives you unlimited email generations, 3-step follow-up sequences, custom brand voice DNA, DocuSign pitch tools, and CSV/TXT history exports.",
+    },
+    {
+      q: "How do I cancel my subscription?",
+      a: "You can manage or cancel your subscription anytime via Lemon Squeezy with one click.",
+    },
   ];
 
   return (
-    <div className="relative w-full overflow-x-hidden min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
-      
+    <div
+      className="relative w-full overflow-x-hidden min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white"
+      style={{
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      }}
+    >
       {/* Apple Ambient Glow */}
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[100px] pointer-events-none rounded-full" />
 
       {/* Header */}
-      <header className={`sticky top-0 z-50 border-b border-white/10 transition-colors duration-300 ${mobileMenuOpen ? 'bg-[#000000]' : 'bg-[#000000]/70 backdrop-blur-2xl saturate-150'}`}>
+      <header
+        className={`sticky top-0 z-50 border-b border-white/10 transition-colors duration-300 ${
+          mobileMenuOpen ? "bg-[#000000]" : "bg-[#000000]/70 backdrop-blur-2xl saturate-150"
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center space-x-2 font-semibold tracking-tight text-lg z-50" onClick={() => setMobileMenuOpen(false)}>
-              <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">✉️</span>
+            <Link
+              href="/"
+              className="flex items-center space-x-2 font-semibold tracking-tight text-lg z-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
+                ✉️
+              </span>
               <span>WriteYourEmail</span>
             </Link>
-            
+
             <nav className="hidden md:flex items-center space-x-6 text-sm text-[#86868b] font-medium">
-              <a href="#generator" className="hover:text-[#f5f5f7] transition-colors">Products</a>
-              <a href="#faq" className="hover:text-[#f5f5f7] transition-colors">Resources</a>
-              <Link href="/pricing" className="hover:text-[#f5f5f7] transition-colors">Pricing</Link>
+              <a href="#generator" className="hover:text-[#f5f5f7] transition-colors">
+                Products
+              </a>
+              <a href="#faq" className="hover:text-[#f5f5f7] transition-colors">
+                Resources
+              </a>
+              <Link href="/pricing" className="hover:text-[#f5f5f7] transition-colors">
+                Pricing
+              </Link>
             </nav>
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
+            {isPro ? (
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-300">
+                ⚡ PRO MEMBER
+              </span>
+            ) : (
+              <button
+                onClick={() =>
+                  triggerProModal(
+                    "Upgrade to Pro to unlock unlimited daily generations, 3-step outreach sequences, and custom brand voice."
+                  )
+                }
+                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1"
+              >
+                <span>🚀 Free Plan</span> — <span className="text-[#0a84ff] underline">Upgrade ($9/mo)</span>
+              </button>
+            )}
+
             <button
               onClick={() => setHistoryModalOpen(true)}
               className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition flex items-center gap-1.5"
@@ -322,43 +445,74 @@ export default function Home() {
             {user ? (
               <div className="flex items-center space-x-4 ml-2 border-l border-white/10 pl-4">
                 <span className="text-sm text-[#86868b]">{user.email}</span>
-                <button onClick={handleLogout} className="text-sm text-[#86868b] hover:text-[#f5f5f7] transition">Log out</button>
+                <button onClick={handleLogout} className="text-sm text-[#86868b] hover:text-[#f5f5f7] transition">
+                  Log out
+                </button>
               </div>
             ) : (
               <div className="flex items-center space-x-3 ml-2 border-l border-white/10 pl-4">
-                <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); }} className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition">
+                <button
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setAuthModalOpen(true);
+                  }}
+                  className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition"
+                >
                   Log In
                 </button>
-                <button onClick={() => { setIsSignUp(true); setAuthModalOpen(true); }} className="text-sm font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-1.5 rounded-full transition shadow-sm">
+                <button
+                  onClick={() => {
+                    setIsSignUp(true);
+                    setAuthModalOpen(true);
+                  }}
+                  className="text-sm font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-1.5 rounded-full transition shadow-sm"
+                >
                   Sign Up
                 </button>
               </div>
             )}
           </div>
 
-          <button 
+          <button
             className="md:hidden text-[#86868b] hover:text-[#f5f5f7] z-50 p-2 -mr-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             ) : (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             )}
           </button>
         </div>
       </header>
 
       {/* Mobile Menu */}
-      <div className={`fixed inset-0 z-40 bg-[#000000] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${mobileMenuOpen ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none'}`}>
+      <div
+        className={`fixed inset-0 z-40 bg-[#000000] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${
+          mobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
+        }`}
+      >
         <nav className="flex flex-col text-lg font-medium text-[#f5f5f7]">
-          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">Products</a>
-          <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">Resources</a>
-          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">Pricing</Link>
-          
+          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
+            Products
+          </a>
+          <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
+            Resources
+          </a>
+          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
+            Pricing
+          </Link>
+
           <div className="pt-8 flex flex-col space-y-4">
-            <button 
-              onClick={() => { setMobileMenuOpen(false); setHistoryModalOpen(true); }}
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setHistoryModalOpen(true);
+              }}
               className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold"
             >
               Saved History ({savedHistory.length})
@@ -366,12 +520,35 @@ export default function Home() {
             {user ? (
               <>
                 <span className="text-sm text-[#86868b] text-center">{user.email}</span>
-                <button onClick={handleLogout} className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold">Log Out</button>
+                <button
+                  onClick={handleLogout}
+                  className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold"
+                >
+                  Log Out
+                </button>
               </>
             ) : (
               <>
-                <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold">Log In</button>
-                <button onClick={() => { setIsSignUp(true); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold">Sign Up</button>
+                <button
+                  onClick={() => {
+                    setIsSignUp(false);
+                    setAuthModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold"
+                >
+                  Log In
+                </button>
+                <button
+                  onClick={() => {
+                    setIsSignUp(true);
+                    setAuthModalOpen(true);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold"
+                >
+                  Sign Up
+                </button>
               </>
             )}
           </div>
@@ -384,14 +561,21 @@ export default function Home() {
           Intelligence that closes deals.
         </h1>
         <p className="text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium">
-          Generate sales pitches, e-signature requests with DocuSign, and multi-language emails instantly.
+          Generate sales pitches, 3-step outreach sequences, e-signature requests with DocuSign, and multi-language emails
+          instantly.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-          <a href="#generator" className="bg-[#f5f5f7] text-black hover:bg-white font-semibold px-8 py-3.5 rounded-full text-base transition shadow-sm w-full sm:w-auto">
+          <a
+            href="#generator"
+            className="bg-[#f5f5f7] text-black hover:bg-white font-semibold px-8 py-3.5 rounded-full text-base transition shadow-sm w-full sm:w-auto"
+          >
             Start Writing
           </a>
-          <Link href="/pricing" className="bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#f5f5f7] font-semibold px-8 py-3.5 rounded-full text-base transition w-full sm:w-auto">
-            View Pricing
+          <Link
+            href="/pricing"
+            className="bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#f5f5f7] font-semibold px-8 py-3.5 rounded-full text-base transition w-full sm:w-auto"
+          >
+            View Pricing ($9/mo)
           </Link>
         </div>
       </section>
@@ -399,11 +583,10 @@ export default function Home() {
       {/* Generator Workspace */}
       <section id="generator" className="py-12 px-4 sm:px-6 max-w-4xl mx-auto">
         <div className="bg-[#1c1c1e]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
-          
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio v3.5</h2>
-              <p className="text-sm text-[#86868b] mt-1">Includes DocuSign & e-Signature request support.</p>
+              <p className="text-sm text-[#86868b] mt-1">Includes DocuSign & 3-Step Sequence support.</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <button
@@ -422,7 +605,7 @@ export default function Home() {
           </div>
 
           {/* Segmented Control */}
-          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-fit mb-8">
+          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-fit mb-8 overflow-x-auto">
             <button
               onClick={() => setStudioMode("create")}
               className={`text-sm font-medium px-5 py-2 rounded-lg transition-all ${
@@ -439,10 +622,30 @@ export default function Home() {
             >
               Magic Polish
             </button>
+            <button
+              onClick={() => {
+                if (!isPro) {
+                  triggerProModal("3-Step Outreach Sequence generator is a Pro exclusive feature.");
+                } else {
+                  setStudioMode("sequence");
+                }
+              }}
+              className={`text-sm font-medium px-5 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                studioMode === "sequence"
+                  ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm"
+                  : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>🔁 3-Step Sequence</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
+            </button>
           </div>
 
           <form onSubmit={handleGenerate} className="space-y-6">
-            
             <div className="max-w-xs">
               <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
                 Output Language
@@ -450,63 +653,56 @@ export default function Home() {
               <select
                 value={targetLanguage}
                 onChange={(e) => setTargetLanguage(e.target.value)}
-                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none"
+                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
               >
                 {LANGUAGES.map((lang) => (
-                  <option key={lang} value={lang}>{lang}</option>
+                  <option key={lang} value={lang}>
+                    {lang}
+                  </option>
                 ))}
               </select>
             </div>
 
-            {studioMode === "create" ? (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Email Type</label>
-                    <select value={emailType} onChange={(e) => setEmailType(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none">
-                      <option value="cold_outreach">Cold Outreach / Sales</option>
-                      <option value="contract_pitch">Contract / Proposal Pitch (DocuSign)</option>
-                      <option value="job_application">Job Application / Pitch</option>
-                      <option value="follow_up">Follow Up</option>
-                      <option value="resignation">Resignation / Transition</option>
-                      <option value="custom">Custom Email</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Tone of Voice</label>
-                    <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none">
-                      <option value="professional">Professional & Direct</option>
-                      <option value="persuasive">Persuasive & Confident</option>
-                      <option value="friendly">Friendly & Warm</option>
-                      <option value="urgent">Urgent & High Priority</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Recipient Name</label>
-                    <input type="text" placeholder="e.g. Tim Cook" value={recipient} onChange={(e) => setRecipient(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]" />
-                  </div>
-                </div>
+            {/* Custom Brand Voice DNA Input (Pro Feature) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider flex items-center gap-1.5">
+                  <span>✍️ Custom Brand Voice DNA</span>
+                  {!isPro && (
+                    <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                      PRO
+                    </span>
+                  )}
+                </label>
+                {!isPro && (
+                  <button
+                    type="button"
+                    onClick={() => triggerProModal("Custom Brand Voice DNA is a Pro feature.")}
+                    className="text-xs text-amber-400 hover:underline"
+                  >
+                    Unlock Pro
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                disabled={!isPro}
+                placeholder={
+                  isPro
+                    ? "e.g. Direct Silicon Valley executive, max 3 bullet points, sign off 'Warmly'"
+                    : "🔒 Upgrade to Pro to enforce your unique personal brand voice"
+                }
+                value={brandVoice}
+                onChange={(e) => setBrandVoice(e.target.value)}
+                className={`w-full border-none rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none ${
+                  isPro
+                    ? "bg-[#2c2c2e] text-[#f5f5f7] placeholder-[#86868b]"
+                    : "bg-[#2c2c2e]/50 text-[#86868b] cursor-not-allowed"
+                }`}
+              />
+            </div>
 
-                {/* DocuSign URL Input Field */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                    🖋️ DocuSign / e-Signature URL (Optional)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://app.docusign.com/signing/..."
-                    value={docuSignLink}
-                    onChange={(e) => setDocuSignLink(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Context & Main Points</label>
-                  <textarea rows={4} required placeholder="What is the key goal of this email or contract request?" value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none" />
-                </div>
-              </>
-            ) : (
+            {studioMode === "polish" ? (
               <>
                 <div>
                   <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
@@ -531,7 +727,7 @@ export default function Home() {
                       "Fix grammar, typos & improve flow",
                       "Make shorter & punchier",
                       "Make strong & confident",
-                      "Make politely firm (set boundaries)"
+                      "Make politely firm (set boundaries)",
                     ].map((goal) => (
                       <button
                         type="button"
@@ -549,15 +745,115 @@ export default function Home() {
                   </div>
                 </div>
               </>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                      Email Type
+                    </label>
+                    <select
+                      value={emailType}
+                      onChange={(e) => setEmailType(e.target.value)}
+                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="cold_outreach">Cold Outreach / Sales</option>
+                      <option value="contract_pitch">Contract / Proposal Pitch (DocuSign)</option>
+                      <option value="job_application">Job Application / Pitch</option>
+                      <option value="follow_up">Follow Up</option>
+                      <option value="resignation">Resignation / Transition</option>
+                      <option value="custom">Custom Email</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                      Tone of Voice
+                    </label>
+                    <select
+                      value={tone}
+                      onChange={(e) => setTone(e.target.value)}
+                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                    >
+                      <option value="professional">Professional & Direct</option>
+                      <option value="persuasive">Persuasive & Confident</option>
+                      <option value="friendly">Friendly & Warm</option>
+                      <option value="urgent">Urgent & High Priority</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                      Recipient Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Tim Cook"
+                      value={recipient}
+                      onChange={(e) => setRecipient(e.target.value)}
+                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]"
+                    />
+                  </div>
+                </div>
+
+                {/* DocuSign URL Input Field */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    🖋️ DocuSign / e-Signature URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="https://app.docusign.com/signing/..."
+                    value={docuSignLink}
+                    onChange={(e) => setDocuSignLink(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                    {studioMode === "sequence" ? "Sequence Context & Pitch Goal" : "Context & Main Points"}
+                  </label>
+                  <textarea
+                    rows={4}
+                    required
+                    placeholder={
+                      studioMode === "sequence"
+                        ? "Pitching SaaS tool to Head of Marketing. Goal is to book a 15-min call."
+                        : "What is the key goal of this email or contract request?"
+                    }
+                    value={context}
+                    onChange={(e) => setContext(e.target.value)}
+                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] resize-none"
+                  />
+                </div>
+              </>
             )}
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
-              <input type="text" placeholder="Your Name (Sender Signature)" value={sender} onChange={(e) => setSender(e.target.value)} className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] w-full sm:w-1/2" />
-              <button type="submit" disabled={loading} className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2 shadow-md">
+              <input
+                type="text"
+                placeholder="Your Name (Sender Signature)"
+                value={sender}
+                onChange={(e) => setSender(e.target.value)}
+                className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none placeholder-[#86868b] w-full sm:w-1/2"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2 shadow-md"
+              >
                 {loading ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Processing...</span></>
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Processing...</span>
+                  </>
                 ) : (
-                  <span>{studioMode === "create" ? "Generate Emails" : "Magic Polish Draft"}</span>
+                  <span>
+                    {studioMode === "sequence"
+                      ? "Generate 3-Step Sequence"
+                      : studioMode === "create"
+                      ? "Generate Emails"
+                      : "Magic Polish Draft"}
+                  </span>
                 )}
               </button>
             </div>
@@ -566,7 +862,6 @@ export default function Home() {
           {/* Result Output Display */}
           {variations.length > 0 && (
             <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8">
-              
               {/* Subject Lines */}
               {subjectLines.length > 0 && (
                 <div className="space-y-3">
@@ -575,17 +870,22 @@ export default function Home() {
                   </span>
                   <div className="space-y-2">
                     {subjectLines.map((subj, idx) => (
-                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#2c2c2e] p-4 rounded-2xl gap-3">
+                      <div
+                        key={idx}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#2c2c2e] p-4 rounded-2xl gap-3"
+                      >
                         <span className="text-sm font-medium text-[#f5f5f7]">{subj.subject}</span>
                         <div className="flex items-center space-x-3 shrink-0">
-                          <span className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
-                            subj.score >= 90 
-                              ? 'bg-[#34c759]/20 text-[#34c759]' 
-                              : 'bg-[#ff9f0a]/20 text-[#ff9f0a]'
-                          }`}>
+                          <span
+                            className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
+                              subj.score >= 90
+                                ? "bg-[#34c759]/20 text-[#34c759]"
+                                : "bg-[#ff9f0a]/20 text-[#ff9f0a]"
+                            }`}
+                          >
                             {subj.spamRisk}
                           </span>
-                          <button 
+                          <button
                             onClick={() => copySubject(subj.subject, idx)}
                             className="text-xs font-medium text-[#0a84ff] hover:text-[#0071e3] bg-[#0a84ff]/10 px-3 py-1.5 rounded-full transition"
                           >
@@ -598,7 +898,7 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Variations */}
+              {/* Variations / Sequence steps */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2">
                   <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
@@ -620,17 +920,15 @@ export default function Home() {
                           : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
                       }`}
                     >
-                      Option {i + 1}: {v.title}
+                      {v.title}
                     </button>
                   ))}
                 </div>
 
                 <div className="relative bg-[#2c2c2e] rounded-2xl p-6 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px] shadow-inner mt-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-5 pb-4 border-b border-white/10">
-                    <span className="text-xs font-medium text-[#34c759] flex items-center gap-1">
-                      ✓ Auto-saved
-                    </span>
-                    
+                    <span className="text-xs font-medium text-[#34c759] flex items-center gap-1">✓ Auto-saved</span>
+
                     <div className="flex flex-wrap items-center gap-2">
                       {docuSignLink && (
                         <a
@@ -643,22 +941,26 @@ export default function Home() {
                         </a>
                       )}
 
-                      <button 
-                        onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)} 
+                      <button
+                        onClick={() =>
+                          openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)
+                        }
                         className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition"
                       >
                         Open in Gmail
                       </button>
 
-                      <button 
-                        onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)} 
+                      <button
+                        onClick={() =>
+                          openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)
+                        }
                         className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition"
                       >
                         Mail App
                       </button>
 
-                      <button 
-                        onClick={() => copyBody(variations[selectedTab]?.body)} 
+                      <button
+                        onClick={() => copyBody(variations[selectedTab]?.body)}
                         className="text-xs font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-2 rounded-full transition shadow-sm"
                       >
                         {copiedBody ? "Copied!" : "Copy Text"}
@@ -669,11 +971,72 @@ export default function Home() {
                   {variations[selectedTab]?.body}
                 </div>
               </div>
-
             </div>
           )}
         </div>
       </section>
+
+      {/* PRO UPGRADE MODAL */}
+      {proModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full relative shadow-2xl overflow-hidden">
+            <button
+              onClick={() => setProModalOpen(false)}
+              className="absolute top-6 right-6 bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
+            >
+              ✕
+            </button>
+
+            <div className="text-center mb-6 pt-2">
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-block mb-3">
+                ⚡ UNLOCK EXECUTIVE PRO
+              </span>
+              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">Upgrade to Pro ($9/mo)</h3>
+              <p className="text-sm text-[#86868b]">
+                {proReason || "Unlock all executive tools and unlimited generations."}
+              </p>
+            </div>
+
+            <div className="space-y-3 mb-8 text-sm text-[#f5f5f7]">
+              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+                <span className="text-emerald-400 font-bold">✓</span>
+                <span>
+                  <strong>Unlimited Email Generations</strong> (No 5/day limit)
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+                <span className="text-purple-400 font-bold">✓</span>
+                <span>
+                  <strong>3-Step Outreach Sequence Generator</strong>
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+                <span className="text-[#0a84ff] font-bold">✓</span>
+                <span>
+                  <strong>Custom Brand Voice DNA Preset</strong>
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+                <span className="text-amber-400 font-bold">✓</span>
+                <span>
+                  <strong>1-Click CSV/TXT Email History Export</strong>
+                </span>
+              </div>
+            </div>
+
+            <a
+              href={LEMON_SQUEEZY_CHECKOUT}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-4 bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold rounded-2xl text-center block transition shadow-lg"
+            >
+              Get Pro Access — $9/mo (Cards & PayPal)
+            </a>
+
+            <p className="text-[11px] text-center text-[#86868b] mt-3">Powered by Lemon Squeezy • Cancel anytime</p>
+          </div>
+        </div>
+      )}
 
       {/* History Modal */}
       {historyModalOpen && (
@@ -682,14 +1045,33 @@ export default function Home() {
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <div>
                 <h3 className="text-xl font-semibold text-[#f5f5f7]">Saved History</h3>
-                <p className="text-sm text-[#86868b]">Search and re-open past emails.</p>
+                <p className="text-sm text-[#86868b]">Search, copy, or export past emails.</p>
               </div>
-              <button 
-                onClick={() => setHistoryModalOpen(false)} 
+              <button
+                onClick={() => setHistoryModalOpen(false)}
                 className="bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
               >
                 ✕
               </button>
+            </div>
+
+            {/* Export Toolbar */}
+            <div className="py-3 flex items-center justify-between border-b border-white/5 text-xs text-[#86868b]">
+              <span>{savedHistory.length} saved records</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => exportHistory("txt")}
+                  className="px-3 py-1.5 rounded-full bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] font-medium transition"
+                >
+                  Export TXT {!isPro && "🔒"}
+                </button>
+                <button
+                  onClick={() => exportHistory("csv")}
+                  className="px-3 py-1.5 rounded-full bg-[#0a84ff]/20 text-[#0a84ff] font-medium transition"
+                >
+                  Export CSV {!isPro && "🔒"}
+                </button>
+              </div>
             </div>
 
             <div className="py-4">
@@ -704,14 +1086,14 @@ export default function Home() {
 
             <div className="overflow-y-auto flex-1 space-y-4 pr-2">
               {filteredHistory.length === 0 ? (
-                <div className="text-center py-12 text-[#86868b] text-sm font-medium">
-                  No saved emails found.
-                </div>
+                <div className="text-center py-12 text-[#86868b] text-sm font-medium">No saved emails found.</div>
               ) : (
                 filteredHistory.map((item) => (
                   <div key={item.id} className="bg-[#2c2c2e] rounded-2xl p-5 space-y-3">
                     <div className="flex items-center justify-between text-xs text-[#86868b] border-b border-white/5 pb-2">
-                      <span className="font-semibold uppercase tracking-wider">{item.email_type} ({item.language})</span>
+                      <span className="font-semibold uppercase tracking-wider">
+                        {item.email_type} ({item.language})
+                      </span>
                       <span>{new Date(item.created_at).toLocaleDateString()}</span>
                     </div>
 
@@ -720,10 +1102,25 @@ export default function Home() {
 
                     <div className="flex items-center justify-between pt-2">
                       <div className="flex items-center space-x-2">
-                        <button onClick={() => openInGmail(item.subject_line, item.body)} className="text-xs font-medium bg-[#ff3b30]/10 text-[#ff3b30] px-3 py-1.5 rounded-full">Gmail</button>
-                        <button onClick={() => copyBody(item.body)} className="text-xs font-medium bg-[#f5f5f7] text-black px-3 py-1.5 rounded-full">Copy</button>
+                        <button
+                          onClick={() => openInGmail(item.subject_line, item.body)}
+                          className="text-xs font-medium bg-[#ff3b30]/10 text-[#ff3b30] px-3 py-1.5 rounded-full"
+                        >
+                          Gmail
+                        </button>
+                        <button
+                          onClick={() => copyBody(item.body)}
+                          className="text-xs font-medium bg-[#f5f5f7] text-black px-3 py-1.5 rounded-full"
+                        >
+                          Copy
+                        </button>
                       </div>
-                      <button onClick={() => deleteHistoryItem(item.id)} className="text-xs font-medium text-[#86868b] hover:text-[#ff3b30] transition">Delete</button>
+                      <button
+                        onClick={() => deleteHistoryItem(item.id)}
+                        className="text-xs font-medium text-[#86868b] hover:text-[#ff3b30] transition"
+                      >
+                        Delete
+                      </button>
                     </div>
                   </div>
                 ))
@@ -735,11 +1132,13 @@ export default function Home() {
 
       {/* FAQ */}
       <section id="faq" className="py-24 px-6 max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold tracking-tight text-[#f5f5f7] mb-10 text-center">Frequently Asked Questions</h2>
+        <h2 className="text-3xl font-bold tracking-tight text-[#f5f5f7] mb-10 text-center">
+          Frequently Asked Questions
+        </h2>
         <div className="space-y-3">
           {faqs.map((faq, index) => (
             <div key={index} className="bg-[#1c1c1e] rounded-2xl overflow-hidden transition-all">
-              <button 
+              <button
                 onClick={() => setOpenFaq(openFaq === index ? null : index)}
                 className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
               >
@@ -747,9 +1146,7 @@ export default function Home() {
                 <span className="text-[#86868b] ml-4 text-xl font-light">{openFaq === index ? "−" : "+"}</span>
               </button>
               {openFaq === index && (
-                <div className="px-6 pb-6 text-[15px] text-[#86868b] leading-relaxed">
-                  {faq.a}
-                </div>
+                <div className="px-6 pb-6 text-[15px] text-[#86868b] leading-relaxed">{faq.a}</div>
               )}
             </div>
           ))}
@@ -760,23 +1157,53 @@ export default function Home() {
       {authModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
           <div className="bg-[#1c1c1e] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full relative shadow-2xl">
-            <button onClick={() => setAuthModalOpen(false)} className="absolute top-6 right-6 bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition">✕</button>
+            <button
+              onClick={() => setAuthModalOpen(false)}
+              className="absolute top-6 right-6 bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
+            >
+              ✕
+            </button>
             <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
             <p className="text-sm text-[#86868b] mb-8">Get 5 free AI email generations every day.</p>
             <form onSubmit={handleAuth} className="space-y-4">
               <div>
-                <input type="email" required placeholder="Email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm focus:ring-2 focus:ring-[#0a84ff] outline-none placeholder-[#86868b]" />
+                <input
+                  type="email"
+                  required
+                  placeholder="Email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm focus:ring-2 focus:ring-[#0a84ff] outline-none placeholder-[#86868b]"
+                />
               </div>
               <div>
-                <input type="password" required placeholder="Password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm focus:ring-2 focus:ring-[#0a84ff] outline-none placeholder-[#86868b]" />
+                <input
+                  type="password"
+                  required
+                  placeholder="Password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm focus:ring-2 focus:ring-[#0a84ff] outline-none placeholder-[#86868b]"
+                />
               </div>
-              {authMessage && <p className="text-sm text-[#ff3b30] bg-[#ff3b30]/10 p-3 rounded-xl">{authMessage}</p>}
-              <button type="submit" className="w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-4 rounded-xl text-sm transition shadow-md mt-2">
+              {authMessage && (
+                <p className="text-sm text-[#ff3b30] bg-[#ff3b30]/10 p-3 rounded-xl">{authMessage}</p>
+              )}
+              <button
+                type="submit"
+                className="w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-4 rounded-xl text-sm transition shadow-md mt-2"
+              >
                 {isSignUp ? "Sign Up" : "Log In"}
               </button>
             </form>
             <div className="mt-6 text-center">
-              <button onClick={() => { setIsSignUp(!isSignUp); setAuthMessage(""); }} className="text-sm font-medium text-[#0a84ff] hover:text-[#0071e3] transition">
+              <button
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setAuthMessage("");
+                }}
+                className="text-sm font-medium text-[#0a84ff] hover:text-[#0071e3] transition"
+              >
                 {isSignUp ? "Already have an account? Log In" : "Need an account? Sign Up"}
               </button>
             </div>
@@ -789,8 +1216,12 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© 2026 WriteYourEmail. All rights reserved.</p>
           <div className="flex space-x-6">
-            <Link href="/terms" className="hover:text-[#f5f5f7] transition">Terms</Link>
-            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">Privacy</Link>
+            <Link href="/terms" className="hover:text-[#f5f5f7] transition">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">
+              Privacy
+            </Link>
           </div>
         </div>
       </footer>
