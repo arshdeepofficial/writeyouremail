@@ -21,6 +21,15 @@ interface EmailVariation {
   body: string;
 }
 
+interface SavedEmailRecord {
+  id: string;
+  created_at: string;
+  email_type: string;
+  subject_line: string;
+  body: string;
+  language: string;
+}
+
 const LANGUAGES = [
   "English", "Spanish", "French", "German", "Italian", "Portuguese",
   "Dutch", "Japanese", "Chinese (Simplified)", "Hindi", "Arabic",
@@ -49,6 +58,11 @@ export default function Home() {
   const [selectedTab, setSelectedTab] = useState<number>(0);
   const [loading, setLoading] = useState(false);
 
+  // History State
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [savedHistory, setSavedHistory] = useState<SavedEmailRecord[]>([]);
+  const [historySearch, setHistorySearch] = useState("");
+
   // Auth & Usage State
   const [user, setUser] = useState<any>(null);
   const [dailyUsage, setDailyUsage] = useState<number>(0);
@@ -69,21 +83,23 @@ export default function Home() {
   const resultRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (mobileMenuOpen) {
+    if (mobileMenuOpen || historyModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "unset";
     }
-  }, [mobileMenuOpen]);
+  }, [mobileMenuOpen, historyModalOpen]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserUsage(session.user.id);
+        fetchUserHistory(session.user.id);
       } else {
         const storedGuestUsage = localStorage.getItem("guest_usage");
         setGuestUsage(storedGuestUsage ? parseInt(storedGuestUsage, 10) : 0);
+        loadGuestHistory();
       }
     });
 
@@ -91,6 +107,9 @@ export default function Home() {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserUsage(session.user.id);
+        fetchUserHistory(session.user.id);
+      } else {
+        loadGuestHistory();
       }
     });
 
@@ -111,6 +130,88 @@ export default function Home() {
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const fetchUserHistory = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("emails")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setSavedHistory(
+          data.map((item: any) => ({
+            id: item.id,
+            created_at: item.created_at,
+            email_type: item.email_type,
+            subject_line: item.recipient || "Generated Email",
+            body: item.generated_email,
+            language: item.tone || "English",
+          }))
+        );
+      }
+    } catch (e) {
+      console.error("Error fetching history:", e);
+    }
+  };
+
+  const loadGuestHistory = () => {
+    const raw = localStorage.getItem("guest_email_history");
+    if (raw) {
+      try {
+        setSavedHistory(JSON.parse(raw));
+      } catch (e) {
+        console.error("Error parsing guest history");
+      }
+    }
+  };
+
+  const saveToHistory = async (subjects: SubjectLine[], vars: EmailVariation[]) => {
+    const primarySubject = subjects[0]?.subject || "Generated Email";
+    const primaryBody = vars[0]?.body || "";
+
+    const newRecord: SavedEmailRecord = {
+      id: Date.now().toString(),
+      created_at: new Date().toISOString(),
+      email_type: studioMode === "create" ? emailType : "Magic Polish",
+      subject_line: primarySubject,
+      body: primaryBody,
+      language: targetLanguage,
+    };
+
+    if (user) {
+      try {
+        await supabase.from("emails").insert({
+          user_id: user.id,
+          email_type: studioMode === "create" ? emailType : "Magic Polish",
+          context: studioMode === "create" ? context : draftText,
+          recipient: primarySubject,
+          sender: sender || "User",
+          tone: targetLanguage,
+          generated_email: primaryBody,
+        });
+        fetchUserHistory(user.id);
+      } catch (e) {
+        console.error("Failed to save to Supabase history:", e);
+      }
+    } else {
+      const updated = [newRecord, ...savedHistory];
+      setSavedHistory(updated);
+      localStorage.setItem("guest_email_history", JSON.stringify(updated.slice(0, 20)));
+    }
+  };
+
+  const deleteHistoryItem = async (id: string) => {
+    if (user) {
+      await supabase.from("emails").delete().eq("id", id);
+      fetchUserHistory(user.id);
+    } else {
+      const updated = savedHistory.filter((item) => item.id !== id);
+      setSavedHistory(updated);
+      localStorage.setItem("guest_email_history", JSON.stringify(updated));
     }
   };
 
@@ -181,6 +282,7 @@ export default function Home() {
           setVariations(data.variations || []);
           setSelectedTab(0);
           success = true;
+          await saveToHistory(data.subjectLines || [], data.variations || []);
           break;
         }
       } catch (err) {
@@ -241,6 +343,28 @@ export default function Home() {
     setTimeout(() => setCopiedBody(false), 2000);
   };
 
+  // Open Direct in Gmail
+  const openInGmail = (subjectText: string, bodyText: string) => {
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(
+      subjectText
+    )}&body=${encodeURIComponent(bodyText)}`;
+    window.open(url, "_blank");
+  };
+
+  // Open Direct in Default Mail Client (mailto)
+  const openInMailClient = (subjectText: string, bodyText: string) => {
+    const url = `mailto:?subject=${encodeURIComponent(
+      subjectText
+    )}&body=${encodeURIComponent(bodyText)}`;
+    window.location.href = url;
+  };
+
+  const filteredHistory = savedHistory.filter((item) =>
+    item.subject_line.toLowerCase().includes(historySearch.toLowerCase()) ||
+    item.body.toLowerCase().includes(historySearch.toLowerCase()) ||
+    item.email_type.toLowerCase().includes(historySearch.toLowerCase())
+  );
+
   const faqs = [
     { q: "What is WriteYourEmail?", a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), and polishes draft emails into high-converting messages in seconds." },
     { q: "Is there a free tier?", a: "Yes. Unregistered guests get 2 free emails. Registered users get 5 free emails every single day." },
@@ -271,9 +395,18 @@ export default function Home() {
           </div>
 
           <div className="hidden md:flex items-center space-x-3">
-            <a href="#generator" className="text-xs font-medium text-zinc-300 hover:text-white px-3.5 py-2 rounded-full border border-zinc-800 hover:border-zinc-700 transition">
-              Get a Demo
-            </a>
+            <button
+              onClick={() => setHistoryModalOpen(true)}
+              className="text-xs font-medium text-zinc-300 hover:text-white px-3.5 py-2 rounded-full border border-zinc-800 hover:border-zinc-700 transition flex items-center gap-1.5"
+            >
+              <span>📜 History</span>
+              {savedHistory.length > 0 && (
+                <span className="bg-zinc-800 text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono">
+                  {savedHistory.length}
+                </span>
+              )}
+            </button>
+
             {user ? (
               <div className="flex items-center space-x-3 ml-2 border-l border-zinc-800 pl-4">
                 <span className="text-xs text-zinc-400">{user.email}</span>
@@ -313,9 +446,12 @@ export default function Home() {
           <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="hover:text-white border-b border-zinc-900 py-4">Pricing</Link>
           
           <div className="pt-8 flex flex-col space-y-4">
-            <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="text-center bg-zinc-900 text-white py-3 rounded-full text-sm font-semibold border border-zinc-800">
-              Get a Demo
-            </a>
+            <button 
+              onClick={() => { setMobileMenuOpen(false); setHistoryModalOpen(true); }}
+              className="text-center bg-zinc-900 text-white py-3 rounded-full text-sm font-semibold border border-zinc-800"
+            >
+              📜 Saved Email History ({savedHistory.length})
+            </button>
             {user ? (
               <>
                 <span className="text-sm text-zinc-500 text-center">{user.email}</span>
@@ -340,19 +476,22 @@ export default function Home() {
             </h1>
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
               <a href="#generator" className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-3 rounded-full text-sm transition shadow-lg shadow-white/5 w-full sm:w-auto text-center">
-                Start Studio (25+ Languages)
+                Start Writing
               </a>
-              <Link href="/pricing" className="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-white font-medium px-6 py-3 rounded-full text-sm transition backdrop-blur-md w-full sm:w-auto text-center">
-                View Pricing
-              </Link>
+              <button
+                onClick={() => setHistoryModalOpen(true)}
+                className="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-white font-medium px-6 py-3 rounded-full text-sm transition backdrop-blur-md w-full sm:w-auto text-center flex items-center justify-center gap-2"
+              >
+                <span>📜 View Saved History</span>
+              </button>
             </div>
           </div>
 
           <div className="lg:col-span-5 relative">
             <div className="relative z-10 space-y-4 text-zinc-300 font-medium text-lg sm:text-xl border-l border-zinc-800 pl-6">
               <p className="hover:text-white transition">25+ Languages supported natively</p>
-              <p className="hover:text-white transition">Magic Polish for existing drafts</p>
-              <p className="hover:text-white transition">Spam risk tested subject lines</p>
+              <p className="hover:text-white transition">Direct 1-click open in Gmail</p>
+              <p className="hover:text-white transition">Auto-saved email history</p>
             </div>
             <div className="mt-12 relative flex justify-center items-center">
               <div className="w-48 h-48 bg-gradient-to-tr from-white/20 via-zinc-500/10 to-transparent rounded-full blur-2xl absolute" />
@@ -370,15 +509,22 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-4 border-b border-zinc-900 gap-4">
             <div>
               <h2 className="text-xl font-semibold tracking-tight text-white">Email Studio v3.0</h2>
-              <p className="text-xs text-zinc-400 mt-1">Multi-language AI email creation & draft polishing.</p>
+              <p className="text-xs text-zinc-400 mt-1">Multi-language AI email creation, draft polishing & auto-save.</p>
             </div>
-            {!isPro && (
-              <div className="shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setHistoryModalOpen(true)}
+                className="text-xs px-3 py-1.5 bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-full text-zinc-300 transition"
+              >
+                📜 History ({savedHistory.length})
+              </button>
+              {!isPro && (
                 <span className="text-xs px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-full text-zinc-400 font-mono whitespace-nowrap">
                   {user ? `${dailyUsage}/5 Free Daily` : `${guestUsage}/2 Guest Free`}
                 </span>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Mode Switcher Tabs */}
@@ -403,7 +549,7 @@ export default function Home() {
 
           <form onSubmit={handleGenerate} className="space-y-6">
             
-            {/* Output Language Selector (Applies to both modes) */}
+            {/* Output Language Selector */}
             <div className="max-w-xs">
               <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
                 🌍 Output Language
@@ -574,14 +720,36 @@ export default function Home() {
                 </div>
 
                 <div className="relative bg-zinc-900/90 border border-zinc-700/80 rounded-xl p-5 text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap text-sm shadow-xl mt-4">
-                  <div className="flex justify-end mb-3">
-                    <button 
-                      onClick={() => copyBody(variations[selectedTab]?.body)} 
-                      className="text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3.5 py-1.5 rounded-full text-zinc-200 transition"
-                    >
-                      {copiedBody ? "Copied Selected Email!" : "Copy Email Body"}
-                    </button>
+                  {/* Phase 1 Action Bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-zinc-800/80">
+                    <span className="text-xs font-mono text-emerald-400 flex items-center gap-1">
+                      ✓ Auto-saved to History
+                    </span>
+                    
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button 
+                        onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)} 
+                        className="text-xs bg-red-950/60 hover:bg-red-900/80 border border-red-800 text-red-200 px-3 py-1.5 rounded-full transition flex items-center gap-1"
+                      >
+                        ✉️ Open in Gmail
+                      </button>
+
+                      <button 
+                        onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)} 
+                        className="text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-200 px-3 py-1.5 rounded-full transition flex items-center gap-1"
+                      >
+                        📬 Mail App
+                      </button>
+
+                      <button 
+                        onClick={() => copyBody(variations[selectedTab]?.body)} 
+                        className="text-xs bg-white text-black hover:bg-zinc-200 font-medium px-3 py-1.5 rounded-full transition"
+                      >
+                        {copiedBody ? "Copied!" : "Copy Text"}
+                      </button>
+                    </div>
                   </div>
+
                   {variations[selectedTab]?.body}
                 </div>
               </div>
@@ -590,6 +758,81 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {/* Saved History Drawer / Modal */}
+      {historyModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 max-w-2xl w-full max-h-[85vh] flex flex-col relative shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-zinc-900">
+              <div>
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span>📜 Saved Email History</span>
+                </h3>
+                <p className="text-xs text-zinc-400">Search and re-open past email generations.</p>
+              </div>
+              <button 
+                onClick={() => setHistoryModalOpen(false)} 
+                className="text-zinc-500 hover:text-white p-2 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="py-4">
+              <input
+                type="text"
+                placeholder="Search history by keyword or subject..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-white transition"
+              />
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+              {filteredHistory.length === 0 ? (
+                <div className="text-center py-12 text-zinc-500 text-xs font-mono">
+                  No saved emails found.
+                </div>
+              ) : (
+                filteredHistory.map((item) => (
+                  <div key={item.id} className="bg-zinc-900/60 border border-zinc-800/80 rounded-xl p-4 space-y-3 hover:border-zinc-700 transition">
+                    <div className="flex items-center justify-between text-xs text-zinc-400 border-b border-zinc-800/60 pb-2">
+                      <span className="font-mono text-zinc-300 uppercase">{item.email_type} ({item.language})</span>
+                      <span className="text-[10px] text-zinc-500">{new Date(item.created_at).toLocaleDateString()}</span>
+                    </div>
+
+                    <p className="text-xs font-medium text-white truncate">{item.subject_line}</p>
+                    <p className="text-xs text-zinc-400 line-clamp-3 whitespace-pre-wrap font-sans">{item.body}</p>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => openInGmail(item.subject_line, item.body)}
+                          className="text-[11px] bg-red-950/60 hover:bg-red-900/80 text-red-200 border border-red-800 px-2.5 py-1 rounded-md transition"
+                        >
+                          Gmail
+                        </button>
+                        <button
+                          onClick={() => copyBody(item.body)}
+                          className="text-[11px] bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 rounded-md transition"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => deleteHistoryItem(item.id)}
+                        className="text-[11px] text-zinc-500 hover:text-red-400 transition"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FAQ Section */}
       <section id="faq" className="py-20 px-6 max-w-3xl mx-auto">
