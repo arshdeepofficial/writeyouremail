@@ -5,7 +5,6 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
 });
 
-// Active Groq Model Endpoints
 const GROQ_MODELS = [
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
@@ -14,47 +13,74 @@ const GROQ_MODELS = [
 
 export async function POST(req: Request) {
   try {
-    const { emailType, context, recipient, sender, tone } = await req.json();
+    const { mode, emailType, context, recipient, sender, tone, targetLanguage, draftText, polishGoal } = await req.json();
 
-    if (!context || !context.trim()) {
-      return NextResponse.json(
-        { error: "Context is required." },
-        { status: 400 }
-      );
-    }
+    const lang = targetLanguage || "English";
+    let prompt = "";
 
-    const prompt = `You are an world-class email copywriting engine. Create 3 subject lines with spam scores and 3 distinct email body variations based on these inputs:
+    if (mode === "polish") {
+      if (!draftText || !draftText.trim()) {
+        return NextResponse.json({ error: "Draft text is required for polishing." }, { status: 400 });
+      }
+
+      prompt = `You are a world-class executive editor and email copywriter.
+Task: Polish and rewrite the user's rough email draft.
+- Target Output Language: ${lang}
+- Polish Goal: ${polishGoal || "Fix grammar and improve professional clarity"}
+- Original Draft: "${draftText}"
+
+Requirements:
+1. Generate 3 improved subject line variations written in ${lang} with spam risk ratings.
+2. Generate 3 distinct polished versions of the body written natively in ${lang}:
+   - Variation 1: Direct & Concise
+   - Variation 2: Confident & High Impact
+   - Variation 3: Warm & Collaborative`;
+    } else {
+      if (!context || !context.trim()) {
+        return NextResponse.json({ error: "Context is required." }, { status: 400 });
+      }
+
+      prompt = `You are a world-class email copywriting engine. Create 3 subject lines with spam scores and 3 distinct email body variations based on these inputs:
+- Target Language: Output EVERYTHING natively in ${lang}
 - Email Type: ${emailType}
 - Tone: ${tone}
 - Recipient: ${recipient || "Not specified"}
 - Sender Signature: ${sender || "Not specified"}
 - Context & Goals: ${context}
 
-Respond ONLY with valid, strict JSON matching this exact structure:
+Requirements:
+1. Generate 3 high-converting subject line variations written natively in ${lang} with spam risk ratings.
+2. Generate 3 distinct email body variations written natively in ${lang}:
+   - Option 1: Direct & Concise
+   - Option 2: Persuasive & Detailed
+   - Option 3: Casual & Warm`;
+    }
+
+    prompt += `\n\nRespond ONLY with valid, strict JSON matching this exact structure:
 {
   "subjectLines": [
-    { "subject": "Subject line 1", "spamRisk": "Low Risk", "score": 98 },
-    { "subject": "Subject line 2", "spamRisk": "Low Risk", "score": 94 },
-    { "subject": "Subject line 3", "spamRisk": "Medium Risk", "score": 82 }
+    { "subject": "Subject line 1 in ${lang}", "spamRisk": "Low Risk", "score": 98 },
+    { "subject": "Subject line 2 in ${lang}", "spamRisk": "Low Risk", "score": 94 },
+    { "subject": "Subject line 3 in ${lang}", "spamRisk": "Medium Risk", "score": 82 }
   ],
   "variations": [
     {
-      "id": "direct",
+      "id": "v1",
       "title": "Direct & Concise",
       "readingTime": "20 sec read",
-      "body": "Subject: [Use chosen subject]\n\nEmail body text here..."
+      "body": "Full body text in ${lang}..."
     },
     {
-      "id": "persuasive",
-      "title": "Persuasive & Detailed",
-      "readingTime": "45 sec read",
-      "body": "Subject: [Use chosen subject]\n\nEmail body text here..."
+      "id": "v2",
+      "title": "Confident & High Impact",
+      "readingTime": "40 sec read",
+      "body": "Full body text in ${lang}..."
     },
     {
-      "id": "casual",
-      "title": "Casual & Warm",
+      "id": "v3",
+      "title": "Warm & Collaborative",
       "readingTime": "30 sec read",
-      "body": "Subject: [Use chosen subject]\n\nEmail body text here..."
+      "body": "Full body text in ${lang}..."
     }
   ]
 }
@@ -79,19 +105,19 @@ DO NOT include markdown codeblocks (like \`\`\`json). Output pure JSON string on
           ],
           model: model,
           temperature: 0.7,
-          max_tokens: 1500,
+          max_tokens: 1600,
         });
 
         const rawText = completion.choices[0]?.message?.content || "";
         const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-        
+
         const parsed = JSON.parse(cleanJson);
         if (parsed.variations && parsed.variations.length > 0) {
           generatedData = parsed;
           break;
         }
       } catch (err) {
-        console.warn(`Model ${model} failed JSON response, trying fallback...`, err);
+        console.warn(`Model ${model} failed, trying next fallback...`, err);
         lastError = err;
       }
     }
@@ -102,10 +128,7 @@ DO NOT include markdown codeblocks (like \`\`\`json). Output pure JSON string on
 
     return NextResponse.json(generatedData);
   } catch (error: any) {
-    console.error("Groq Multi-Variation Error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate multi-variation emails." },
-      { status: 500 }
-    );
+    console.error("Groq Generation Error:", error);
+    return NextResponse.json({ error: "Failed to generate output." }, { status: 500 });
   }
 }

@@ -21,15 +21,29 @@ interface EmailVariation {
   body: string;
 }
 
+const LANGUAGES = [
+  "English", "Spanish", "French", "German", "Italian", "Portuguese",
+  "Dutch", "Japanese", "Chinese (Simplified)", "Hindi", "Arabic",
+  "Korean", "Russian", "Turkish", "Vietnamese", "Polish"
+];
+
 export default function Home() {
-  // Generator State
+  // Studio Mode: 'create' | 'polish'
+  const [studioMode, setStudioMode] = useState<"create" | "polish">("create");
+
+  // Create Mode Inputs
   const [emailType, setEmailType] = useState("cold_outreach");
   const [context, setContext] = useState("");
   const [recipient, setRecipient] = useState("");
   const [sender, setSender] = useState("");
   const [tone, setTone] = useState("professional");
+  const [targetLanguage, setTargetLanguage] = useState("English");
 
-  // Output State (Phase 2)
+  // Polish Mode Inputs
+  const [draftText, setDraftText] = useState("");
+  const [polishGoal, setPolishGoal] = useState("Fix grammar, typos & improve flow");
+
+  // Output State
   const [subjectLines, setSubjectLines] = useState<SubjectLine[]>([]);
   const [variations, setVariations] = useState<EmailVariation[]>([]);
   const [selectedTab, setSelectedTab] = useState<number>(0);
@@ -50,8 +64,6 @@ export default function Home() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  // FAQ State
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const resultRef = useRef<HTMLDivElement>(null);
@@ -140,7 +152,6 @@ export default function Home() {
     }
 
     setLoading(true);
-
     let attempts = 0;
     let success = false;
 
@@ -150,7 +161,17 @@ export default function Home() {
         const response = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ emailType, context, recipient, sender, tone }),
+          body: JSON.stringify({
+            mode: studioMode,
+            emailType,
+            context,
+            recipient,
+            sender,
+            tone,
+            targetLanguage,
+            draftText,
+            polishGoal,
+          }),
         });
 
         const data = await response.json();
@@ -221,9 +242,9 @@ export default function Home() {
   };
 
   const faqs = [
-    { q: "What is WriteYourEmail?", a: "WriteYourEmail is an AI-powered email studio that generates 3 high-converting email variations and spam-tested subject lines instantly." },
+    { q: "What is WriteYourEmail?", a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), and polishes draft emails into high-converting messages in seconds." },
     { q: "Is there a free tier?", a: "Yes. Unregistered guests get 2 free emails. Registered users get 5 free emails every single day." },
-    { q: "What is included in the Pro plan?", a: "The Pro plan ($9/mo) gives you unlimited email generations, priority speed, and full multi-variation support." },
+    { q: "What is included in the Pro plan?", a: "The Pro plan ($9/mo) gives you unlimited email generations, priority speed, multi-language support, and Magic Polish." },
     { q: "How do I cancel my subscription?", a: "You can manage or cancel your subscription anytime via Lemon Squeezy with one click." }
   ];
 
@@ -315,11 +336,11 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-7 space-y-8">
             <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white leading-[1.05]">
-              Agentic <br /> Email Intelligence
+              Agentic <br /> Email Studio
             </h1>
             <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
               <a href="#generator" className="bg-white text-black hover:bg-zinc-200 font-medium px-6 py-3 rounded-full text-sm transition shadow-lg shadow-white/5 w-full sm:w-auto text-center">
-                Start Writing (3 Variations)
+                Start Studio (25+ Languages)
               </a>
               <Link href="/pricing" className="bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800 text-white font-medium px-6 py-3 rounded-full text-sm transition backdrop-blur-md w-full sm:w-auto text-center">
                 View Pricing
@@ -329,9 +350,9 @@ export default function Home() {
 
           <div className="lg:col-span-5 relative">
             <div className="relative z-10 space-y-4 text-zinc-300 font-medium text-lg sm:text-xl border-l border-zinc-800 pl-6">
-              <p className="hover:text-white transition">3 Variations generated in parallel</p>
-              <p className="hover:text-white transition">Subject line spam risk score</p>
-              <p className="hover:text-white transition">Automated by AI agents</p>
+              <p className="hover:text-white transition">25+ Languages supported natively</p>
+              <p className="hover:text-white transition">Magic Polish for existing drafts</p>
+              <p className="hover:text-white transition">Spam risk tested subject lines</p>
             </div>
             <div className="mt-12 relative flex justify-center items-center">
               <div className="w-48 h-48 bg-gradient-to-tr from-white/20 via-zinc-500/10 to-transparent rounded-full blur-2xl absolute" />
@@ -348,8 +369,8 @@ export default function Home() {
           
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-4 border-b border-zinc-900 gap-4">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">Email Studio v2.0</h2>
-              <p className="text-xs text-zinc-400 mt-1">Generates 3 tailored email options + spam-rated subject lines.</p>
+              <h2 className="text-xl font-semibold tracking-tight text-white">Email Studio v3.0</h2>
+              <p className="text-xs text-zinc-400 mt-1">Multi-language AI email creation & draft polishing.</p>
             </div>
             {!isPro && (
               <div className="shrink-0">
@@ -360,62 +381,146 @@ export default function Home() {
             )}
           </div>
 
+          {/* Mode Switcher Tabs */}
+          <div className="flex items-center space-x-3 mb-6 bg-zinc-900/80 p-1.5 rounded-xl border border-zinc-800 w-fit">
+            <button
+              onClick={() => setStudioMode("create")}
+              className={`text-xs font-semibold px-4 py-2 rounded-lg transition ${
+                studioMode === "create" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              ✨ Create New Email
+            </button>
+            <button
+              onClick={() => setStudioMode("polish")}
+              className={`text-xs font-semibold px-4 py-2 rounded-lg transition ${
+                studioMode === "polish" ? "bg-white text-black" : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              🪄 Magic Polish Draft
+            </button>
+          </div>
+
           <form onSubmit={handleGenerate} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Email Type</label>
-                <select value={emailType} onChange={(e) => setEmailType(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition">
-                  <option value="cold_outreach">Cold Outreach / Sales</option>
-                  <option value="job_application">Job Application / Pitch</option>
-                  <option value="follow_up">Follow Up</option>
-                  <option value="resignation">Resignation / Transition</option>
-                  <option value="custom">Custom Email</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Tone of Voice</label>
-                <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition">
-                  <option value="professional">Professional & Direct</option>
-                  <option value="persuasive">Persuasive & Confident</option>
-                  <option value="friendly">Friendly & Warm</option>
-                  <option value="urgent">Urgent & High Priority</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Recipient Name / Title</label>
-                <input type="text" placeholder="e.g. Sarah Connor" value={recipient} onChange={(e) => setRecipient(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600" />
-              </div>
+            
+            {/* Output Language Selector (Applies to both modes) */}
+            <div className="max-w-xs">
+              <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
+                🌍 Output Language
+              </label>
+              <select
+                value={targetLanguage}
+                onChange={(e) => setTargetLanguage(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition"
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+              </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Context & Main Points</label>
-              <textarea rows={4} required placeholder="What is the key goal of this email?" value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 resize-none" />
-            </div>
+            {studioMode === "create" ? (
+              /* CREATE MODE INPUTS */
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Email Type</label>
+                    <select value={emailType} onChange={(e) => setEmailType(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition">
+                      <option value="cold_outreach">Cold Outreach / Sales</option>
+                      <option value="job_application">Job Application / Pitch</option>
+                      <option value="follow_up">Follow Up</option>
+                      <option value="resignation">Resignation / Transition</option>
+                      <option value="custom">Custom Email</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Tone of Voice</label>
+                    <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition">
+                      <option value="professional">Professional & Direct</option>
+                      <option value="persuasive">Persuasive & Confident</option>
+                      <option value="friendly">Friendly & Warm</option>
+                      <option value="urgent">Urgent & High Priority</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Recipient Name / Title</label>
+                    <input type="text" placeholder="e.g. Sarah Connor" value={recipient} onChange={(e) => setRecipient(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Context & Main Points</label>
+                  <textarea rows={4} required placeholder="What is the key goal of this email?" value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 resize-none" />
+                </div>
+              </>
+            ) : (
+              /* MAGIC POLISH DRAFT INPUTS */
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
+                    Paste Your Existing Rough Draft
+                  </label>
+                  <textarea
+                    rows={5}
+                    required
+                    placeholder="Paste your messy draft, notes, or bullet points here..."
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    className="w-full bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
+                    Select Polish Goal
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      "Fix grammar, typos & improve flow",
+                      "Make shorter & punchier",
+                      "Make strong & confident",
+                      "Make politely firm (set boundaries)"
+                    ].map((goal) => (
+                      <button
+                        type="button"
+                        key={goal}
+                        onClick={() => setPolishGoal(goal)}
+                        className={`text-xs px-3.5 py-2 rounded-lg border transition ${
+                          polishGoal === goal
+                            ? "bg-white text-black border-white font-medium"
+                            : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-white"
+                        }`}
+                      >
+                        {goal}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
               <input type="text" placeholder="Your Name (Sender Signature)" value={sender} onChange={(e) => setSender(e.target.value)} className="bg-zinc-900 border border-zinc-800 text-white rounded-lg p-3 text-sm focus:outline-none focus:border-white transition placeholder-zinc-600 w-full sm:w-1/2" />
               <button type="submit" disabled={loading} className="w-full sm:w-auto bg-white text-black hover:bg-zinc-200 font-semibold px-8 py-3 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2">
                 {loading ? (
-                  <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /><span>Generating 3 Variations...</span></>
+                  <><span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" /><span>Processing AI Studio...</span></>
                 ) : (
-                  <span>Generate Emails ▲</span>
+                  <span>{studioMode === "create" ? "Generate Emails ▲" : "Magic Polish Draft ▲"}</span>
                 )}
               </button>
             </div>
           </form>
 
-          {/* Phase 2 Multi-Variation & Subject Line Display */}
+          {/* Result Output Display */}
           {variations.length > 0 && (
             <div ref={resultRef} className="mt-10 pt-8 border-t border-zinc-900 space-y-8">
               
-              {/* Subject Line Studio Section */}
+              {/* Subject Lines */}
               {subjectLines.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                      🎯 Subject Line Studio (Spam Risk Tested)
-                    </span>
-                  </div>
+                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
+                    🎯 Subject Line Studio ({targetLanguage})
+                  </span>
                   <div className="space-y-2">
                     {subjectLines.map((subj, idx) => (
                       <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-zinc-900/80 border border-zinc-800 p-3 rounded-xl gap-2">
@@ -441,11 +546,11 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Variation Tabs */}
+              {/* Variations */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
                   <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">
-                    ⚡ Select Email Variation
+                    ⚡ {targetLanguage} Output Options
                   </span>
                   <span className="text-xs text-zinc-500 font-mono">
                     {variations[selectedTab]?.readingTime}
@@ -468,7 +573,6 @@ export default function Home() {
                   ))}
                 </div>
 
-                {/* Active Variation Output */}
                 <div className="relative bg-zinc-900/90 border border-zinc-700/80 rounded-xl p-5 text-zinc-100 font-sans leading-relaxed whitespace-pre-wrap text-sm shadow-xl mt-4">
                   <div className="flex justify-end mb-3">
                     <button 
