@@ -58,10 +58,25 @@ const ICP_PERSONAS = [
   "CFO / Finance (Focus on ROI & Cost Savings)",
   "CTO / Engineering (Focus on Tech & Efficiency)",
   "HR / Ops (Focus on Team & Culture)",
-  "Marketing / Sales (Focus on Leads & Revenue)"
+  "Marketing / Sales (Focus on Leads & Revenue)",
+  "Investors / VCs (Focus on Traction & Multiples)",
+  "Small Business Owner (Focus on Survival & Ease)",
+  "Enterprise Procurement (Focus on Compliance & Scale)",
+  "Creator / Influencer (Focus on Brand & Monetization)"
 ];
 
-type StudioMode = "create" | "sequence" | "csv_bulk" | "classifier" | "ab_test" | "batch" | "reply" | "polish";
+type StudioMode = 
+  | "create" 
+  | "polish" 
+  | "reply" 
+  | "linkedin" 
+  | "twitter" 
+  | "cold_call"
+  | "classifier" 
+  | "sequence" 
+  | "ab_test" 
+  | "batch" 
+  | "csv_bulk";
 
 export default function StudioPage() {
   const [studioMode, setStudioMode] = useState<StudioMode>("create");
@@ -189,7 +204,7 @@ export default function StudioPage() {
           id: item.id,
           created_at: item.created_at,
           email_type: item.email_type,
-          subject_line: item.recipient || "Generated Email",
+          subject_line: item.recipient || "Generated Content",
           body: item.generated_email,
           language: item.tone || "English",
         })));
@@ -205,7 +220,7 @@ export default function StudioPage() {
   };
 
   const saveToHistory = async (subjects: SubjectLine[], vars: EmailVariation[]) => {
-    const primarySubject = subjects[0]?.subject || "Generated Email";
+    const primarySubject = subjects[0]?.subject || "Generated Content";
     const primaryBody = vars[0]?.body || "";
     
     const modeLabels: Record<StudioMode, string> = {
@@ -216,10 +231,13 @@ export default function StudioPage() {
       batch: "Multi-Vertical Batch",
       csv_bulk: "Bulk CSV Leads",
       classifier: "AI Reply Intent",
-      polish: "Magic Polish"
+      polish: "Magic Polish",
+      linkedin: "LinkedIn DM",
+      twitter: "Twitter/X DM",
+      cold_call: "Cold Call Script"
     };
     
-    let typeLabel = modeLabels[studioMode] || "Generated Email";
+    let typeLabel = modeLabels[studioMode] || "Generated Content";
 
     const newRecord: SavedEmailRecord = {
       id: Date.now().toString(),
@@ -270,7 +288,7 @@ export default function StudioPage() {
 
     if (format === "txt") {
       const content = savedHistory.map((item, idx) => (
-        `=== EMAIL #${idx + 1} (${new Date(item.created_at).toLocaleDateString()}) ===\nType: ${item.email_type}\nSubject: ${item.subject_line}\n\nBODY:\n${item.body}\n\n`
+        `=== ITEM #${idx + 1} (${new Date(item.created_at).toLocaleDateString()}) ===\nType: ${item.email_type}\nSubject: ${item.subject_line}\n\nBODY:\n${item.body}\n\n`
       )).join("\n---\n\n");
       const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
       const a = document.createElement("a");
@@ -324,7 +342,7 @@ export default function StudioPage() {
         return;
       }
       if (user && dailyUsage >= 5) {
-        triggerProModal("You have reached your 5 daily free emails! Upgrade to Pro for unlimited email generations.");
+        triggerProModal("You have reached your 5 daily free generations! Upgrade to Pro for unlimited access.");
         return;
       }
     }
@@ -474,19 +492,19 @@ export default function StudioPage() {
 
   return (
     <div
-      className="relative w-full overflow-x-hidden min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white"
+      className="relative w-full overflow-x-hidden min-h-screen bg-[#0a0a0a] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white"
       style={{
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
       {/* Apple Ambient Glow */}
-      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[100px] pointer-events-none rounded-full" />
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[120px] pointer-events-none rounded-full" />
 
       {/* Header */}
       <header
-        className={`sticky top-0 z-50 border-b border-white/10 transition-colors duration-300 ${
-          mobileMenuOpen ? "bg-[#000000]" : "bg-[#000000]/70 backdrop-blur-2xl saturate-150"
+        className={`sticky top-0 z-50 border-b border-white/5 transition-colors duration-300 ${
+          mobileMenuOpen ? "bg-[#0a0a0a]" : "bg-[#0a0a0a]/70 backdrop-blur-2xl saturate-150"
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
@@ -514,7 +532,7 @@ export default function StudioPage() {
 
           <div className="hidden md:flex items-center space-x-4">
             {isPro ? (
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-500/40 text-amber-300">
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/30 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]">
                 ⚡ PRO MEMBER
               </span>
             ) : (
@@ -524,9 +542,9 @@ export default function StudioPage() {
                     "Upgrade to Pro to unlock unlimited daily generations, 3-step outreach sequences, and custom brand voice."
                   )
                 }
-                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1"
+                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-white transition flex items-center gap-1 ring-1 ring-white/10"
               >
-                <span>🚀 Free Plan</span> — <span className="text-[#0a84ff] underline">Upgrade</span>
+                <span>🚀 Free Plan</span> — <span className="text-[#0a84ff]">Upgrade</span>
               </button>
             )}
 
@@ -592,7 +610,7 @@ export default function StudioPage() {
 
       {/* Mobile Drawer */}
       <div
-        className={`fixed inset-0 z-40 bg-[#000000] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${
+        className={`fixed inset-0 z-40 bg-[#0a0a0a] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${
           mobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
         }`}
       >
@@ -653,18 +671,18 @@ export default function StudioPage() {
       </div>
 
       {/* Generator Workspace */}
-      <section id="generator" className="py-12 px-4 sm:px-6 max-w-5xl mx-auto">
-        <div className="bg-[#1c1c1e]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+      <section id="generator" className="py-12 px-4 sm:px-6 max-w-[1050px] mx-auto">
+        <div className="bg-[#141415]/80 backdrop-blur-3xl border border-white/5 rounded-[2rem] p-6 sm:p-10 shadow-[0_0_80px_rgba(10,132,255,0.03)] relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Studio v7.0 Titan</h2>
-              <p className="text-sm text-[#86868b] mt-1">Includes A/B Testing, CSV Bulk, Presets & CRM Tags.</p>
+              <p className="text-sm text-[#86868b] mt-1">Includes Omni-Channel Outreach, CSV Bulk, Presets & CRM Tags.</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {presets.length > 0 && (
                 <select
                   onChange={(e) => loadPreset(e.target.value)}
-                  className="text-sm px-4 py-2 bg-[#2c2c2e] text-[#f5f5f7] rounded-full outline-none border-none cursor-pointer"
+                  className="text-sm px-4 py-2 bg-[#222224] text-[#f5f5f7] rounded-full outline-none border border-white/5 cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50"
                 >
                   <option value="">Load Preset...</option>
                   {presets.map((p) => (
@@ -675,38 +693,66 @@ export default function StudioPage() {
                 </select>
               )}
               {!isPro && (
-                <span className="text-sm px-4 py-2 bg-[#2c2c2e] rounded-full text-[#86868b] font-medium">
+                <span className="text-sm px-4 py-2 bg-[#222224] rounded-full text-[#86868b] font-medium border border-white/5">
                   {user ? `${dailyUsage}/5 Free` : `${guestUsage}/2 Free`}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Segmented Mode Selector Bar (All 8 Modes) */}
-          <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-full mb-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
+          {/* Hiding Webkit Scrollbar properly while keeping scroll functionality */}
+          <div className="flex items-center gap-2 bg-[#1c1c1e] p-1.5 rounded-2xl w-full mb-8 overflow-x-auto whitespace-nowrap border border-white/5 shadow-inner [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <button
               type="button"
               onClick={() => setStudioMode("create")}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
-                studioMode === "create" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
+                studioMode === "create" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
-              Create New
+              ✉️ Create New
             </button>
             <button
               type="button"
-              onClick={() => setStudioMode("polish")}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
-                studioMode === "polish" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
+              onClick={() => setStudioMode("linkedin")}
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "linkedin" ? "bg-[#0077b5] text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
-              Magic Polish
+              💼 LinkedIn DM
+            </button>
+            <button
+              type="button"
+              onClick={() => setStudioMode("twitter")}
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "twitter" ? "bg-black text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+              }`}
+            >
+              🐦 Twitter/X DM
+            </button>
+            <button
+              type="button"
+              onClick={() => setStudioMode("cold_call")}
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "cold_call" ? "bg-rose-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+              }`}
+            >
+              📞 Call Script
+            </button>
+            <div className="w-[1px] h-6 bg-white/10 mx-1 shrink-0" />
+            <button
+              type="button"
+              onClick={() => setStudioMode("polish")}
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
+                studioMode === "polish" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+              }`}
+            >
+              ✨ Magic Polish
             </button>
             <button
               type="button"
               onClick={() => setStudioMode("reply")}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all ${
-                studioMode === "reply" ? "bg-[#636366] text-white shadow-sm" : "text-[#86868b] hover:text-[#f5f5f7]"
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
+                studioMode === "reply" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               🥊 Objection Reply
@@ -717,13 +763,13 @@ export default function StudioPage() {
                 if (!isPro) triggerProModal("AI Reply Intent Classifier is a Pro exclusive feature.");
                 else setStudioMode("classifier");
               }}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                studioMode === "classifier" ? "bg-pink-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "classifier" ? "bg-pink-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>🧠 Classifier</span>
               {!isPro && (
-                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
                   PRO
                 </span>
               )}
@@ -734,13 +780,13 @@ export default function StudioPage() {
                 if (!isPro) triggerProModal("3-Step Outreach Sequence generator is a Pro exclusive feature.");
                 else setStudioMode("sequence");
               }}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                studioMode === "sequence" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "sequence" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>🔁 Sequence</span>
               {!isPro && (
-                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
                   PRO
                 </span>
               )}
@@ -751,13 +797,13 @@ export default function StudioPage() {
                 if (!isPro) triggerProModal("A/B Split Test generator is a Pro exclusive feature.");
                 else setStudioMode("ab_test");
               }}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                studioMode === "ab_test" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "ab_test" ? "bg-[#0a84ff] text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>⚖️ A/B Split</span>
               {!isPro && (
-                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
                   PRO
                 </span>
               )}
@@ -768,13 +814,13 @@ export default function StudioPage() {
                 if (!isPro) triggerProModal("Multi-Vertical Batch generator is a Pro exclusive feature.");
                 else setStudioMode("batch");
               }}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                studioMode === "batch" ? "bg-emerald-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "batch" ? "bg-emerald-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>📦 Batch</span>
               {!isPro && (
-                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
                   PRO
                 </span>
               )}
@@ -785,13 +831,13 @@ export default function StudioPage() {
                 if (!isPro) triggerProModal("Bulk CSV Leads generator is a Pro exclusive feature.");
                 else setStudioMode("csv_bulk");
               }}
-              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
-                studioMode === "csv_bulk" ? "bg-orange-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "csv_bulk" ? "bg-orange-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>📄 CSV Bulk</span>
               {!isPro && (
-                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
                   PRO
                 </span>
               )}
@@ -807,7 +853,7 @@ export default function StudioPage() {
                 <select
                   value={targetLanguage}
                   onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition outline-none appearance-none cursor-pointer shadow-sm"
                 >
                   {LANGUAGES.map((lang) => (
                     <option key={lang} value={lang}>
@@ -823,7 +869,7 @@ export default function StudioPage() {
                 <select
                   value={icpPersona}
                   onChange={(e) => setIcpPersona(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff] transition outline-none appearance-none cursor-pointer"
+                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition outline-none appearance-none cursor-pointer shadow-sm"
                 >
                   {ICP_PERSONAS.map((icp) => (
                     <option key={icp} value={icp}>
@@ -835,9 +881,9 @@ export default function StudioPage() {
             </div>
 
             {/* Advanced Campaign Tools Panel */}
-            <div className="bg-[#2c2c2e]/40 p-5 rounded-xl border border-white/5 space-y-4">
+            <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-white/5 space-y-4 shadow-inner">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-[#f5f5f7] uppercase tracking-wider flex items-center gap-2">
+                <label className="text-xs font-bold text-[#f5f5f7] uppercase tracking-wider flex items-center gap-2">
                   ⚙️ Advanced Campaign Engine
                 </label>
               </div>
@@ -846,7 +892,7 @@ export default function StudioPage() {
                 <div>
                   <label className="text-xs font-semibold text-[#86868b] mb-2 flex justify-between">
                     <span>Brand Voice DNA</span>
-                    {!isPro && <span className="text-[10px] text-amber-400 font-bold">PRO</span>}
+                    {!isPro && <span className="text-[10px] text-amber-400 font-bold tracking-wider">PRO</span>}
                   </label>
                   <input
                     type="text"
@@ -854,8 +900,8 @@ export default function StudioPage() {
                     placeholder={isPro ? "e.g. Direct Silicon Valley executive" : "🔒 Pro Required"}
                     value={brandVoice}
                     onChange={(e) => setBrandVoice(e.target.value)}
-                    className={`w-full border-none rounded-xl p-3 text-sm outline-none ${
-                      isPro ? "bg-[#2c2c2e] text-[#f5f5f7]" : "bg-[#2c2c2e]/50 text-[#86868b] cursor-not-allowed"
+                    className={`w-full border border-white/5 rounded-xl p-3 text-sm outline-none transition ${
+                      isPro ? "bg-[#222224] text-[#f5f5f7] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d]" : "bg-[#1a1a1c] text-[#86868b] cursor-not-allowed opacity-70"
                     }`}
                   />
                 </div>
@@ -868,7 +914,7 @@ export default function StudioPage() {
                     placeholder="e.g. https://stripe.com or 'VP of Sales'"
                     value={prospectBio}
                     onChange={(e) => setProspectBio(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                   />
                 </div>
               </div>
@@ -879,11 +925,11 @@ export default function StudioPage() {
                   id="crmTagsCheckbox"
                   checked={crmTags}
                   onChange={(e) => setCrmTags(e.target.checked)}
-                  className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer"
+                  className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer bg-[#222224] border-white/10"
                 />
-                <label htmlFor="crmTagsCheckbox" className="text-sm text-[#86868b] cursor-pointer">
+                <label htmlFor="crmTagsCheckbox" className="text-sm text-[#86868b] cursor-pointer font-medium">
                   Use CRM Merge Tags{" "}
-                  <code className="text-xs bg-[#1c1c1e] px-1.5 py-0.5 rounded text-[#f5f5f7] ml-1">{`{{first_name}}`}</code>
+                  <code className="text-xs bg-[#2a2a2d] px-1.5 py-0.5 rounded text-[#f5f5f7] ml-1 ring-1 ring-white/5">{`{{first_name}}`}</code>
                 </label>
               </div>
             </div>
@@ -900,7 +946,7 @@ export default function StudioPage() {
                   placeholder="e.g. SaaS, Real Estate, Healthcare"
                   value={targetIndustries}
                   onChange={(e) => setTargetIndustries(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
+                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                 />
               </div>
             )}
@@ -916,7 +962,7 @@ export default function StudioPage() {
                   placeholder="John Doe, Acme Corp, SaaS&#10;Jane Smith, Globex, Real Estate"
                   value={csvData}
                   onChange={(e) => setCsvData(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                 />
               </div>
             )}
@@ -932,7 +978,7 @@ export default function StudioPage() {
                   placeholder="Paste the prospect's reply here to analyze their intent (e.g. Positive, Negative, OOO, Pricing Objection)..."
                   value={incomingEmailText}
                   onChange={(e) => setIncomingEmailText(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                 />
               </div>
             )}
@@ -949,7 +995,7 @@ export default function StudioPage() {
                     placeholder="e.g. 'Thanks for reaching out, but your solution is way too expensive for our Q3 budget right now.'"
                     value={incomingEmailText}
                     onChange={(e) => setIncomingEmailText(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                   />
                 </div>
                 <div>
@@ -959,7 +1005,7 @@ export default function StudioPage() {
                   <select
                     value={replyStrategy}
                     onChange={(e) => setReplyStrategy(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
+                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                   >
                     <option value="Value & ROI Reframing">Value & ROI Reframing (Turn cost into ROI)</option>
                     <option value="Soft 5-Minute Nudge">Soft 5-Minute Nudge (Low friction ask)</option>
@@ -979,7 +1025,7 @@ export default function StudioPage() {
                     placeholder="Paste your draft or raw notes here..."
                     value={draftText}
                     onChange={(e) => setDraftText(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                   />
                 </div>
                 <div>
@@ -997,10 +1043,10 @@ export default function StudioPage() {
                         type="button"
                         key={goal}
                         onClick={() => setPolishGoal(goal)}
-                        className={`text-sm px-4 py-2 rounded-full transition font-medium ${
+                        className={`text-sm px-4 py-2 rounded-xl transition-all font-medium ${
                           polishGoal === goal
-                            ? "bg-[#0a84ff] text-white"
-                            : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
+                            ? "bg-[#0a84ff] text-white shadow-md ring-1 ring-[#0a84ff]/50"
+                            : "bg-[#222224] border border-white/5 text-[#86868b] hover:bg-[#2a2a2d] hover:text-[#f5f5f7]"
                         }`}
                       >
                         {goal}
@@ -1014,16 +1060,21 @@ export default function StudioPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                      Email Type
+                      Outreach Type
                     </label>
                     <select
                       value={emailType}
                       onChange={(e) => setEmailType(e.target.value)}
-                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
+                      className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                     >
                       <option value="cold_outreach">Cold Outreach / Sales</option>
-                      <option value="contract_pitch">Contract / Proposal Pitch</option>
                       <option value="follow_up">Follow Up</option>
+                      <option value="networking">Networking / Connect</option>
+                      <option value="investor_pitch">Investor / VC Pitch</option>
+                      <option value="pr_outreach">PR / Media Outreach</option>
+                      <option value="job_application">Job / Career Inquiry</option>
+                      <option value="newsletter_sponsor">Newsletter Sponsorship</option>
+                      <option value="contract_pitch">Contract / Proposal Pitch</option>
                     </select>
                   </div>
                   <div>
@@ -1033,11 +1084,17 @@ export default function StudioPage() {
                     <select
                       value={tone}
                       onChange={(e) => setTone(e.target.value)}
-                      className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer"
+                      className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                     >
                       <option value="professional">Professional & Direct</option>
                       <option value="persuasive">Persuasive & Confident</option>
                       <option value="friendly">Friendly & Warm</option>
+                      <option value="urgent">Urgent & Compelling</option>
+                      <option value="storytelling">Storytelling & Narrative</option>
+                      <option value="empathetic">Empathetic & Understanding</option>
+                      <option value="data_driven">Data-Driven & Analytical</option>
+                      <option value="authoritative">Authoritative & Expert</option>
+                      <option value="humorous">Humorous & Witty</option>
                     </select>
                   </div>
                   <div>
@@ -1050,21 +1107,21 @@ export default function StudioPage() {
                       placeholder={crmTags ? "{{first_name}}" : "Recipient Name"}
                       value={recipient}
                       onChange={(e) => setRecipient(e.target.value)}
-                      className="w-full bg-[#2c2c2e] disabled:opacity-50 border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
+                      className="w-full bg-[#222224] border border-white/5 disabled:opacity-50 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                     />
                   </div>
                 </div>
 
-                <div className="bg-[#2c2c2e]/60 p-4 rounded-xl space-y-3">
+                <div className="bg-[#1c1c1e]/60 p-4 rounded-2xl border border-white/5 space-y-3 shadow-inner">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                    <label className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
                       🖋️ HTML Signature & DocuSign
                     </label>
                     <input
                       type="checkbox"
                       checked={includeSignature}
                       onChange={(e) => setIncludeSignature(e.target.checked)}
-                      className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer"
+                      className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer bg-[#222224] border-white/10"
                     />
                   </div>
                   {includeSignature && (
@@ -1074,14 +1131,14 @@ export default function StudioPage() {
                         placeholder="Sender Title (e.g. VP of Sales)"
                         value={senderTitle}
                         onChange={(e) => setSenderTitle(e.target.value)}
-                        className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                        className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                       />
                       <input
                         type="url"
                         placeholder="DocuSign / Pitch Link"
                         value={docuSignLink}
                         onChange={(e) => setDocuSignLink(e.target.value)}
-                        className="bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b]"
+                        className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                       />
                     </div>
                   )}
@@ -1092,8 +1149,8 @@ export default function StudioPage() {
                     <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
                       Context & Pitch Goal
                     </label>
-                    <button type="button" onClick={savePreset} className="text-xs text-[#0a84ff] font-medium hover:underline">
-                      Save as Preset
+                    <button type="button" onClick={savePreset} className="text-xs text-[#0a84ff] font-medium hover:text-[#0071e3] transition">
+                      + Save as Preset
                     </button>
                   </div>
                   <textarea
@@ -1102,25 +1159,25 @@ export default function StudioPage() {
                     placeholder="Pitching SaaS tool. Goal is to book a 15-min demo call."
                     value={context}
                     onChange={(e) => setContext(e.target.value)}
-                    className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                   />
                 </div>
               </>
             ) : null}
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
               <input
                 type="text"
                 disabled={crmTags}
                 placeholder={crmTags ? "{{sender_name}}" : "Your Name"}
                 value={sender}
                 onChange={(e) => setSender(e.target.value)}
-                className="bg-[#2c2c2e] disabled:opacity-50 border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] w-full sm:w-1/2"
+                className="bg-[#222224] border border-white/5 disabled:opacity-50 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] w-full sm:w-1/2 focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
               />
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-full text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2 shadow-md"
+                className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-xl text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2 shadow-[0_0_20px_rgba(10,132,255,0.3)] ring-1 ring-[#0a84ff]/50"
               >
                 {loading ? (
                   <>
@@ -1141,7 +1198,13 @@ export default function StudioPage() {
                       ? "Process CSV Bulk"
                       : studioMode === "classifier"
                       ? "Classify Reply Intent"
-                      : "Generate Email"}
+                      : studioMode === "linkedin"
+                      ? "Generate LinkedIn DM"
+                      : studioMode === "twitter"
+                      ? "Generate Twitter DM"
+                      : studioMode === "cold_call"
+                      ? "Generate Call Script"
+                      : "Generate Content"}
                   </span>
                 )}
               </button>
@@ -1150,54 +1213,54 @@ export default function StudioPage() {
 
           {/* Result Output Display */}
           {variations.length > 0 && (
-            <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8">
+            <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {/* Analytics Dashboard */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
-                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Deliverability Audit</p>
+                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5 flex flex-col justify-center shadow-inner">
+                  <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Deliverability Audit</p>
                   <p className={`text-sm font-bold ${activeSpamTriggers.length === 0 ? "text-emerald-400" : "text-amber-400"}`}>
                     {activeSpamTriggers.length === 0 ? "Inbox Ready (0 Triggers)" : `${activeSpamTriggers.length} Spam Words Found`}
                   </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
-                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Reading Grade</p>
+                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5 flex flex-col justify-center shadow-inner">
+                  <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Reading Grade</p>
                   <p className="text-sm font-bold text-[#f5f5f7]">{analytics?.readingLevel || "5th Grade (Optimal)"}</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-[#2c2c2e]/80 border border-white/10 flex flex-col justify-center">
-                  <p className="text-xs text-[#86868b] uppercase tracking-wider mb-1">Tone Sentiment</p>
+                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5 flex flex-col justify-center shadow-inner">
+                  <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Tone Sentiment</p>
                   <p className="text-sm font-bold text-[#0a84ff]">{analytics?.sentiment || "Assertive"}</p>
                 </div>
               </div>
 
-              {/* Subject Lines */}
-              {subjectLines.length > 0 && (
+              {/* Subject Lines (Hidden for certain modes like Cold Call) */}
+              {subjectLines.length > 0 && studioMode !== "cold_call" && (
                 <div className="space-y-3">
-                  <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                  <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
                     Subject Line Studio
                   </span>
                   <div className="space-y-2">
                     {subjectLines.map((subj, idx) => (
                       <div
                         key={idx}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#2c2c2e] p-4 rounded-2xl gap-3"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#1c1c1e] border border-white/5 p-4 rounded-2xl gap-3 shadow-sm hover:bg-[#222224] transition"
                       >
                         <span className="text-sm font-medium text-[#f5f5f7]">{subj.subject}</span>
                         <div className="flex items-center space-x-3 shrink-0">
                           {subj.openRateForecast && (
-                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
                               Forecast: {subj.openRateForecast}
                             </span>
                           )}
                           <span
                             className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
-                              subj.score >= 90 ? "bg-[#34c759]/20 text-[#34c759]" : "bg-[#ff9f0a]/20 text-[#ff9f0a]"
+                              subj.score >= 90 ? "bg-[#34c759]/10 text-[#34c759] border border-[#34c759]/20" : "bg-[#ff9f0a]/10 text-[#ff9f0a] border border-[#ff9f0a]/20"
                             }`}
                           >
                             {subj.spamRisk}
                           </span>
                           <button
                             onClick={() => copySubject(subj.subject, idx)}
-                            className="text-xs font-medium text-[#0a84ff] hover:text-[#0071e3] bg-[#0a84ff]/10 px-3 py-1.5 rounded-full transition"
+                            className="text-xs font-medium text-[#0a84ff] hover:text-white hover:bg-[#0a84ff] bg-[#0a84ff]/10 px-3 py-1.5 rounded-full transition ring-1 ring-[#0a84ff]/30"
                           >
                             {copiedSubject === idx ? "Copied" : "Copy"}
                           </button>
@@ -1211,7 +1274,7 @@ export default function StudioPage() {
               {/* Variations */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2">
-                  <span className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
+                  <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
                     Output Options
                   </span>
                   <span className="text-xs text-[#86868b] font-medium">
@@ -1224,8 +1287,8 @@ export default function StudioPage() {
                     <button
                       key={v.id || i}
                       onClick={() => setSelectedTab(i)}
-                      className={`text-sm font-medium px-5 py-2 rounded-full transition ${
-                        selectedTab === i ? "bg-[#f5f5f7] text-black" : "bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7]"
+                      className={`text-sm font-medium px-5 py-2 rounded-full transition-all ${
+                        selectedTab === i ? "bg-[#f5f5f7] text-black shadow-md" : "bg-[#1c1c1e] border border-white/5 text-[#86868b] hover:bg-[#222224] hover:text-[#f5f5f7]"
                       }`}
                     >
                       {v.title}
@@ -1234,37 +1297,39 @@ export default function StudioPage() {
                 </div>
 
                 {/* 1-Click Persona Rewriter Bar */}
-                <div className="flex items-center gap-2 overflow-x-auto pt-2 scrollbar-hide">
-                  <span className="text-xs text-[#86868b] font-medium shrink-0">1-Click Rewrite:</span>
+                <div className="flex items-center gap-2 overflow-x-auto pt-2 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#86868b] shrink-0">1-Click Rewrite:</span>
                   <button
                     onClick={() => handleGenerate(undefined, "Compress to less than 75 words exactly.")}
-                    className="text-xs bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 px-3 py-1.5 rounded-full transition shrink-0"
+                    className="text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 px-3 py-1.5 rounded-full transition shrink-0"
                   >
                     ✂️ Compress &lt;75 Words
                   </button>
                   <button
                     onClick={() => handleGenerate(undefined, "Executive C-Suite Short & Concise")}
-                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                    className="text-xs font-medium bg-[#1c1c1e] border border-white/5 hover:bg-[#222224] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
                   >
                     ⚡ C-Suite Brief
                   </button>
                   <button
                     onClick={() => handleGenerate(undefined, "Warm, Friendly & Casual")}
-                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                    className="text-xs font-medium bg-[#1c1c1e] border border-white/5 hover:bg-[#222224] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
                   >
                     ☕ Casual
                   </button>
                   <button
                     onClick={() => handleGenerate(undefined, "Direct Response Aggressive Call to Action")}
-                    className="text-xs bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
+                    className="text-xs font-medium bg-[#1c1c1e] border border-white/5 hover:bg-[#222224] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
                   >
                     🎯 Direct-Response CTA
                   </button>
                 </div>
 
-                <div className="relative bg-[#2c2c2e] rounded-2xl p-6 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px] shadow-inner mt-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-5 pb-4 border-b border-white/10">
-                    <span className="text-xs font-medium text-[#34c759] flex items-center gap-1">✓ Auto-saved</span>
+                <div className="relative bg-[#1c1c1e] border border-white/5 rounded-2xl p-6 sm:p-8 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px] shadow-inner mt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-5 pb-4 border-b border-white/5">
+                    <span className="text-xs font-semibold text-[#34c759] flex items-center gap-1 bg-[#34c759]/10 px-2.5 py-1 rounded-full border border-[#34c759]/20">
+                      ✓ Auto-saved
+                    </span>
 
                     <div className="flex flex-wrap items-center gap-2">
                       {docuSignLink && (
@@ -1272,7 +1337,7 @@ export default function StudioPage() {
                           href={docuSignLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs font-medium bg-[#ff9f0a]/10 hover:bg-[#ff9f0a]/20 text-[#ff9f0a] px-4 py-2 rounded-full transition flex items-center gap-1"
+                          className="text-xs font-medium bg-[#ff9f0a]/10 hover:bg-[#ff9f0a]/20 text-[#ff9f0a] px-4 py-2 rounded-full transition flex items-center gap-1 border border-[#ff9f0a]/20"
                         >
                           🖋️ Test DocuSign
                         </a>
@@ -1280,21 +1345,21 @@ export default function StudioPage() {
 
                       <button
                         onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
-                        className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition"
+                        className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition border border-[#ff3b30]/20"
                       >
                         Gmail
                       </button>
 
                       <button
                         onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
-                        className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition"
+                        className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition border border-[#0a84ff]/20"
                       >
                         Mail App
                       </button>
 
                       <button
                         onClick={() => copyBody(variations[selectedTab]?.body)}
-                        className="text-xs font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-2 rounded-full transition shadow-sm"
+                        className="text-xs font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-2 rounded-full transition shadow-md"
                       >
                         {copiedBody ? "Copied!" : "Copy Text"}
                       </button>
@@ -1312,44 +1377,44 @@ export default function StudioPage() {
       {/* PRO UPGRADE MODAL */}
       {proModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full relative shadow-2xl overflow-hidden">
+          <div className="bg-[#141415] border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full relative shadow-[0_0_80px_rgba(10,132,255,0.1)] overflow-hidden">
             <button
               onClick={() => setProModalOpen(false)}
-              className="absolute top-6 right-6 bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
+              className="absolute top-6 right-6 bg-[#222224] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition border border-white/5"
             >
               ✕
             </button>
 
             <div className="text-center mb-6 pt-2">
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-block mb-3">
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 inline-block mb-3 shadow-[0_0_15px_rgba(251,191,36,0.1)]">
                 ⚡ UNLOCK EXECUTIVE PRO
               </span>
-              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">Upgrade to Pro</h3>
+              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2 tracking-tight">Upgrade to Pro</h3>
               <p className="text-sm text-[#86868b]">
                 {proReason || "Unlock all executive tools and unlimited generations."}
               </p>
             </div>
 
             <div className="space-y-3 mb-8 text-sm text-[#f5f5f7]">
-              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+              <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
                 <span className="text-emerald-400 font-bold">✓</span>
                 <span>
-                  <strong>Unlimited Email Generations</strong> (No 5/day limit)
+                  <strong>Unlimited Generations</strong> (No 5/day limit)
                 </span>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+              <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
                 <span className="text-purple-400 font-bold">✓</span>
                 <span>
                   <strong>3-Step Outreach Sequence Generator</strong>
                 </span>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+              <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
                 <span className="text-[#0a84ff] font-bold">✓</span>
                 <span>
                   <strong>A/B Split Testing & Multi-Vertical Batching</strong>
                 </span>
               </div>
-              <div className="p-3.5 rounded-xl bg-[#2c2c2e] flex items-center gap-3">
+              <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
                 <span className="text-amber-400 font-bold">✓</span>
                 <span>
                   <strong>Custom Presets & 1-Click CRM Exports</strong>
@@ -1359,45 +1424,45 @@ export default function StudioPage() {
 
             <Link
               href="/pricing"
-              className="w-full py-4 bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold rounded-2xl text-center block transition shadow-lg"
+              className="w-full py-4 bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold rounded-2xl text-center block transition shadow-[0_0_20px_rgba(10,132,255,0.3)] ring-1 ring-[#0a84ff]/50"
             >
               View Pro Plans (Starter, Growth, Enterprise)
             </Link>
 
-            <p className="text-[11px] text-center text-[#86868b] mt-3">Powered by Lemon Squeezy • Cancel anytime</p>
+            <p className="text-[11px] text-center text-[#86868b] mt-4 font-medium">Powered by Lemon Squeezy • Cancel anytime</p>
           </div>
         </div>
       )}
 
       {/* History Modal */}
       {historyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-md p-0 sm:p-4">
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-6 max-w-2xl w-full h-[85vh] sm:max-h-[80vh] flex flex-col relative shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xl p-0 sm:p-4">
+          <div className="bg-[#141415] border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-6 max-w-2xl w-full h-[85vh] sm:max-h-[80vh] flex flex-col relative shadow-[0_0_80px_rgba(0,0,0,0.5)]">
+            <div className="flex items-center justify-between pb-4 border-b border-white/5">
               <div>
-                <h3 className="text-xl font-semibold text-[#f5f5f7]">Saved History</h3>
-                <p className="text-sm text-[#86868b]">Search, copy, or export past emails.</p>
+                <h3 className="text-xl font-bold tracking-tight text-[#f5f5f7]">Saved History</h3>
+                <p className="text-sm text-[#86868b]">Search, copy, or export past content.</p>
               </div>
               <button
                 onClick={() => setHistoryModalOpen(false)}
-                className="bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
+                className="bg-[#222224] border border-white/5 text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
               >
                 ✕
               </button>
             </div>
 
-            <div className="py-3 flex items-center justify-between border-b border-white/5 text-xs text-[#86868b]">
+            <div className="py-3 flex items-center justify-between border-b border-white/5 text-xs text-[#86868b] font-medium">
               <span>{savedHistory.length} saved records</span>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => exportHistory("txt")}
-                  className="px-3 py-1.5 rounded-full bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] font-medium transition"
+                  className="px-3 py-1.5 rounded-full bg-[#1c1c1e] border border-white/5 hover:bg-[#222224] text-[#f5f5f7] transition"
                 >
                   Export TXT {!isPro && "🔒"}
                 </button>
                 <button
                   onClick={() => exportHistory("csv")}
-                  className="px-3 py-1.5 rounded-full bg-[#0a84ff]/20 text-[#0a84ff] font-medium transition"
+                  className="px-3 py-1.5 rounded-full bg-[#0a84ff]/10 border border-[#0a84ff]/20 text-[#0a84ff] hover:bg-[#0a84ff]/20 transition"
                 >
                   Export CSV {!isPro && "🔒"}
                 </button>
@@ -1410,18 +1475,18 @@ export default function StudioPage() {
                 placeholder="Search history..."
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b]"
+                className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
               />
             </div>
 
-            <div className="overflow-y-auto flex-1 space-y-4 pr-2">
+            <div className="overflow-y-auto flex-1 space-y-4 pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
               {filteredHistory.length === 0 ? (
-                <div className="text-center py-12 text-[#86868b] text-sm font-medium">No saved emails found.</div>
+                <div className="text-center py-12 text-[#86868b] text-sm font-medium">No saved content found.</div>
               ) : (
                 filteredHistory.map((item) => (
-                  <div key={item.id} className="bg-[#2c2c2e] rounded-2xl p-5 space-y-3">
-                    <div className="flex items-center justify-between text-xs text-[#86868b] border-b border-white/5 pb-2">
-                      <span className="font-semibold uppercase tracking-wider">
+                  <div key={item.id} className="bg-[#1c1c1e] border border-white/5 rounded-2xl p-5 space-y-3 shadow-inner">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-[#86868b] border-b border-white/5 pb-2 uppercase tracking-wider">
+                      <span>
                         {item.email_type} ({item.language})
                       </span>
                       <span>{new Date(item.created_at).toLocaleDateString()}</span>
@@ -1434,13 +1499,13 @@ export default function StudioPage() {
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => openInGmail(item.subject_line, item.body)}
-                          className="text-xs font-medium bg-[#ff3b30]/10 text-[#ff3b30] px-3 py-1.5 rounded-full"
+                          className="text-xs font-medium bg-[#ff3b30]/10 border border-[#ff3b30]/20 text-[#ff3b30] px-3 py-1.5 rounded-full hover:bg-[#ff3b30]/20 transition"
                         >
                           Gmail
                         </button>
                         <button
                           onClick={() => copyBody(item.body)}
-                          className="text-xs font-medium bg-[#f5f5f7] text-black px-3 py-1.5 rounded-full"
+                          className="text-xs font-medium bg-[#f5f5f7] text-black px-3 py-1.5 rounded-full hover:bg-white transition shadow-sm"
                         >
                           Copy
                         </button>
@@ -1462,16 +1527,16 @@ export default function StudioPage() {
 
       {/* Auth Modal */}
       {authModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md p-4">
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full relative shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl p-4">
+          <div className="bg-[#141415] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full relative shadow-[0_0_80px_rgba(10,132,255,0.1)]">
             <button
               onClick={() => setAuthModalOpen(false)}
-              className="absolute top-6 right-6 bg-[#2c2c2e] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
+              className="absolute top-6 right-6 bg-[#222224] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition border border-white/5"
             >
               ✕
             </button>
-            <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
-            <p className="text-sm text-[#86868b] mb-6">Get 5 free AI email generations every day.</p>
+            <h3 className="text-2xl font-bold tracking-tight text-[#f5f5f7] mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
+            <p className="text-sm text-[#86868b] mb-6">Get 5 free AI generations every day.</p>
             <form onSubmit={handleAuth} className="space-y-4">
               <div>
                 <input
@@ -1480,7 +1545,7 @@ export default function StudioPage() {
                   placeholder="Email"
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b]"
+                  className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
                 />
               </div>
               <div>
@@ -1490,15 +1555,15 @@ export default function StudioPage() {
                   placeholder="Password"
                   value={authPassword}
                   onChange={(e) => setAuthPassword(e.target.value)}
-                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b]"
+                  className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
                 />
               </div>
               {authMessage && (
-                <p className="text-sm text-[#ff3b30] bg-[#ff3b30]/10 p-3 rounded-xl">{authMessage}</p>
+                <p className="text-sm font-medium text-[#ff3b30] bg-[#ff3b30]/10 border border-[#ff3b30]/20 p-3 rounded-xl">{authMessage}</p>
               )}
               <button
                 type="submit"
-                className="w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-4 rounded-xl text-sm transition shadow-md mt-2"
+                className="w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-4 rounded-xl text-sm transition shadow-[0_0_20px_rgba(10,132,255,0.3)] ring-1 ring-[#0a84ff]/50 mt-2"
               >
                 {isSignUp ? "Sign Up" : "Log In"}
               </button>
@@ -1519,7 +1584,7 @@ export default function StudioPage() {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-12 text-center text-sm font-medium text-[#86868b]">
+      <footer className="border-t border-white/5 py-12 text-center text-sm font-medium text-[#86868b]">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© 2026 WriteYourEmail. All rights reserved.</p>
           <div className="flex space-x-6">
