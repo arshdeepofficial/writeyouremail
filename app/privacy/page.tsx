@@ -6,13 +6,13 @@ export default function PrivacyPolicy() {
       {/* Header */}
       <header className="border-b border-neutral-800 bg-black/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 font-bold text-lg tracking-tight">
+          <Link href="/studio" className="flex items-center gap-3 font-bold text-lg tracking-tight">
             <span className="w-8 h-8 bg-white text-black rounded-lg flex items-center justify-center font-black text-sm">
               ✉️
             </span>
             WriteYourEmail<span className="text-neutral-500">.com</span>
           </Link>
-          <Link href="/" className="text-xs text-neutral-400 hover:text-white transition">
+          <Link href="/studio" className="text-xs text-neutral-400 hover:text-white transition">
             ← Back to App
           </Link>
         </div>
