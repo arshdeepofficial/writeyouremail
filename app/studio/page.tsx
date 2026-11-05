@@ -8,8 +8,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const LEMON_SQUEEZY_CHECKOUT = "https://writeyouremail.lemonsqueezy.com/checkout/buy/8de4d383-5177-4977-8066-de6872cdb69d";
-
 const COMMON_SPAM_WORDS = [
   "100% free", "free", "guaranteed", "no cost", "risk-free", "act now",
   "click here", "urgent", "make money", "winner", "cash", "no obligation",
@@ -63,8 +61,10 @@ const ICP_PERSONAS = [
   "Marketing / Sales (Focus on Leads & Revenue)"
 ];
 
-export default function Home() {
-  const [studioMode, setStudioMode] = useState<"create" | "polish" | "sequence" | "reply" | "ab_test" | "batch">("create");
+type StudioMode = "create" | "sequence" | "csv_bulk" | "classifier" | "ab_test" | "batch" | "reply" | "polish";
+
+export default function StudioPage() {
+  const [studioMode, setStudioMode] = useState<StudioMode>("create");
 
   // Form State
   const [emailType, setEmailType] = useState("cold_outreach");
@@ -79,6 +79,7 @@ export default function Home() {
   const [prospectBio, setProspectBio] = useState("");
   const [crmTags, setCrmTags] = useState(false);
   const [targetIndustries, setTargetIndustries] = useState("");
+  const [csvData, setCsvData] = useState("");
 
   // Mode Specific Inputs
   const [draftText, setDraftText] = useState("");
@@ -123,7 +124,6 @@ export default function Home() {
 
   const [copiedSubject, setCopiedSubject] = useState<number | null>(null);
   const [copiedBody, setCopiedBody] = useState(false);
-  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -207,7 +207,19 @@ export default function Home() {
   const saveToHistory = async (subjects: SubjectLine[], vars: EmailVariation[]) => {
     const primarySubject = subjects[0]?.subject || "Generated Email";
     const primaryBody = vars[0]?.body || "";
-    let typeLabel = studioMode === "sequence" ? "3-Step Sequence" : studioMode === "reply" ? "Objection Response" : studioMode === "ab_test" ? "A/B Split Test" : studioMode === "batch" ? "Multi-Vertical Batch" : (studioMode === "create" ? emailType : "Magic Polish");
+    
+    const modeLabels: Record<StudioMode, string> = {
+      create: emailType,
+      sequence: "3-Step Sequence",
+      reply: "Objection Response",
+      ab_test: "A/B Split Test",
+      batch: "Multi-Vertical Batch",
+      csv_bulk: "Bulk CSV Leads",
+      classifier: "AI Reply Intent",
+      polish: "Magic Polish"
+    };
+    
+    let typeLabel = modeLabels[studioMode] || "Generated Email";
 
     const newRecord: SavedEmailRecord = {
       id: Date.now().toString(),
@@ -223,7 +235,7 @@ export default function Home() {
         await supabase.from("emails").insert({
           user_id: user.id,
           email_type: newRecord.email_type,
-          context: context || incomingEmailText || draftText,
+          context: context || incomingEmailText || draftText || csvData,
           recipient: primarySubject,
           sender: sender || "User",
           tone: targetLanguage,
@@ -340,6 +352,7 @@ export default function Home() {
             replyStrategy,
             incomingEmailText,
             docuSignLink,
+            csvData,
             brandVoice: isPro ? brandVoice : "",
             senderTitle: includeSignature ? senderTitle : "",
             icpPersona,
@@ -459,25 +472,6 @@ export default function Home() {
       item.email_type.toLowerCase().includes(historySearch.toLowerCase())
   );
 
-  const faqs = [
-    {
-      q: "What is WriteYourEmail?",
-      a: "WriteYourEmail is an AI email engine that writes, translates (25+ languages), polishes drafts, handles prospect objections, and embeds DocuSign requests.",
-    },
-    {
-      q: "Is there a free tier?",
-      a: "Yes. Unregistered guests get 2 free emails. Registered users get 5 free emails every single day.",
-    },
-    {
-      q: "What is included in the Pro plan?",
-      a: "The Pro plan ($9/mo) gives you unlimited email generations, 3-step follow-up sequences, A/B split testing, custom brand voice DNA, AI objection handler, live spam risk audit, and CSV/TXT history exports.",
-    },
-    {
-      q: "How do I cancel my subscription?",
-      a: "You can manage or cancel your subscription anytime via Lemon Squeezy with one click.",
-    },
-  ];
-
   return (
     <div
       className="relative w-full overflow-x-hidden min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white"
@@ -505,16 +499,13 @@ export default function Home() {
               <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
                 ✉️
               </span>
-              <span>WriteYourEmail</span>
+              <span>WriteYourEmail Studio</span>
             </Link>
 
             <nav className="hidden md:flex items-center space-x-6 text-sm text-[#86868b] font-medium">
-              <a href="#generator" className="hover:text-[#f5f5f7] transition-colors">
-                Products
-              </a>
-              <a href="#faq" className="hover:text-[#f5f5f7] transition-colors">
-                Resources
-              </a>
+              <Link href="/" className="hover:text-[#f5f5f7] transition-colors">
+                Home
+              </Link>
               <Link href="/pricing" className="hover:text-[#f5f5f7] transition-colors">
                 Pricing
               </Link>
@@ -535,7 +526,7 @@ export default function Home() {
                 }
                 className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition flex items-center gap-1"
               >
-                <span>🚀 Free Plan</span> — <span className="text-[#0a84ff] underline">Upgrade ($9/mo)</span>
+                <span>🚀 Free Plan</span> — <span className="text-[#0a84ff] underline">Upgrade</span>
               </button>
             )}
 
@@ -606,12 +597,9 @@ export default function Home() {
         }`}
       >
         <nav className="flex flex-col text-lg font-medium text-[#f5f5f7]">
-          <a href="#generator" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
-            Products
-          </a>
-          <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
-            Resources
-          </a>
+          <Link href="/" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
+            Home
+          </Link>
           <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
             Pricing
           </Link>
@@ -664,37 +652,13 @@ export default function Home() {
         </nav>
       </div>
 
-      {/* Hero */}
-      <section className="relative pt-24 pb-20 px-6 max-w-5xl mx-auto text-center">
-        <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#f5f5f7] leading-tight mb-6">
-          Intelligence that closes deals.
-        </h1>
-        <p className="text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium">
-          Generate A/B split tests, 3-step outreach sequences, objection replies, e-signature requests, and CRM-ready pitches instantly.
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-          <a
-            href="#generator"
-            className="bg-[#f5f5f7] text-black hover:bg-white font-semibold px-8 py-3.5 rounded-full text-base transition shadow-sm w-full sm:w-auto"
-          >
-            Start Writing
-          </a>
-          <Link
-            href="/pricing"
-            className="bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#f5f5f7] font-semibold px-8 py-3.5 rounded-full text-base transition w-full sm:w-auto"
-          >
-            View Pricing ($9/mo)
-          </Link>
-        </div>
-      </section>
-
       {/* Generator Workspace */}
-      <section id="generator" className="py-12 px-4 sm:px-6 max-w-4xl mx-auto">
+      <section id="generator" className="py-12 px-4 sm:px-6 max-w-5xl mx-auto">
         <div className="bg-[#1c1c1e]/80 backdrop-blur-2xl border border-white/10 rounded-[2rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Email Studio v5.0 Pro</h2>
-              <p className="text-sm text-[#86868b] mt-1">Includes A/B Testing, Presets & CRM Tags.</p>
+              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Studio v7.0 Titan</h2>
+              <p className="text-sm text-[#86868b] mt-1">Includes A/B Testing, CSV Bulk, Presets & CRM Tags.</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {presets.length > 0 && (
@@ -718,7 +682,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Segmented Mode Selector Bar */}
+          {/* Segmented Mode Selector Bar (All 8 Modes) */}
           <div className="flex items-center bg-[#2c2c2e] p-1 rounded-xl w-full mb-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
             <button
               type="button"
@@ -746,6 +710,23 @@ export default function Home() {
               }`}
             >
               🥊 Objection Reply
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPro) triggerProModal("AI Reply Intent Classifier is a Pro exclusive feature.");
+                else setStudioMode("classifier");
+              }}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                studioMode === "classifier" ? "bg-pink-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>🧠 Classifier</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
             </button>
             <button
               type="button"
@@ -792,6 +773,23 @@ export default function Home() {
               }`}
             >
               <span>📦 Batch</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isPro) triggerProModal("Bulk CSV Leads generator is a Pro exclusive feature.");
+                else setStudioMode("csv_bulk");
+              }}
+              className={`text-sm font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-1.5 ${
+                studioMode === "csv_bulk" ? "bg-orange-600 text-white" : "text-[#86868b] hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>📄 CSV Bulk</span>
               {!isPro && (
                 <span className="text-[10px] bg-amber-500/30 text-amber-300 border border-amber-500/40 px-1.5 py-0.5 rounded-full font-bold">
                   PRO
@@ -907,6 +905,38 @@ export default function Home() {
               </div>
             )}
 
+            {studioMode === "csv_bulk" && (
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  Paste CSV Data (Name, Company, Industry, etc.)
+                </label>
+                <textarea
+                  rows={5}
+                  required
+                  placeholder="John Doe, Acme Corp, SaaS&#10;Jane Smith, Globex, Real Estate"
+                  value={csvData}
+                  onChange={(e) => setCsvData(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                />
+              </div>
+            )}
+
+            {studioMode === "classifier" && (
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  Paste Incoming Email to Classify Intent
+                </label>
+                <textarea
+                  rows={5}
+                  required
+                  placeholder="Paste the prospect's reply here to analyze their intent (e.g. Positive, Negative, OOO, Pricing Objection)..."
+                  value={incomingEmailText}
+                  onChange={(e) => setIncomingEmailText(e.target.value)}
+                  className="w-full bg-[#2c2c2e] border-none text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none"
+                />
+              </div>
+            )}
+
             {studioMode === "reply" ? (
               <>
                 <div>
@@ -979,7 +1009,7 @@ export default function Home() {
                   </div>
                 </div>
               </>
-            ) : (
+            ) : studioMode !== "classifier" && studioMode !== "csv_bulk" ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
@@ -1076,7 +1106,7 @@ export default function Home() {
                   />
                 </div>
               </>
-            )}
+            ) : null}
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
               <input
@@ -1107,6 +1137,10 @@ export default function Home() {
                       ? "Generate Batch Campaign"
                       : studioMode === "reply"
                       ? "Generate Rebuttal"
+                      : studioMode === "csv_bulk"
+                      ? "Process CSV Bulk"
+                      : studioMode === "classifier"
+                      ? "Classify Reply Intent"
                       : "Generate Email"}
                   </span>
                 )}
@@ -1290,7 +1324,7 @@ export default function Home() {
               <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-block mb-3">
                 ⚡ UNLOCK EXECUTIVE PRO
               </span>
-              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">Upgrade to Pro ($9/mo)</h3>
+              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2">Upgrade to Pro</h3>
               <p className="text-sm text-[#86868b]">
                 {proReason || "Unlock all executive tools and unlimited generations."}
               </p>
@@ -1323,14 +1357,12 @@ export default function Home() {
               </div>
             </div>
 
-            <a
-              href={LEMON_SQUEEZY_CHECKOUT}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/pricing"
               className="w-full py-4 bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold rounded-2xl text-center block transition shadow-lg"
             >
-              Get Pro Access — $9/mo (Cards & PayPal)
-            </a>
+              View Pro Plans (Starter, Growth, Enterprise)
+            </Link>
 
             <p className="text-[11px] text-center text-[#86868b] mt-3">Powered by Lemon Squeezy • Cancel anytime</p>
           </div>
@@ -1485,29 +1517,6 @@ export default function Home() {
           </div>
         </div>
       )}
-
-      {/* FAQ Section */}
-      <section id="faq" className="py-24 px-6 max-w-3xl mx-auto">
-        <h2 className="text-3xl font-bold tracking-tight text-[#f5f5f7] mb-10 text-center">
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-3">
-          {faqs.map((faq, index) => (
-            <div key={index} className="bg-[#1c1c1e] rounded-2xl overflow-hidden transition-all">
-              <button
-                onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                className="w-full flex items-center justify-between p-6 text-left focus:outline-none"
-              >
-                <span className="font-semibold text-[#f5f5f7]">{faq.q}</span>
-                <span className="text-[#86868b] ml-4 text-xl font-light">{openFaq === index ? "−" : "+"}</span>
-              </button>
-              {openFaq === index && (
-                <div className="px-6 pb-6 text-[15px] text-[#86868b] leading-relaxed">{faq.a}</div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="border-t border-white/10 py-12 text-center text-sm font-medium text-[#86868b]">
