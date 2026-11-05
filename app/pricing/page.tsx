@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const PRO_CHECKOUT_BASE_URL =
-  "https://writeyouremail.lemonsqueezy.com/checkout/buy/8de4d383-5177-4977-8066-de6872cdb69d";
+// Placeholders for your new Lemon Squeezy Product Links
+const CHECKOUT_STARTER = "https://writeyouremail.lemonsqueezy.com/checkout/buy/YOUR_STARTER_LINK";
+const CHECKOUT_GROWTH = "https://writeyouremail.lemonsqueezy.com/checkout/buy/YOUR_GROWTH_LINK";
+const CHECKOUT_ENTERPRISE = "https://writeyouremail.lemonsqueezy.com/checkout/buy/YOUR_ENTERPRISE_LINK";
 
 export default function PricingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isAnnual, setIsAnnual] = useState<boolean>(true); // Default to annual for better conversion
 
   // Initialize Supabase & Fetch Session for Lemon Squeezy Passthrough
   useEffect(() => {
@@ -49,13 +52,13 @@ export default function PricingPage() {
   }, [mobileMenuOpen]);
 
   // Build Checkout URL with dynamically attached custom user parameters
-  const getCheckoutUrl = () => {
+  const getCheckoutUrl = (baseUrl: string) => {
     const params = new URLSearchParams();
     if (userId) params.append("checkout[custom][user_id]", userId);
     if (userEmail) params.append("checkout[email]", userEmail);
 
     const queryString = params.toString();
-    return queryString ? `${PRO_CHECKOUT_BASE_URL}?${queryString}` : PRO_CHECKOUT_BASE_URL;
+    return queryString ? `${baseUrl}?${queryString}` : baseUrl;
   };
 
   return (
@@ -67,7 +70,7 @@ export default function PricingPage() {
       }}
     >
       {/* Apple Ambient Radial Glow */}
-      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1100px] h-[500px] bg-gradient-to-b from-[#0a84ff]/20 via-[#0a84ff]/5 to-transparent blur-[120px] pointer-events-none rounded-full" />
+      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1100px] h-[500px] bg-gradient-to-b from-[#0a84ff]/20 via-purple-500/10 to-transparent blur-[120px] pointer-events-none rounded-full" />
 
       {/* Glassmorphic Navigation Header */}
       <header
@@ -91,8 +94,8 @@ export default function PricingPage() {
               <Link href="/#generator" className="hover:text-[#f5f5f7] transition-colors">
                 Studio
               </Link>
-              <Link href="/#faq" className="hover:text-[#f5f5f7] transition-colors">
-                FAQ
+              <Link href="/#features" className="hover:text-[#f5f5f7] transition-colors">
+                Features
               </Link>
               <Link href="/pricing" className="text-[#f5f5f7] font-semibold transition-colors">
                 Pricing
@@ -101,27 +104,14 @@ export default function PricingPage() {
           </div>
 
           <div className="hidden md:flex items-center space-x-3">
-            <Link
-              href="/"
-              className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition"
-            >
+            <Link href="/" className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition">
               Open Studio
             </Link>
             <div className="flex items-center space-x-3 ml-2 border-l border-white/10 pl-4">
               {userId ? (
-                <div className="flex items-center space-x-3">
-                  <span className="text-xs text-[#86868b] bg-[#1c1c1e] px-3 py-1.5 rounded-full border border-white/5">
-                    Logged in
-                  </span>
-                  <a
-                    href={getCheckoutUrl()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-semibold bg-[#0a84ff] hover:bg-[#0071e3] text-white px-4 py-1.5 rounded-full transition shadow-md"
-                  >
-                    Upgrade Now ⚡
-                  </a>
-                </div>
+                <span className="text-xs text-[#86868b] bg-[#1c1c1e] px-3 py-1.5 rounded-full border border-white/5">
+                  Logged in
+                </span>
               ) : (
                 <>
                   <Link href="/" className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition">
@@ -131,7 +121,7 @@ export default function PricingPage() {
                     href="/"
                     className="text-sm font-semibold bg-[#f5f5f7] text-black hover:bg-white px-4 py-1.5 rounded-full transition shadow-sm"
                   >
-                    Get Started Free
+                    Start Free
                   </Link>
                 </>
               )}
@@ -141,7 +131,6 @@ export default function PricingPage() {
           <button
             className="md:hidden text-[#86868b] hover:text-[#f5f5f7] z-50 p-2 -mr-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
           >
             {mobileMenuOpen ? (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,213 +145,146 @@ export default function PricingPage() {
         </div>
       </header>
 
-      {/* Mobile Menu Drawer */}
-      <div
-        className={`fixed inset-0 z-40 bg-[#000000] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${
-          mobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
-        }`}
-      >
-        <nav className="flex flex-col text-lg font-medium text-[#f5f5f7]">
-          <Link href="/#generator" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
-            Studio Engine
-          </Link>
-          <Link href="/#faq" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
-            FAQ & Support
-          </Link>
-          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4 text-[#0a84ff] font-bold">
-            Pricing Plans
-          </Link>
-          <div className="pt-8 flex flex-col space-y-4">
-            <a
-              href={getCheckoutUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-center bg-[#0a84ff] text-white py-3.5 rounded-xl text-base font-semibold shadow-lg"
-            >
-              Upgrade to Executive Pro ($9/mo)
-            </a>
-            <Link href="/" className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3.5 rounded-xl text-base font-semibold border border-white/10">
-              Return to App
-            </Link>
-          </div>
-        </nav>
-      </div>
-
       {/* Hero Pricing Header */}
       <section className="pt-20 pb-12 px-6 max-w-4xl mx-auto text-center relative z-10">
         <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 inline-block mb-4 shadow-sm">
-          TRANSPARENT sAAS PRICING
+          B2B SAAS PRICING
         </span>
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold tracking-tight text-[#f5f5f7] mb-6 leading-tight">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#f5f5f7] mb-6 leading-tight">
           Supercharge your outreach. <br />
           <span className="bg-gradient-to-r from-[#0a84ff] via-purple-400 to-amber-300 bg-clip-text text-transparent">
             Scale without limits.
           </span>
         </h1>
-        <p className="text-[#86868b] text-lg sm:text-xl font-medium max-w-2xl mx-auto leading-relaxed">
-          Start for free with daily credits, or unlock Executive Pro for 3-step automated follow-up sequences, brand voice DNA, and unlimited generations.
+        <p className="text-[#86868b] text-lg font-medium max-w-2xl mx-auto mb-10">
+          From solo founders to enterprise sales teams. Pick the plan that fits your growth engine.
         </p>
+
+        {/* Billing Toggle */}
+        <div className="flex items-center justify-center gap-3 text-sm font-medium">
+          <span className={!isAnnual ? "text-white" : "text-[#86868b]"}>Pay Monthly</span>
+          <button
+            onClick={() => setIsAnnual(!isAnnual)}
+            className="w-14 h-7 rounded-full bg-[#2c2c2e] border border-white/10 relative transition-colors duration-300 focus:outline-none"
+            style={{ backgroundColor: isAnnual ? "#0a84ff" : "#2c2c2e" }}
+          >
+            <div
+              className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform duration-300 ${
+                isAnnual ? "translate-x-8" : "translate-x-1"
+              }`}
+            />
+          </button>
+          <span className={isAnnual ? "text-white" : "text-[#86868b]"}>
+            Pay Annually <span className="text-emerald-400 text-xs font-bold ml-1">Save 20%</span>
+          </span>
+        </div>
       </section>
 
       {/* Pricing Cards Grid */}
-      <section className="pb-24 px-4 sm:px-6 max-w-5xl mx-auto relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+      <section className="pb-24 px-4 sm:px-6 max-w-7xl mx-auto relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
           
-          {/* Free Tier Card */}
-          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2.5rem] p-8 sm:p-10 flex flex-col justify-between hover:border-white/20 transition duration-300">
+          {/* Tier 1: Starter */}
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2.5rem] p-8 flex flex-col justify-between hover:border-white/20 transition duration-300">
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-2xl font-bold text-[#f5f5f7]">Hobby Free</h3>
-                <span className="text-xs font-semibold px-3 py-1 rounded-full bg-white/5 text-[#86868b] border border-white/10">
-                  Starter
-                </span>
-              </div>
-              <p className="text-[#86868b] text-[15px] font-medium mb-8">
-                For casual users, students, and early testers exploring AI email writing.
+              <h3 className="text-xl font-bold text-[#f5f5f7] mb-2">Starter</h3>
+              <p className="text-[#86868b] text-sm font-medium mb-6">
+                For solo founders and freelancers building their pipeline.
               </p>
-              <div className="mb-8 flex items-baseline">
-                <span className="text-5xl font-bold text-[#f5f5f7] tracking-tight">$0</span>
-                <span className="text-[#86868b] ml-2 font-medium">/ forever</span>
+              <div className="mb-6 flex items-baseline">
+                <span className="text-4xl font-bold text-[#f5f5f7] tracking-tight">
+                  ${isAnnual ? "15" : "19"}
+                </span>
+                <span className="text-[#86868b] ml-2 text-sm font-medium">/ month</span>
               </div>
-              <Link
-                href="/"
-                className="block w-full text-center bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] font-semibold py-4 rounded-2xl text-[15px] transition mb-8 shadow-sm"
+              <a
+                href={getCheckoutUrl(CHECKOUT_STARTER)}
+                className="block w-full text-center bg-[#2c2c2e] hover:bg-[#3a3a3c] text-[#f5f5f7] font-semibold py-3.5 rounded-2xl text-sm transition mb-8 shadow-sm"
               >
-                Use Free Version
-              </Link>
-              <ul className="space-y-4 text-[15px] text-[#86868b] font-medium">
-                <li className="flex items-center">
-                  <span className="text-[#34c759] mr-3 font-bold">✓</span> 2 Instant Guest Generations
-                </li>
-                <li className="flex items-center">
-                  <span className="text-[#34c759] mr-3 font-bold">✓</span> 5 Daily Free Generations (Logged-In)
-                </li>
-                <li className="flex items-center">
-                  <span className="text-[#34c759] mr-3 font-bold">✓</span> Standard Cold Outreach & Sales Studio
-                </li>
-                <li className="flex items-center">
-                  <span className="text-[#34c759] mr-3 font-bold">✓</span> Magic Polish & Tone adjustment
-                </li>
-                <li className="flex items-center">
-                  <span className="text-[#34c759] mr-3 font-bold">✓</span> 25+ Global Language Translations
-                </li>
-                <li className="flex items-center text-[#55555d] line-through">
-                  <span className="mr-3 font-bold">✕</span> 🔒 3-Step Follow-Up Sequences
-                </li>
-                <li className="flex items-center text-[#55555d] line-through">
-                  <span className="mr-3 font-bold">✕</span> 🔒 Brand Voice DNA Profile Engine
-                </li>
-                <li className="flex items-center text-[#55555d] line-through">
-                  <span className="mr-3 font-bold">✕</span> 🔒 1-Click CSV & TXT History Export
-                </li>
+                Get Starter
+              </a>
+              <ul className="space-y-4 text-sm text-[#d2d2d7] font-medium">
+                <li className="flex items-start gap-3"><span className="text-[#34c759] font-bold">✓</span> Unlimited Email Generations</li>
+                <li className="flex items-start gap-3"><span className="text-[#34c759] font-bold">✓</span> 1-Click Gmail & Outlook Launch</li>
+                <li className="flex items-start gap-3"><span className="text-[#34c759] font-bold">✓</span> Subject Line Matrix (5 Variations)</li>
+                <li className="flex items-start gap-3"><span className="text-[#34c759] font-bold">✓</span> CRM Merge Tag Support</li>
+                <li className="flex items-start gap-3"><span className="text-[#34c759] font-bold">✓</span> Spam Auto-Sanitizer & Reading Grade</li>
               </ul>
-            </div>
-            <div className="mt-8 pt-4 border-t border-white/5 text-xs text-[#86868b] text-center font-medium">
-              No credit card required
             </div>
           </div>
 
-          {/* Executive Pro Tier Card */}
-          <div className="bg-[#1c1c1e] border-2 border-[#0a84ff] rounded-[2.5rem] p-8 sm:p-10 relative shadow-2xl shadow-[#0a84ff]/10 flex flex-col justify-between overflow-hidden">
-            <div className="absolute top-0 right-0 bg-gradient-to-l from-[#0a84ff] to-purple-600 text-white text-[11px] font-bold uppercase tracking-widest py-1.5 px-5 rounded-bl-2xl shadow-md">
+          {/* Tier 2: Growth (Most Popular) */}
+          <div className="bg-[#1c1c1e] border-2 border-[#0a84ff] rounded-[2.5rem] p-8 relative shadow-2xl shadow-[#0a84ff]/10 flex flex-col justify-between transform md:-translate-y-4">
+            <div className="absolute top-0 right-0 bg-gradient-to-l from-[#0a84ff] to-purple-600 text-white text-[10px] font-bold uppercase tracking-widest py-1.5 px-4 rounded-bl-2xl shadow-md">
               Most Popular
             </div>
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-2xl font-bold text-[#f5f5f7]">Executive Pro</h3>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                  ⚡ GOD MODE
-                </span>
-              </div>
-              <p className="text-[#86868b] text-[15px] font-medium mb-8">
-                For sales executives, founders, agency owners, and power writers.
+              <h3 className="text-xl font-bold text-[#f5f5f7] mb-2">Growth</h3>
+              <p className="text-[#86868b] text-sm font-medium mb-6">
+                For sales reps and marketers running omni-channel campaigns.
               </p>
-              <div className="mb-8 flex items-baseline">
-                <span className="text-5xl font-bold text-[#f5f5f7] tracking-tight">$9</span>
-                <span className="text-[#86868b] ml-2 font-medium">/ month</span>
+              <div className="mb-6 flex items-baseline">
+                <span className="text-4xl font-bold text-[#f5f5f7] tracking-tight">
+                  ${isAnnual ? "31" : "39"}
+                </span>
+                <span className="text-[#86868b] ml-2 text-sm font-medium">/ month</span>
               </div>
               <a
-                href={getCheckoutUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-4 rounded-2xl text-[15px] transition shadow-lg shadow-[#0a84ff]/20 mb-8 transform hover:scale-[1.01]"
+                href={getCheckoutUrl(CHECKOUT_GROWTH)}
+                className="block w-full text-center bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-3.5 rounded-2xl text-sm transition shadow-lg shadow-[#0a84ff]/20 mb-8 transform hover:scale-[1.02]"
               >
-                Upgrade to Pro ($9/mo) — Cards & PayPal
+                Get Growth
               </a>
-              <ul className="space-y-4 text-[15px] text-[#f5f5f7] font-medium">
-                <li className="flex items-center">
-                  <span className="text-[#34c759] mr-3 font-bold">✓</span> <strong>Unlimited Daily Email Generations</strong>
-                </li>
-                <li className="flex items-center">
-                  <span className="text-purple-400 mr-3 font-bold">✓</span> <strong>3-Step Automated Outreach Sequences</strong> (Day 1, 3, 7)
-                </li>
-                <li className="flex items-center">
-                  <span className="text-[#0a84ff] mr-3 font-bold">✓</span> <strong>Custom Brand Voice DNA Engine</strong>
-                </li>
-                <li className="flex items-center">
-                  <span className="text-amber-400 mr-3 font-bold">✓</span> <strong>🥊 AI Objection Handler & Rebuttal Studio</strong>
-                </li>
-                <li className="flex items-center">
-                  <span className="text-[#34c759] mr-3 font-bold">✓</span> <strong>📊 A/B Split Test Generator (Metrics vs Pain-Point)</strong>
-                </li>
-                <li className="flex items-center">
-                  <span className="text-[#0a84ff] mr-3 font-bold">✓</span> <strong>💼 Multi-Vertical Industry Batch Generator</strong>
-                </li>
-                <li className="flex items-center">
-                  <span className="text-emerald-400 mr-3 font-bold">✓</span> <strong>🛡️ Live Deliverability Spam Risk Audit</strong>
-                </li>
-                <li className="flex items-center">
-                  <span className="text-[#34c759] mr-3 font-bold">✓</span> <strong>📥 1-Click CSV & TXT CRM History Export</strong>
-                </li>
+              <p className="text-xs font-bold text-[#86868b] mb-4 uppercase tracking-wider">Everything in Starter, plus:</p>
+              <ul className="space-y-4 text-sm text-[#f5f5f7] font-medium">
+                <li className="flex items-start gap-3"><span className="text-[#0a84ff] font-bold">✓</span> <strong>LinkedIn Omni-Channel Matcher</strong></li>
+                <li className="flex items-start gap-3"><span className="text-[#0a84ff] font-bold">✓</span> <strong>Cold Call & Voicemail Scripts</strong></li>
+                <li className="flex items-start gap-3"><span className="text-[#0a84ff] font-bold">✓</span> <strong>Twitter/X Cold DM Generator</strong></li>
+                <li className="flex items-start gap-3"><span className="text-[#0a84ff] font-bold">✓</span> LinkedIn Profile Personalizer</li>
+                <li className="flex items-start gap-3"><span className="text-[#0a84ff] font-bold">✓</span> 3-Step Follow-Up Sequences</li>
               </ul>
             </div>
-            <p className="text-[12px] text-center text-[#86868b] mt-8 pt-4 border-t border-white/5 font-medium">
-              Instant activation • Automated via Lemon Squeezy • Cancel anytime
-            </p>
+          </div>
+
+          {/* Tier 3: Enterprise */}
+          <div className="bg-[#1c1c1e] border border-white/10 rounded-[2.5rem] p-8 flex flex-col justify-between hover:border-white/20 transition duration-300 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 blur-[50px] rounded-full pointer-events-none" />
+            <div>
+              <h3 className="text-xl font-bold text-[#f5f5f7] mb-2 flex items-center gap-2">
+                Enterprise <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">MAX</span>
+              </h3>
+              <p className="text-[#86868b] text-sm font-medium mb-6">
+                For agencies and sales teams doing high-volume automation.
+              </p>
+              <div className="mb-6 flex items-baseline">
+                <span className="text-4xl font-bold text-[#f5f5f7] tracking-tight">
+                  ${isAnnual ? "63" : "79"}
+                </span>
+                <span className="text-[#86868b] ml-2 text-sm font-medium">/ month</span>
+              </div>
+              <a
+                href={getCheckoutUrl(CHECKOUT_ENTERPRISE)}
+                className="block w-full text-center bg-[#f5f5f7] hover:bg-white text-black font-semibold py-3.5 rounded-2xl text-sm transition mb-8 shadow-sm"
+              >
+                Get Enterprise
+              </a>
+              <p className="text-xs font-bold text-[#86868b] mb-4 uppercase tracking-wider">Everything in Growth, plus:</p>
+              <ul className="space-y-4 text-sm text-[#f5f5f7] font-medium">
+                <li className="flex items-start gap-3"><span className="text-amber-400 font-bold">✓</span> <strong>Bulk CSV Lead Personalizer</strong></li>
+                <li className="flex items-start gap-3"><span className="text-amber-400 font-bold">✓</span> <strong>URL / Website Icebreaker Scraper</strong></li>
+                <li className="flex items-start gap-3"><span className="text-amber-400 font-bold">✓</span> <strong>Webhooks / Zapier CRM Push</strong></li>
+                <li className="flex items-start gap-3"><span className="text-amber-400 font-bold">✓</span> Custom Brand Voice DNA</li>
+                <li className="flex items-start gap-3"><span className="text-amber-400 font-bold">✓</span> A/B Testing & Multi-Vertical Engine</li>
+              </ul>
+            </div>
           </div>
 
         </div>
-      </section>
-
-      {/* Feature Guarantee & Security Bar */}
-      <section className="pb-20 px-6 max-w-4xl mx-auto text-center relative z-10">
-        <div className="bg-[#1c1c1e]/60 border border-white/10 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-around gap-4 text-xs font-medium text-[#86868b] backdrop-blur-md">
-          <div className="flex items-center gap-2">
-            <span className="text-base">🔒</span> 256-Bit SSL Encrypted Checkout
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-base">💳</span> Credit Cards & PayPal Supported
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-base">⚡</span> Multi-Model Groq Priority Pipeline
-          </div>
-        </div>
-      </section>
-
-      {/* Frequently Asked Questions */}
-      <section className="pb-24 px-6 max-w-3xl mx-auto relative z-10">
-        <h2 className="text-3xl font-bold text-center text-[#f5f5f7] mb-10">
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-6">
-          <div className="bg-[#1c1c1e] border border-white/5 rounded-2xl p-6">
-            <h4 className="text-lg font-semibold text-[#f5f5f7] mb-2">How does the billing activation work?</h4>
-            <p className="text-[#86868b] text-sm leading-relaxed">
-              When you complete payment via Lemon Squeezy, our webhook automatically upgrades your Supabase user ID within seconds. You immediately unlock unlimited generations and all Pro features without reloading.
-            </p>
-          </div>
-          <div className="bg-[#1c1c1e] border border-white/5 rounded-2xl p-6">
-            <h4 className="text-lg font-semibold text-[#f5f5f7] mb-2">What is the Brand Voice DNA feature?</h4>
-            <p className="text-[#86868b] text-sm leading-relaxed">
-              Brand Voice DNA allows you to input your company's tone guideline, key selling points, or website bio. The AI enforces this signature style across every generated email and multi-step sequence.
-            </p>
-          </div>
-          <div className="bg-[#1c1c1e] border border-white/5 rounded-2xl p-6">
-            <h4 className="text-lg font-semibold text-[#f5f5f7] mb-2">Can I cancel my subscription anytime?</h4>
-            <p className="text-[#86868b] text-sm leading-relaxed">
-              Yes, absolutely. You can manage or cancel your subscription at any time directly through the Lemon Squeezy customer portal sent with your order confirmation email.
-            </p>
-          </div>
+        
+        <div className="mt-12 text-center">
+          <Link href="/" className="text-sm font-medium text-[#86868b] hover:text-white transition underline underline-offset-4">
+            Just want to test it out? Start with the free tier.
+          </Link>
         </div>
       </section>
 
