@@ -142,6 +142,9 @@ export default function StudioPage() {
 
   const resultRef = useRef<HTMLDivElement>(null);
 
+  // Derived state for Social/Call scripts
+  const isSocialOrCall = studioMode === "linkedin" || studioMode === "twitter" || studioMode === "cold_call";
+
   useEffect(() => {
     if (mobileMenuOpen || historyModalOpen || proModalOpen || authModalOpen) {
       document.body.style.overflow = "hidden";
@@ -359,7 +362,7 @@ export default function StudioPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             mode: studioMode,
-            emailType,
+            emailType: isSocialOrCall ? studioMode : emailType,
             context,
             recipient,
             sender,
@@ -713,30 +716,54 @@ export default function StudioPage() {
             </button>
             <button
               type="button"
-              onClick={() => setStudioMode("linkedin")}
+              onClick={() => {
+                if (!isPro) triggerProModal("LinkedIn DM generator is a Pro exclusive feature.");
+                else setStudioMode("linkedin");
+              }}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "linkedin" ? "bg-[#0077b5] text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+                studioMode === "linkedin" ? "bg-[#0077b5] text-white shadow-md ring-1 ring-[#0077b5]/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
-              💼 LinkedIn DM
+              <span>💼 LinkedIn DM</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
             </button>
             <button
               type="button"
-              onClick={() => setStudioMode("twitter")}
+              onClick={() => {
+                if (!isPro) triggerProModal("Twitter/X DM generator is a Pro exclusive feature.");
+                else setStudioMode("twitter");
+              }}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "twitter" ? "bg-black text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+                studioMode === "twitter" ? "bg-white text-black shadow-md ring-1 ring-white/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
-              🐦 Twitter/X DM
+              <span>🐦 Twitter/X DM</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
             </button>
             <button
               type="button"
-              onClick={() => setStudioMode("cold_call")}
+              onClick={() => {
+                if (!isPro) triggerProModal("Cold Call Script generator is a Pro exclusive feature.");
+                else setStudioMode("cold_call");
+              }}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "cold_call" ? "bg-rose-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+                studioMode === "cold_call" ? "bg-rose-600 text-white shadow-md ring-1 ring-rose-500/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
-              📞 Call Script
+              <span>📞 Call Script</span>
+              {!isPro && (
+                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
+                  PRO
+                </span>
+              )}
             </button>
             <div className="w-[1px] h-6 bg-white/10 mx-1 shrink-0" />
             <button
@@ -1057,26 +1084,28 @@ export default function StudioPage() {
               </>
             ) : studioMode !== "classifier" && studioMode !== "csv_bulk" ? (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                      Outreach Type
-                    </label>
-                    <select
-                      value={emailType}
-                      onChange={(e) => setEmailType(e.target.value)}
-                      className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                    >
-                      <option value="cold_outreach">Cold Outreach / Sales</option>
-                      <option value="follow_up">Follow Up</option>
-                      <option value="networking">Networking / Connect</option>
-                      <option value="investor_pitch">Investor / VC Pitch</option>
-                      <option value="pr_outreach">PR / Media Outreach</option>
-                      <option value="job_application">Job / Career Inquiry</option>
-                      <option value="newsletter_sponsor">Newsletter Sponsorship</option>
-                      <option value="contract_pitch">Contract / Proposal Pitch</option>
-                    </select>
-                  </div>
+                <div className={`grid grid-cols-1 sm:grid-cols-${isSocialOrCall ? '2' : '3'} gap-4`}>
+                  {!isSocialOrCall && (
+                    <div>
+                      <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                        Outreach Type
+                      </label>
+                      <select
+                        value={emailType}
+                        onChange={(e) => setEmailType(e.target.value)}
+                        className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
+                      >
+                        <option value="cold_outreach">Cold Outreach / Sales</option>
+                        <option value="follow_up">Follow Up</option>
+                        <option value="networking">Networking / Connect</option>
+                        <option value="investor_pitch">Investor / VC Pitch</option>
+                        <option value="pr_outreach">PR / Media Outreach</option>
+                        <option value="job_application">Job / Career Inquiry</option>
+                        <option value="newsletter_sponsor">Newsletter Sponsorship</option>
+                        <option value="contract_pitch">Contract / Proposal Pitch</option>
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
                       Tone of Voice
@@ -1112,42 +1141,44 @@ export default function StudioPage() {
                   </div>
                 </div>
 
-                <div className="bg-[#1c1c1e]/60 p-4 rounded-2xl border border-white/5 space-y-3 shadow-inner">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
-                      🖋️ HTML Signature & DocuSign
-                    </label>
-                    <input
-                      type="checkbox"
-                      checked={includeSignature}
-                      onChange={(e) => setIncludeSignature(e.target.checked)}
-                      className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer bg-[#222224] border-white/10"
-                    />
-                  </div>
-                  {includeSignature && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                {!isSocialOrCall && (
+                  <div className="bg-[#1c1c1e]/60 p-4 rounded-2xl border border-white/5 space-y-3 shadow-inner">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
+                        🖋️ HTML Signature & DocuSign
+                      </label>
                       <input
-                        type="text"
-                        placeholder="Sender Title (e.g. VP of Sales)"
-                        value={senderTitle}
-                        onChange={(e) => setSenderTitle(e.target.value)}
-                        className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                      />
-                      <input
-                        type="url"
-                        placeholder="DocuSign / Pitch Link"
-                        value={docuSignLink}
-                        onChange={(e) => setDocuSignLink(e.target.value)}
-                        className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
+                        type="checkbox"
+                        checked={includeSignature}
+                        onChange={(e) => setIncludeSignature(e.target.checked)}
+                        className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer bg-[#222224] border-white/10"
                       />
                     </div>
-                  )}
-                </div>
+                    {includeSignature && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        <input
+                          type="text"
+                          placeholder="Sender Title (e.g. VP of Sales)"
+                          value={senderTitle}
+                          onChange={(e) => setSenderTitle(e.target.value)}
+                          className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
+                        />
+                        <input
+                          type="url"
+                          placeholder="DocuSign / Pitch Link"
+                          value={docuSignLink}
+                          onChange={(e) => setDocuSignLink(e.target.value)}
+                          className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
-                      Context & Pitch Goal
+                      {isSocialOrCall ? "Context & Goal" : "Context & Pitch Goal"}
                     </label>
                     <button type="button" onClick={savePreset} className="text-xs text-[#0a84ff] font-medium hover:text-[#0071e3] transition">
                       + Save as Preset
@@ -1156,7 +1187,12 @@ export default function StudioPage() {
                   <textarea
                     rows={4}
                     required
-                    placeholder="Pitching SaaS tool. Goal is to book a 15-min demo call."
+                    placeholder={
+                      studioMode === "linkedin" ? "e.g. Pitching my SaaS. Goal is to connect and book a quick chat." :
+                      studioMode === "twitter" ? "e.g. Pitching design service via DM. Keep it very short and casual." :
+                      studioMode === "cold_call" ? "e.g. Calling VP of Sales to pitch our CRM. Need a strong hook." :
+                      "Pitching SaaS tool. Goal is to book a 15-min demo call."
+                    }
                     value={context}
                     onChange={(e) => setContext(e.target.value)}
                     className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
@@ -1232,8 +1268,8 @@ export default function StudioPage() {
                 </div>
               </div>
 
-              {/* Subject Lines (Hidden for certain modes like Cold Call) */}
-              {subjectLines.length > 0 && studioMode !== "cold_call" && (
+              {/* Subject Lines (Hidden for Social and Call Scripts) */}
+              {subjectLines.length > 0 && !isSocialOrCall && (
                 <div className="space-y-3">
                   <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
                     Subject Line Studio
@@ -1332,7 +1368,7 @@ export default function StudioPage() {
                     </span>
 
                     <div className="flex flex-wrap items-center gap-2">
-                      {docuSignLink && (
+                      {docuSignLink && !isSocialOrCall && (
                         <a
                           href={docuSignLink}
                           target="_blank"
@@ -1343,19 +1379,23 @@ export default function StudioPage() {
                         </a>
                       )}
 
-                      <button
-                        onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
-                        className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition border border-[#ff3b30]/20"
-                      >
-                        Gmail
-                      </button>
+                      {!isSocialOrCall && (
+                        <>
+                          <button
+                            onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
+                            className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition border border-[#ff3b30]/20"
+                          >
+                            Gmail
+                          </button>
 
-                      <button
-                        onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
-                        className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition border border-[#0a84ff]/20"
-                      >
-                        Mail App
-                      </button>
+                          <button
+                            onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
+                            className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition border border-[#0a84ff]/20"
+                          >
+                            Mail App
+                          </button>
+                        </>
+                      )}
 
                       <button
                         onClick={() => copyBody(variations[selectedTab]?.body)}
@@ -1405,13 +1445,13 @@ export default function StudioPage() {
               <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
                 <span className="text-purple-400 font-bold">✓</span>
                 <span>
-                  <strong>3-Step Outreach Sequence Generator</strong>
+                  <strong>Social DMs & Calls</strong> (LinkedIn, X, Scripts)
                 </span>
               </div>
               <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
                 <span className="text-[#0a84ff] font-bold">✓</span>
                 <span>
-                  <strong>A/B Split Testing & Multi-Vertical Batching</strong>
+                  <strong>Sequences & B2B A/B Split Testing</strong>
                 </span>
               </div>
               <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
@@ -1497,12 +1537,15 @@ export default function StudioPage() {
 
                     <div className="flex items-center justify-between pt-2">
                       <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => openInGmail(item.subject_line, item.body)}
-                          className="text-xs font-medium bg-[#ff3b30]/10 border border-[#ff3b30]/20 text-[#ff3b30] px-3 py-1.5 rounded-full hover:bg-[#ff3b30]/20 transition"
-                        >
-                          Gmail
-                        </button>
+                        {/* Only show Gmail button if it actually looks like an email (simple check) */}
+                        {!item.email_type.includes("DM") && !item.email_type.includes("Script") && (
+                          <button
+                            onClick={() => openInGmail(item.subject_line, item.body)}
+                            className="text-xs font-medium bg-[#ff3b30]/10 border border-[#ff3b30]/20 text-[#ff3b30] px-3 py-1.5 rounded-full hover:bg-[#ff3b30]/20 transition"
+                          >
+                            Gmail
+                          </button>
+                        )}
                         <button
                           onClick={() => copyBody(item.body)}
                           className="text-xs font-medium bg-[#f5f5f7] text-black px-3 py-1.5 rounded-full hover:bg-white transition shadow-sm"
