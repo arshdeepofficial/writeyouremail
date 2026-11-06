@@ -9,20 +9,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// ============================================================================
-// PAYPAL LIVE CLIENT ID & 6 PLAN IDS
-// ============================================================================
 const PAYPAL_CLIENT_ID = "BAAODdDSTxLd8ul-bpGX8tIqVSkyEezEjQtleLHKXIXvHjTNHXcOkzCcvrfGB_uL-Sxm8y9Hr3GxIw8ZAc";
-
-const PLANS = {
-  starter_monthly: "P-65540742DC055563HNLWVQHA",
-  starter_yearly: "P-9CN21210V4270151DNLWVTRQ",
-  growth_monthly: "P-67E73174CK110761DNLWVRVQ",
-  growth_yearly: "P-2XL77868VJ625713TNLWVUEY",
-  enterprise_monthly: "P-8RE44022PJ0533112NLWVSLA",
-  enterprise_yearly: "P-14H71946X5554112LNLWVURA",
-};
-// ============================================================================
 
 export default function PricingPage() {
   const [user, setUser] = useState<any>(null);
@@ -45,6 +32,8 @@ export default function PricingPage() {
     {
       name: "Starter",
       id: "starter",
+      priceMonthlyNum: 19,
+      priceYearlyNum: 190,
       priceMonthly: "$19",
       priceYearly: "$190",
       periodLabelMonthly: "/mo",
@@ -57,14 +46,14 @@ export default function PricingPage() {
         "Export History to TXT",
         "Spam Trigger Word Risk Audit"
       ],
-      planIdMonthly: PLANS.starter_monthly,
-      planIdYearly: PLANS.starter_yearly,
       highlight: false,
       badge: "ESSENTIAL"
     },
     {
       name: "Growth",
       id: "growth",
+      priceMonthlyNum: 39,
+      priceYearlyNum: 390,
       priceMonthly: "$39",
       priceYearly: "$390",
       periodLabelMonthly: "/mo",
@@ -78,14 +67,14 @@ export default function PricingPage() {
         "LinkedIn & Twitter/X Cold DM Generator",
         "Priority Fallback Model Routing"
       ],
-      planIdMonthly: PLANS.growth_monthly,
-      planIdYearly: PLANS.growth_yearly,
       highlight: true,
       badge: "MOST POPULAR"
     },
     {
       name: "Enterprise",
       id: "enterprise",
+      priceMonthlyNum: 79,
+      priceYearlyNum: 790,
       priceMonthly: "$79",
       priceYearly: "$790",
       periodLabelMonthly: "/mo",
@@ -99,8 +88,6 @@ export default function PricingPage() {
         "DocuSign & Proposal E-Signature Links",
         "Zapier & CRM Webhook Export (Coming Soon)"
       ],
-      planIdMonthly: PLANS.enterprise_monthly,
-      planIdYearly: PLANS.enterprise_yearly,
       highlight: false,
       badge: "SCALE"
     }
@@ -114,14 +101,14 @@ export default function PricingPage() {
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
-      {/* PayPal SDK Script with Server Subscription Support */}
+      {/* Global Standard Checkout PayPal SDK */}
       <Script
-        src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription`}
+        src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`}
         strategy="afterInteractive"
         onLoad={() => setSdkReady(true)}
       />
 
-      {/* Ambient Apple Radial Glow */}
+      {/* Ambient Radial Glow */}
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[120px] pointer-events-none rounded-full" />
 
       {/* Header Navigation */}
@@ -186,7 +173,7 @@ export default function PricingPage() {
         {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
           {tiers.map((tier) => {
-            const activePlanId = billingCycle === "monthly" ? tier.planIdMonthly : tier.planIdYearly;
+            const activePriceNum = billingCycle === "monthly" ? tier.priceMonthlyNum : tier.priceYearlyNum;
             const activePrice = billingCycle === "monthly" ? tier.priceMonthly : tier.priceYearly;
             const activePeriod = billingCycle === "monthly" ? tier.periodLabelMonthly : tier.periodLabelYearly;
 
@@ -224,7 +211,12 @@ export default function PricingPage() {
                   {/* PayPal Smart Button Mount */}
                   <div className="mb-8 min-h-[50px]">
                     {user ? (
-                      <PayPalButtonWrapper planId={activePlanId} userId={user.id} sdkReady={sdkReady} />
+                      <PayPalButtonWrapper
+                        amount={activePriceNum}
+                        tierName={tier.name}
+                        userId={user.id}
+                        sdkReady={sdkReady}
+                      />
                     ) : (
                       <Link
                         href="/studio"
@@ -272,15 +264,17 @@ export default function PricingPage() {
 }
 
 function PayPalButtonWrapper({
-  planId,
+  amount,
+  tierName,
   userId,
   sdkReady,
 }: {
-  planId: string;
+  amount: number;
+  tierName: string;
   userId: string;
   sdkReady: boolean;
 }) {
-  const containerId = `paypal-container-${planId.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const containerId = `paypal-container-${tierName.toLowerCase()}-${amount}`;
 
   useEffect(() => {
     let isMounted = true;
@@ -300,37 +294,45 @@ function PayPalButtonWrapper({
                 shape: "pill",
                 color: "blue",
                 layout: "vertical",
-                label: "subscribe",
+                label: "pay",
               },
-              createSubscription: async (_data: any, actions: any) => {
-                try {
-                  // Primary: Create Subscription securely via Next.js server route
-                  const res = await fetch("/api/paypal/create-subscription", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ planId, userId }),
-                  });
-                  const data = await res.json();
-                  if (res.ok && data.subscriptionId) {
-                    return data.subscriptionId;
-                  }
-                  console.warn("Server route failed, attempting SDK fallback:", data);
-                } catch (e) {
-                  console.warn("Server route fetch error:", e);
-                }
-
-                // Fallback: Direct SDK call
-                return actions.subscription.create({
-                  plan_id: planId,
-                  custom_id: userId,
+              createOrder: async () => {
+                const res = await fetch("/api/paypal/create-order", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    amount,
+                    userId,
+                    planName: tierName,
+                  }),
                 });
+                const data = await res.json();
+                if (!res.ok || !data.orderId) {
+                  alert(data.error || "Failed to initiate PayPal Order.");
+                  throw new Error(data.error || "Order creation failed");
+                }
+                return data.orderId;
               },
-              onApprove: (_data: any) => {
-                alert("Subscription successful! Redirecting to Studio...");
-                window.location.href = "/studio?success=true";
+              onApprove: async (data: any) => {
+                const res = await fetch("/api/paypal/capture-order", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    orderId: data.orderID,
+                    userId,
+                  }),
+                });
+                const captureData = await res.json();
+
+                if (res.ok && captureData.success) {
+                  alert("Payment successful! Your account is now upgraded to PRO.");
+                  window.location.href = "/studio?success=true";
+                } else {
+                  alert("Payment capture failed. Please contact support.");
+                }
               },
               onError: (err: any) => {
-                console.error("PayPal Checkout Error:", err);
+                console.error("PayPal Order Error:", err);
               },
             })
             .render(`#${containerId}`);
@@ -340,12 +342,12 @@ function PayPalButtonWrapper({
       }
     };
 
-    const timer = setTimeout(renderPayPal, 200);
+    const timer = setTimeout(renderPayPal, 150);
     return () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [planId, userId, sdkReady, containerId]);
+  }, [amount, tierName, userId, sdkReady, containerId]);
 
   return <div id={containerId} className="w-full min-h-[45px]" />;
 }
