@@ -1,75 +1,110 @@
-import Link from "next/link";
+"use client";
 
-export default function PrivacyPolicy() {
+import Link from "next/link";
+import { ArrowLeft, Lock } from "lucide-react";
+
+export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-white selection:text-black font-sans">
+    <div
+      className="min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white relative overflow-x-hidden"
+      style={{
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      }}
+    >
       {/* Header */}
-      <header className="border-b border-neutral-800 bg-black/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/studio" className="flex items-center gap-3 font-bold text-lg tracking-tight">
-            <span className="w-8 h-8 bg-white text-black rounded-lg flex items-center justify-center font-black text-sm">
-              ✉️
-            </span>
-            WriteYourEmail<span className="text-neutral-500">.com</span>
-          </Link>
-          <Link href="/studio" className="text-xs text-neutral-400 hover:text-white transition">
-            ← Back to App
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#000000]/70 backdrop-blur-2xl saturate-150 h-16 flex items-center justify-between px-6 max-w-7xl mx-auto">
+        <Link href="/" className="flex items-center space-x-2 font-semibold text-lg tracking-tight">
+          <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
+            ✉️
+          </span>
+          <span>WriteYourEmail</span>
+        </Link>
+        <div className="flex items-center space-x-4">
+          <Link
+            href="/studio"
+            className="text-xs bg-[#0a84ff] text-white px-4 py-2 rounded-lg font-medium hover:bg-[#0071e3] transition-colors"
+          >
+            Go to Studio
           </Link>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-3xl mx-auto px-6 py-16">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">Privacy Policy</h1>
-        <p className="text-xs text-neutral-500 mb-8">Last updated: February 2026</p>
+      <main className="max-w-4xl mx-auto px-6 py-16">
+        <div className="mb-8">
+          <Link
+            href="/"
+            className="inline-flex items-center text-xs font-semibold text-[#86868b] hover:text-[#0a84ff] transition mb-4 gap-1.5"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to Home
+          </Link>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold uppercase tracking-wider mb-4">
+            <Lock className="w-3.5 h-3.5" /> Data Protection
+          </div>
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 text-white">
+            Privacy Policy
+          </h1>
+          <p className="text-sm text-[#86868b]">Last updated: November 2026</p>
+        </div>
 
-        <div className="space-y-8 text-neutral-300 text-sm leading-relaxed border-t border-neutral-900 pt-8">
-          <section>
-            <h2 className="text-lg font-semibold text-white mb-3">1. Information We Collect</h2>
-            <p className="text-neutral-400 mb-2">
-              We collect information to provide better services to our users:
+        <div className="space-y-10 text-[#d1d1d6] text-sm leading-relaxed border-t border-white/10 pt-10">
+          <section className="bg-[#141415] p-6 rounded-2xl border border-white/5">
+            <h2 className="text-lg font-bold text-white mb-3">1. Information We Collect</h2>
+            <p className="mb-3">
+              WriteYourEmail.com collects minimal information required to deliver high-quality AI sales copy generation:
             </p>
-            <ul className="list-disc list-inside space-y-1 text-neutral-400 pl-2">
-              <li><strong className="text-neutral-200">Account Information:</strong> Your email address when you sign up via Supabase.</li>
-              <li><strong className="text-neutral-200">Usage Data:</strong> Prompts, email contexts, and metadata generated while using the tool to maintain your email history.</li>
-              <li><strong className="text-neutral-200">Payment Data:</strong> Payment details are securely processed directly by our Merchant of Record (Lemon Squeezy / PayPal). We do not store full credit card numbers on our servers.</li>
+            <ul className="list-disc pl-5 space-y-1 text-[#86868b]">
+              <li><strong>Account Credentials:</strong> Email address and authentication tokens via Supabase Auth.</li>
+              <li><strong>Generation Prompts:</strong> Inputs provided in the Studio (ICP descriptions, offer details, subject lines) to construct LLM queries.</li>
+              <li><strong>Payment Information:</strong> Handled securely by PayPal. We never store credit card numbers on our servers.</li>
             </ul>
           </section>
 
-          <section>
-            <h2 className="text-lg font-semibold text-white mb-3">2. How We Use Information</h2>
-            <p className="text-neutral-400 mb-2">We use the collected data to:</p>
-            <ul className="list-disc list-inside space-y-1 text-neutral-400 pl-2">
-              <li>Provide, operate, and maintain the WriteYourEmail service.</li>
-              <li>Process AI requests via third-party API providers (Groq/Llama models).</li>
-              <li>Track daily usage limits for Free and Pro tiers.</li>
-              <li>Send critical account updates or billing receipts.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-white mb-3">3. Data Sharing and Third Parties</h2>
-            <p className="text-neutral-400">
-              We do not sell, trade, or rent your personal information to third parties. Text prompts entered into the generator are transmitted securely to our AI inference partners solely to produce the requested email output.
+          <section className="bg-[#141415] p-6 rounded-2xl border border-white/5">
+            <h2 className="text-lg font-bold text-white mb-3">2. How We Use Your Information</h2>
+            <p>
+              Your data is used exclusively to generate outreach copy, track usage limits, manage Pro subscription statuses, and improve user interface performance.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-lg font-semibold text-white mb-3">4. Data Retention & Security</h2>
-            <p className="text-neutral-400">
-              Your saved email history remains in your private account until you delete your account or requests are removed. We enforce industry-standard Row Level Security (RLS) via Supabase to ensure only you have access to your saved records.
+          <section className="bg-[#141415] p-6 rounded-2xl border border-white/5">
+            <h2 className="text-lg font-bold text-white mb-3">3. AI Data Processing Disclosure</h2>
+            <p>
+              Outreach prompt data is transmitted securely to Groq API endpoints solely for immediate inference generation. Prompts are not used to train public foundational models.
             </p>
           </section>
 
-          <section>
-            <h2 className="text-lg font-semibold text-white mb-3">5. Contact Us</h2>
-            <p className="text-neutral-400">
-              If you have any questions regarding this Privacy Policy, please reach out to us at{" "}
-              <span className="text-white font-mono">support@writeyouremail.com</span>.
+          <section className="bg-[#141415] p-6 rounded-2xl border border-white/5">
+            <h2 className="text-lg font-bold text-white mb-3">4. Security & Storage</h2>
+            <p>
+              User databases are hosted on Supabase with Row Level Security (RLS) policies enforced. Admin database keys are strictly isolated on server-side API routes.
+            </p>
+          </section>
+
+          <section className="bg-[#141415] p-6 rounded-2xl border border-white/5">
+            <h2 className="text-lg font-bold text-white mb-3">5. Data Erasure Rights</h2>
+            <p>
+              You have the right to request deletion of your account and prompt generation history at any time by contacting support.
             </p>
           </section>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-white/10 py-12 text-center text-sm font-medium text-[#86868b]">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2026 WriteYourEmail. All rights reserved.</p>
+          <div className="flex space-x-6">
+            <Link href="/terms" className="hover:text-[#f5f5f7] transition">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">
+              Privacy
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
