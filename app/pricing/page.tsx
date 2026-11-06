@@ -10,7 +10,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // ============================================================================
-// PASTE YOUR PAYPAL LIVE CLIENT ID & 6 PLAN IDS HERE
+// PAYPAL LIVE CLIENT ID & 6 PLAN IDS
 // ============================================================================
 const PAYPAL_CLIENT_ID = "BAAODdDSTxLd8ul-bpGX8tIqVSkyEezEjQtleLHKXIXvHjTNHXcOkzCcvrfGB_uL-Sxm8y9Hr3GxIw8ZAc";
 
@@ -27,6 +27,7 @@ const PLANS = {
 export default function PricingPage() {
   const [user, setUser] = useState<any>(null);
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">("monthly");
+  const [sdkReady, setSdkReady] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -113,10 +114,11 @@ export default function PricingPage() {
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
-      {/* PayPal SDK Script */}
+      {/* PayPal SDK Script with Server Subscription Support */}
       <Script
         src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription`}
         strategy="afterInteractive"
+        onLoad={() => setSdkReady(true)}
       />
 
       {/* Ambient Apple Radial Glow */}
@@ -222,7 +224,7 @@ export default function PricingPage() {
                   {/* PayPal Smart Button Mount */}
                   <div className="mb-8 min-h-[50px]">
                     {user ? (
-                      <PayPalButtonWrapper planId={activePlanId} userId={user.id} />
+                      <PayPalButtonWrapper planId={activePlanId} userId={user.id} sdkReady={sdkReady} />
                     ) : (
                       <Link
                         href="/studio"
@@ -269,44 +271,81 @@ export default function PricingPage() {
   );
 }
 
-function PayPalButtonWrapper({ planId, userId }: { planId: string; userId: string }) {
-  useEffect(() => {
-    const containerId = `paypal-container-${planId.replace(/[^a-zA-Z0-9]/g, "")}`;
-    const container = document.getElementById(containerId);
-
-    if (container) {
-      container.innerHTML = "";
-      
-      // @ts-ignore
-      if (window.paypal) {
-        // @ts-ignore
-        window.paypal
-          .Buttons({
-            style: {
-              shape: "pill",
-              color: "blue",
-              layout: "vertical",
-              label: "subscribe",
-            },
-            createSubscription: (_data: any, actions: any) => {
-              return actions.subscription.create({
-                plan_id: planId,
-                custom_id: userId,
-              });
-            },
-            onApprove: (_data: any) => {
-              alert("Subscription successful! Redirecting to Studio...");
-              window.location.href = "/studio?success=true";
-            },
-            onError: (err: any) => {
-              console.error("PayPal Checkout Error:", err);
-            },
-          })
-          .render(`#${containerId}`);
-      }
-    }
-  }, [planId, userId]);
-
+function PayPalButtonWrapper({
+  planId,
+  userId,
+  sdkReady,
+}: {
+  planId: string;
+  userId: string;
+  sdkReady: boolean;
+}) {
   const containerId = `paypal-container-${planId.replace(/[^a-zA-Z0-9]/g, "")}`;
-  return <div id={containerId} className="w-full" />;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const renderPayPal = () => {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      container.innerHTML = "";
+
+      // @ts-ignore
+      if (window.paypal && window.paypal.Buttons) {
+        try {
+          // @ts-ignore
+          window.paypal
+            .Buttons({
+              style: {
+                shape: "pill",
+                color: "blue",
+                layout: "vertical",
+                label: "subscribe",
+              },
+              createSubscription: async (_data: any, actions: any) => {
+                try {
+                  // Primary: Create Subscription securely via Next.js server route
+                  const res = await fetch("/api/paypal/create-subscription", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ planId, userId }),
+                  });
+                  const data = await res.json();
+                  if (res.ok && data.subscriptionId) {
+                    return data.subscriptionId;
+                  }
+                  console.warn("Server route failed, attempting SDK fallback:", data);
+                } catch (e) {
+                  console.warn("Server route fetch error:", e);
+                }
+
+                // Fallback: Direct SDK call
+                return actions.subscription.create({
+                  plan_id: planId,
+                  custom_id: userId,
+                });
+              },
+              onApprove: (_data: any) => {
+                alert("Subscription successful! Redirecting to Studio...");
+                window.location.href = "/studio?success=true";
+              },
+              onError: (err: any) => {
+                console.error("PayPal Checkout Error:", err);
+              },
+            })
+            .render(`#${containerId}`);
+        } catch (err) {
+          console.error("Error rendering PayPal buttons:", err);
+        }
+      }
+    };
+
+    const timer = setTimeout(renderPayPal, 200);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [planId, userId, sdkReady, containerId]);
+
+  return <div id={containerId} className="w-full min-h-[45px]" />;
 }
