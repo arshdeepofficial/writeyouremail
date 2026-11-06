@@ -196,28 +196,45 @@ export default function StudioPage() {
     setProModalOpen(true);
   };
 
-  const fetchUserUsage = async (userId: string) => {
+    const fetchUserUsage = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from("usage_tracking")
-        .select("count, is_pro, last_reset, plan_tier")
+        .select("count, is_pro, last_reset, plan_tier, subscription_ends_at")
         .eq("user_id", userId)
         .single();
-      if (!error && data) {
-        setIsPro(data.is_pro || false);
-        setDailyUsage(data.count || 0);
-        setPlanTier(data.plan_tier || "free");
-      } else if (error) {
-        await supabase.from("usage_tracking").insert([{ 
-          user_id: userId, 
-          count: 0, 
-          is_pro: false, 
-          plan_tier: "free" 
-        }]);
-      }
-    } catch (e) { console.error(e); }
-  };
 
+      if (!error && data) {
+        const now = new Date();
+        const expiry = data.subscription_ends_at
+          ? new Date(data.subscription_ends_at)
+          : null;
+
+        // Subscription expired → treat as free
+        if (expiry && now > expiry) {
+          setIsPro(false);
+          setDailyUsage(data.count || 0);
+          setPlanTier("free");
+        } else {
+          // Still active (or free user with no expiry)
+          setIsPro(data.is_pro || false);
+          setDailyUsage(data.count || 0);
+          setPlanTier(data.plan_tier || "free");
+        }
+      } else if (error) {
+        await supabase.from("usage_tracking").insert([
+          {
+            user_id: userId,
+            count: 0,
+            is_pro: false,
+            plan_tier: "free",
+          },
+        ]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
   const fetchUserHistory = async (userId: string) => {
     try {
       const { data, error } = await supabase.from("emails").select("*").eq("user_id", userId).order("created_at", { ascending: false });
