@@ -10,8 +10,7 @@ import {
   Target, 
   CheckCircle2,
   Send,
-  Phone,
-  MessageSquare
+  Phone
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -142,7 +141,7 @@ export default function LandingPage() {
                 <Target className="w-10 h-10 text-[#0a84ff] mb-6" />
                 <h3 className="text-2xl font-bold mb-3 text-white">11 Omni-Channel Modes</h3>
                 <p className="text-[#86868b] mb-8 max-w-md">
-                  Don't just stick to email. Generate highly personalized outreach for every platform your prospects live on.
+                  Don&apos;t just stick to email. Generate highly personalized outreach for every platform your prospects live on.
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
@@ -250,7 +249,7 @@ export default function LandingPage() {
           </div>
 
           <div className="text-xs text-[#52525b]">
-            © {new Date().getFullYear()} WriteYourEmail. All rights reserved.
+            © 2026 WriteYourEmail. All rights reserved.
           </div>
         </div>
       </footer>
