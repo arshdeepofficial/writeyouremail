@@ -8,7 +8,7 @@ const supabaseAdmin = createClient(
 
 export async function POST(req: Request) {
   try {
-    const { orderId, userId } = await req.json();
+    const { orderId, userId, tierName } = await req.json();
 
     if (!orderId || !userId) {
       return NextResponse.json(
@@ -56,17 +56,23 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Immediately Upgrade User to PRO in Supabase
+    // Determine normalized tier name
+    const normalizedTier = (tierName || "starter").toLowerCase();
+
+    // 3. Update Supabase with exact plan tier & pro status
     const { error: dbError } = await supabaseAdmin
       .from("usage_tracking")
-      .update({ is_pro: true })
+      .update({ 
+        is_pro: true,
+        plan_tier: normalizedTier
+      })
       .eq("user_id", userId);
 
     if (dbError) {
       console.error("Database Update Error:", dbError);
     }
 
-    console.log(`✅ Payment captured successfully! User ${userId} upgraded to PRO.`);
+    console.log(`✅ Payment captured! User ${userId} upgraded to ${normalizedTier.toUpperCase()}`);
 
     return NextResponse.json({ success: true, captureData }, { status: 200 });
   } catch (error: any) {

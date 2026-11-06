@@ -38,7 +38,7 @@ export default function PricingPage() {
       priceYearly: "$190",
       periodLabelMonthly: "/mo",
       periodLabelYearly: "/yr",
-      description: "Ideal for solo sales reps and founders sending cold pitches.",
+      description: "Ideal for solo sales reps sending cold pitches.",
       features: [
         "50 AI Email Generations / month",
         "Standard ICP Persona Engine",
@@ -101,17 +101,14 @@ export default function PricingPage() {
           '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
       }}
     >
-      {/* Global Standard Checkout PayPal SDK */}
       <Script
         src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`}
         strategy="afterInteractive"
         onLoad={() => setSdkReady(true)}
       />
 
-      {/* Ambient Radial Glow */}
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[120px] pointer-events-none rounded-full" />
 
-      {/* Header Navigation */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-[#000000]/70 backdrop-blur-2xl saturate-150 h-16 flex items-center justify-between px-6 max-w-7xl mx-auto">
         <Link href="/" className="flex items-center space-x-2 font-semibold text-lg tracking-tight">
           <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
@@ -126,7 +123,6 @@ export default function PricingPage() {
         </div>
       </header>
 
-      {/* Pricing Hero */}
       <main className="py-20 px-6 max-w-7xl mx-auto text-center relative z-10">
         <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-[#0a84ff]/10 text-[#0a84ff] border border-[#0a84ff]/20 inline-block mb-4 tracking-wider uppercase">
           Flexible B2B Pricing
@@ -138,7 +134,6 @@ export default function PricingPage() {
           Choose the tier that fits your outreach velocity. Instant activation powered by PayPal.
         </p>
 
-        {/* Monthly / Annual Toggle Switch */}
         <div className="flex items-center justify-center gap-4 mb-16">
           <span
             className={`text-sm font-semibold transition ${
@@ -170,7 +165,6 @@ export default function PricingPage() {
           </span>
         </div>
 
-        {/* Pricing Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
           {tiers.map((tier) => {
             const activePriceNum = billingCycle === "monthly" ? tier.priceMonthlyNum : tier.priceYearlyNum;
@@ -208,7 +202,6 @@ export default function PricingPage() {
                     <span className="text-[#86868b] text-sm font-medium">{activePeriod}</span>
                   </div>
 
-                  {/* PayPal Smart Button Mount */}
                   <div className="mb-8 min-h-[50px]">
                     {user ? (
                       <PayPalButtonWrapper
@@ -229,7 +222,7 @@ export default function PricingPage() {
 
                   <div className="space-y-3 pt-6 border-t border-white/5">
                     <p className="text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-4">
-                      What's Included:
+                      What&apos;s Included:
                     </p>
                     {tier.features.map((feat) => (
                       <div key={feat} className="flex items-start gap-3 text-sm">
@@ -245,7 +238,6 @@ export default function PricingPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-white/10 py-12 text-center text-sm font-medium text-[#86868b]">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© 2026 WriteYourEmail. All rights reserved.</p>
@@ -320,12 +312,13 @@ function PayPalButtonWrapper({
                   body: JSON.stringify({
                     orderId: data.orderID,
                     userId,
+                    tierName, // Pass tierName to backend
                   }),
                 });
                 const captureData = await res.json();
 
                 if (res.ok && captureData.success) {
-                  alert("Payment successful! Your account is now upgraded to PRO.");
+                  alert(`Payment successful! Your account is upgraded to ${tierName.toUpperCase()}.`);
                   window.location.href = "/studio?success=true";
                 } else {
                   alert("Payment capture failed. Please contact support.");
