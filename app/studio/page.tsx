@@ -692,9 +692,16 @@ export default function StudioPage() {
               )}
             </button>
 
-            {user ? (
+                {user ? (
               <div className="flex items-center space-x-4 ml-2 border-l border-white/10 pl-4">
-                <span className="text-sm text-[#86868b]">{user.email}</span>
+                <Link 
+                  href="/profile" 
+                  className="text-sm font-medium text-[#f5f5f7] hover:text-[#0a84ff] transition flex items-center gap-1.5"
+                  title="View Profile"
+                >
+                  <span className="w-5 h-5 bg-white/10 rounded-full flex items-center justify-center text-[10px]">👤</span>
+                  {user.email.split('@')[0]}
+                </Link>
                 <button onClick={handleLogout} className="text-sm text-[#86868b] hover:text-[#f5f5f7] transition">
                   Log out
                 </button>
@@ -764,9 +771,15 @@ export default function StudioPage() {
             >
               Saved History ({savedHistory.length})
             </button>
-            {user ? (
+                        {user ? (
               <>
-                <span className="text-sm text-[#86868b] text-center">{user.email}</span>
+                <Link 
+                  href="/profile" 
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-center text-[#f5f5f7] py-2 text-base font-semibold hover:text-[#0a84ff] transition"
+                >
+                  My Profile ({user.email.split('@')[0]})
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold"
