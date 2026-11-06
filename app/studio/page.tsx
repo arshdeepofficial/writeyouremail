@@ -78,6 +78,11 @@ type StudioMode =
   | "batch" 
   | "csv_bulk";
 
+// Tier Access Matrix
+const STARTER_MODES: StudioMode[] = ["create", "polish", "reply"];
+const GROWTH_MODES: StudioMode[] = [...STARTER_MODES, "sequence", "ab_test", "linkedin", "twitter"];
+const ENTERPRISE_MODES: StudioMode[] = [...GROWTH_MODES, "cold_call", "classifier", "batch", "csv_bulk"];
+
 export default function StudioPage() {
   const [studioMode, setStudioMode] = useState<StudioMode>("create");
 
@@ -119,6 +124,7 @@ export default function StudioPage() {
   const [user, setUser] = useState<any>(null);
   const [dailyUsage, setDailyUsage] = useState<number>(0);
   const [isPro, setIsPro] = useState<boolean>(false);
+  const [planTier, setPlanTier] = useState<string>("free");
   const [guestUsage, setGuestUsage] = useState<number>(0);
 
   const [savedHistory, setSavedHistory] = useState<SavedEmailRecord[]>([]);
@@ -129,6 +135,7 @@ export default function StudioPage() {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [proModalOpen, setProModalOpen] = useState(false);
   const [proReason, setProReason] = useState("");
+  const [proTargetTier, setProTargetTier] = useState<"growth" | "enterprise">("growth");
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -142,7 +149,6 @@ export default function StudioPage() {
 
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // Derived state for Social/Call scripts
   const isSocialOrCall = studioMode === "linkedin" || studioMode === "twitter" || studioMode === "cold_call";
 
   useEffect(() => {
@@ -184,17 +190,30 @@ export default function StudioPage() {
     return () => authListener.subscription.unsubscribe();
   }, []);
 
-  const triggerProModal = (reason: string) => {
+  const triggerProModal = (reason: string, targetTier: "growth" | "enterprise" = "growth") => {
     setProReason(reason);
+    setProTargetTier(targetTier);
     setProModalOpen(true);
   };
 
   const fetchUserUsage = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from("usage_tracking").select("count, is_pro, last_reset").eq("user_id", userId).single();
+      const { data, error } = await supabase
+        .from("usage_tracking")
+        .select("count, is_pro, last_reset, plan_tier")
+        .eq("user_id", userId)
+        .single();
       if (!error && data) {
         setIsPro(data.is_pro || false);
         setDailyUsage(data.count || 0);
+        setPlanTier(data.plan_tier || "free");
+      } else if (error) {
+        await supabase.from("usage_tracking").insert([{ 
+          user_id: userId, 
+          count: 0, 
+          is_pro: false, 
+          plan_tier: "free" 
+        }]);
       }
     } catch (e) { console.error(e); }
   };
@@ -219,6 +238,54 @@ export default function StudioPage() {
     const raw = localStorage.getItem("guest_email_history");
     if (raw) {
       try { setSavedHistory(JSON.parse(raw)); } catch (e) { console.error(e); }
+    }
+  };
+
+  // TIER ACCESS LOGIC
+  const checkModeAccess = (targetMode: StudioMode): boolean => {
+    // Free & Guest Users: Only basic modes
+    if (!isPro) {
+      if (!STARTER_MODES.includes(targetMode)) {
+        triggerProModal(
+          "This feature requires a Pro Plan. LinkedIn DMs, Twitter DMs, Sequences, Cold Call Scripts, and Bulk Tools are exclusive to paid plans.",
+          "growth"
+        );
+        return false;
+      }
+      return true;
+    }
+
+    // Starter Plan: Only basic modes
+    if (planTier === "starter") {
+      if (!STARTER_MODES.includes(targetMode)) {
+        triggerProModal(
+          "Your Starter Plan ($19) includes Standard Emails, Polish, and Objection Replies. Upgrade to Growth ($39) to unlock LinkedIn DMs, Twitter DMs, Sequences, and A/B Split Testing.",
+          "growth"
+        );
+        return false;
+      }
+      return true;
+    }
+
+    // Growth Plan: Basic + Growth modes
+    if (planTier === "growth") {
+      if (!GROWTH_MODES.includes(targetMode)) {
+        triggerProModal(
+          "Your Growth Plan ($39) includes DMs and Sequences. Upgrade to Enterprise ($79) to unlock Cold Call Scripts, Intent Classifier, Multi-Vertical Batching, and Bulk CSV Personalization.",
+          "enterprise"
+        );
+        return false;
+      }
+      return true;
+    }
+
+    // Enterprise Plan: All modes
+    return true;
+  };
+
+  const handleSelectMode = (newMode: StudioMode) => {
+    if (checkModeAccess(newMode)) {
+      setStudioMode(newMode);
     }
   };
 
@@ -284,7 +351,7 @@ export default function StudioPage() {
 
   const exportHistory = (format: "txt" | "csv") => {
     if (!isPro) {
-      triggerProModal("1-Click Email History Export is a Pro feature.");
+      triggerProModal("1-Click Email History Export is a Pro feature.", "growth");
       return;
     }
     if (savedHistory.length === 0) return;
@@ -299,6 +366,11 @@ export default function StudioPage() {
       a.download = "WriteYourEmail_History.txt";
       a.click();
     } else {
+      // CSV export requires Enterprise
+      if (planTier !== "enterprise") {
+        triggerProModal("CSV Export is an Enterprise feature.", "enterprise");
+        return;
+      }
       const csvRows = [
         ["Date", "Type", "Subject", "Body"],
         ...savedHistory.map((item) => [
@@ -317,13 +389,16 @@ export default function StudioPage() {
   };
 
   const incrementUsageAfterSuccess = async () => {
-    if (isPro) return;
+    // Growth & Enterprise: Unlimited, no counter needed
+    if (isPro && (planTier === "growth" || planTier === "enterprise")) return;
+
     if (!user) {
       const nextGuestCount = guestUsage + 1;
       setGuestUsage(nextGuestCount);
       localStorage.setItem("guest_usage", nextGuestCount.toString());
       return;
     }
+
     const nextUsage = dailyUsage + 1;
     setDailyUsage(nextUsage);
     try {
@@ -332,6 +407,7 @@ export default function StudioPage() {
         count: nextUsage,
         last_reset: new Date().toISOString().split("T")[0],
         is_pro: isPro,
+        plan_tier: planTier,
       });
     } catch (err) { console.error(err); }
   };
@@ -339,13 +415,27 @@ export default function StudioPage() {
   const handleGenerate = async (e?: React.FormEvent, overrideTone?: string) => {
     if (e) e.preventDefault();
 
-    if (!isPro && !overrideTone) {
+    // Enforce tier mode access
+    if (!checkModeAccess(studioMode)) return;
+
+    // QUOTA ENFORCEMENT
+    if (!overrideTone) {
+      // Guest limit
       if (!user && guestUsage >= 2) {
         setAuthModalOpen(true);
         return;
       }
-      if (user && dailyUsage >= 5) {
-        triggerProModal("You have reached your 5 daily free generations! Upgrade to Pro for unlimited access.");
+      // Free user limit
+      if (user && !isPro && dailyUsage >= 5) {
+        triggerProModal("You have reached your 5 daily free generations! Upgrade to Pro for unlimited access.", "growth");
+        return;
+      }
+      // Starter plan limit (50/month)
+      if (isPro && planTier === "starter" && dailyUsage >= 50) {
+        triggerProModal(
+          "You have used all 50 AI generations on your Starter Plan this month. Upgrade to Growth ($39) for Unlimited Generations!",
+          "growth"
+        );
         return;
       }
     }
@@ -412,8 +502,10 @@ export default function StudioPage() {
   };
 
   const savePreset = () => {
-    if (!isPro) return triggerProModal("Saving Custom Prompt Presets is a Pro feature.");
-    const name = prompt("Enter a name for this custom preset (e.g. 'SaaS Agency Pitch'):");
+    if (planTier !== "growth" && planTier !== "enterprise") {
+      return triggerProModal("Saving Custom Prompt Presets requires the Growth Plan.", "growth");
+    }
+    const name = window.prompt("Enter a name for this custom preset (e.g. 'SaaS Agency Pitch'):");
     if (name) {
       const newPreset: PromptPreset = { id: Date.now().toString(), name, context, emailType, tone, icpPersona };
       const updated = [...presets, newPreset];
@@ -456,6 +548,7 @@ export default function StudioPage() {
     await supabase.auth.signOut();
     setUser(null);
     setIsPro(false);
+    setPlanTier("free");
     setDailyUsage(0);
     setMobileMenuOpen(false);
   };
@@ -492,6 +585,24 @@ export default function StudioPage() {
       item.body.toLowerCase().includes(historySearch.toLowerCase()) ||
       item.email_type.toLowerCase().includes(historySearch.toLowerCase())
   );
+
+  // Determine Usage Display
+  const usageDisplay = () => {
+    if (!user) return `${guestUsage}/2 Guest`;
+    if (planTier === "enterprise") return "Enterprise ∞";
+    if (planTier === "growth") return "Growth ∞";
+    if (planTier === "starter") return `${dailyUsage}/50 Starter`;
+    return `${dailyUsage}/5 Free`;
+  };
+
+  const planBadge = () => {
+    if (planTier === "enterprise") return { label: "ENTERPRISE", color: "from-purple-500/10 to-pink-500/10 border-purple-500/30 text-purple-400" };
+    if (planTier === "growth") return { label: "GROWTH", color: "from-blue-500/10 to-cyan-500/10 border-blue-500/30 text-blue-400" };
+    if (planTier === "starter") return { label: "STARTER", color: "from-amber-500/10 to-yellow-500/10 border-amber-500/30 text-amber-400" };
+    return null;
+  };
+
+  const badge = planBadge();
 
   return (
     <div
@@ -534,15 +645,16 @@ export default function StudioPage() {
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
-            {isPro ? (
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/30 text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]">
-                ⚡ PRO MEMBER
+            {badge ? (
+              <span className={`text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r ${badge.color} border shadow-[0_0_15px_rgba(10,132,255,0.1)]`}>
+                ⚡ {badge.label} MEMBER
               </span>
             ) : (
               <button
                 onClick={() =>
                   triggerProModal(
-                    "Upgrade to Pro to unlock unlimited daily generations, 3-step outreach sequences, and custom brand voice."
+                    "Upgrade to Pro to unlock unlimited daily generations, 3-step outreach sequences, and custom brand voice.",
+                    "growth"
                   )
                 }
                 className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-white transition flex items-center gap-1 ring-1 ring-white/10"
@@ -679,7 +791,7 @@ export default function StudioPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Studio v7.0 Titan</h2>
-              <p className="text-sm text-[#86868b] mt-1">Includes Omni-Channel Outreach, CSV Bulk, Presets & CRM Tags.</p>
+              <p className="text-sm text-[#86868b] mt-1">Omni-Channel Outreach · CSV Bulk · Presets · CRM Tags</p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {presets.length > 0 && (
@@ -695,19 +807,17 @@ export default function StudioPage() {
                   ))}
                 </select>
               )}
-              {!isPro && (
-                <span className="text-sm px-4 py-2 bg-[#222224] rounded-full text-[#86868b] font-medium border border-white/5">
-                  {user ? `${dailyUsage}/5 Free` : `${guestUsage}/2 Free`}
-                </span>
-              )}
+              <span className="text-sm px-4 py-2 bg-[#222224] rounded-full text-[#86868b] font-medium border border-white/5">
+                {usageDisplay()}
+              </span>
             </div>
           </div>
 
-          {/* Hiding Webkit Scrollbar properly while keeping scroll functionality */}
+          {/* Mode Selector Dock (Hidden Scrollbar) */}
           <div className="flex items-center gap-2 bg-[#1c1c1e] p-1.5 rounded-2xl w-full mb-8 overflow-x-auto whitespace-nowrap border border-white/5 shadow-inner [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <button
               type="button"
-              onClick={() => setStudioMode("create")}
+              onClick={() => handleSelectMode("create")}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
                 studioMode === "create" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
@@ -716,59 +826,7 @@ export default function StudioPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (!isPro) triggerProModal("LinkedIn DM generator is a Pro exclusive feature.");
-                else setStudioMode("linkedin");
-              }}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "linkedin" ? "bg-[#0077b5] text-white shadow-md ring-1 ring-[#0077b5]/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>💼 LinkedIn DM</span>
-              {!isPro && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  PRO
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!isPro) triggerProModal("Twitter/X DM generator is a Pro exclusive feature.");
-                else setStudioMode("twitter");
-              }}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "twitter" ? "bg-white text-black shadow-md ring-1 ring-white/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>🐦 Twitter/X DM</span>
-              {!isPro && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  PRO
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!isPro) triggerProModal("Cold Call Script generator is a Pro exclusive feature.");
-                else setStudioMode("cold_call");
-              }}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "cold_call" ? "bg-rose-600 text-white shadow-md ring-1 ring-rose-500/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>📞 Call Script</span>
-              {!isPro && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  PRO
-                </span>
-              )}
-            </button>
-            <div className="w-[1px] h-6 bg-white/10 mx-1 shrink-0" />
-            <button
-              type="button"
-              onClick={() => setStudioMode("polish")}
+              onClick={() => handleSelectMode("polish")}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
                 studioMode === "polish" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
@@ -777,96 +835,109 @@ export default function StudioPage() {
             </button>
             <button
               type="button"
-              onClick={() => setStudioMode("reply")}
+              onClick={() => handleSelectMode("reply")}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
                 studioMode === "reply" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               🥊 Objection Reply
             </button>
+            <div className="w-[1px] h-6 bg-white/10 mx-1 shrink-0" />
             <button
               type="button"
-              onClick={() => {
-                if (!isPro) triggerProModal("AI Reply Intent Classifier is a Pro exclusive feature.");
-                else setStudioMode("classifier");
-              }}
+              onClick={() => handleSelectMode("linkedin")}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "classifier" ? "bg-pink-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+                studioMode === "linkedin" ? "bg-[#0077b5] text-white shadow-md ring-1 ring-[#0077b5]/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
-              <span>🧠 Classifier</span>
-              {!isPro && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  PRO
-                </span>
+              <span>💼 LinkedIn DM</span>
+              {planTier !== "growth" && planTier !== "enterprise" && (
+                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-bold">GROWTH</span>
               )}
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (!isPro) triggerProModal("3-Step Outreach Sequence generator is a Pro exclusive feature.");
-                else setStudioMode("sequence");
-              }}
+              onClick={() => handleSelectMode("twitter")}
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "twitter" ? "bg-white text-black shadow-md ring-1 ring-white/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>🐦 Twitter/X DM</span>
+              {planTier !== "growth" && planTier !== "enterprise" && (
+                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-bold">GROWTH</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectMode("sequence")}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
                 studioMode === "sequence" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>🔁 Sequence</span>
-              {!isPro && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  PRO
-                </span>
+              {planTier !== "growth" && planTier !== "enterprise" && (
+                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-bold">GROWTH</span>
               )}
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (!isPro) triggerProModal("A/B Split Test generator is a Pro exclusive feature.");
-                else setStudioMode("ab_test");
-              }}
+              onClick={() => handleSelectMode("ab_test")}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
                 studioMode === "ab_test" ? "bg-[#0a84ff] text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>⚖️ A/B Split</span>
-              {!isPro && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  PRO
-                </span>
+              {planTier !== "growth" && planTier !== "enterprise" && (
+                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-bold">GROWTH</span>
+              )}
+            </button>
+            <div className="w-[1px] h-6 bg-white/10 mx-1 shrink-0" />
+            <button
+              type="button"
+              onClick={() => handleSelectMode("cold_call")}
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "cold_call" ? "bg-rose-600 text-white shadow-md ring-1 ring-rose-500/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>📞 Call Script</span>
+              {planTier !== "enterprise" && (
+                <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">ENTERPRISE</span>
               )}
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (!isPro) triggerProModal("Multi-Vertical Batch generator is a Pro exclusive feature.");
-                else setStudioMode("batch");
-              }}
+              onClick={() => handleSelectMode("classifier")}
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+                studioMode === "classifier" ? "bg-pink-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
+              }`}
+            >
+              <span>🧠 Classifier</span>
+              {planTier !== "enterprise" && (
+                <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">ENTERPRISE</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectMode("batch")}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
                 studioMode === "batch" ? "bg-emerald-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>📦 Batch</span>
-              {!isPro && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  PRO
-                </span>
+              {planTier !== "enterprise" && (
+                <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">ENTERPRISE</span>
               )}
             </button>
             <button
               type="button"
-              onClick={() => {
-                if (!isPro) triggerProModal("Bulk CSV Leads generator is a Pro exclusive feature.");
-                else setStudioMode("csv_bulk");
-              }}
+              onClick={() => handleSelectMode("csv_bulk")}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
                 studioMode === "csv_bulk" ? "bg-orange-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
               }`}
             >
               <span>📄 CSV Bulk</span>
-              {!isPro && (
-                <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full font-bold">
-                  PRO
-                </span>
+              {planTier !== "enterprise" && (
+                <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">ENTERPRISE</span>
               )}
             </button>
           </div>
@@ -883,9 +954,7 @@ export default function StudioPage() {
                   className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition outline-none appearance-none cursor-pointer shadow-sm"
                 >
                   {LANGUAGES.map((lang) => (
-                    <option key={lang} value={lang}>
-                      {lang}
-                    </option>
+                    <option key={lang} value={lang}>{lang}</option>
                   ))}
                 </select>
               </div>
@@ -899,9 +968,7 @@ export default function StudioPage() {
                   className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition outline-none appearance-none cursor-pointer shadow-sm"
                 >
                   {ICP_PERSONAS.map((icp) => (
-                    <option key={icp} value={icp}>
-                      {icp}
-                    </option>
+                    <option key={icp} value={icp}>{icp}</option>
                   ))}
                 </select>
               </div>
@@ -919,16 +986,16 @@ export default function StudioPage() {
                 <div>
                   <label className="text-xs font-semibold text-[#86868b] mb-2 flex justify-between">
                     <span>Brand Voice DNA</span>
-                    {!isPro && <span className="text-[10px] text-amber-400 font-bold tracking-wider">PRO</span>}
+                    {(planTier !== "growth" && planTier !== "enterprise") && <span className="text-[10px] text-blue-400 font-bold tracking-wider">GROWTH</span>}
                   </label>
                   <input
                     type="text"
-                    disabled={!isPro}
-                    placeholder={isPro ? "e.g. Direct Silicon Valley executive" : "🔒 Pro Required"}
+                    disabled={planTier !== "growth" && planTier !== "enterprise"}
+                    placeholder={(planTier === "growth" || planTier === "enterprise") ? "e.g. Direct Silicon Valley executive" : "🔒 Growth Plan Required"}
                     value={brandVoice}
                     onChange={(e) => setBrandVoice(e.target.value)}
                     className={`w-full border border-white/5 rounded-xl p-3 text-sm outline-none transition ${
-                      isPro ? "bg-[#222224] text-[#f5f5f7] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d]" : "bg-[#1a1a1c] text-[#86868b] cursor-not-allowed opacity-70"
+                      (planTier === "growth" || planTier === "enterprise") ? "bg-[#222224] text-[#f5f5f7] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d]" : "bg-[#1a1a1c] text-[#86868b] cursor-not-allowed opacity-70"
                     }`}
                   />
                 </div>
@@ -1002,7 +1069,7 @@ export default function StudioPage() {
                 <textarea
                   rows={5}
                   required
-                  placeholder="Paste the prospect's reply here to analyze their intent (e.g. Positive, Negative, OOO, Pricing Objection)..."
+                  placeholder="Paste the prospect's reply here to analyze their intent..."
                   value={incomingEmailText}
                   onChange={(e) => setIncomingEmailText(e.target.value)}
                   className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
@@ -1034,8 +1101,8 @@ export default function StudioPage() {
                     onChange={(e) => setReplyStrategy(e.target.value)}
                     className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
                   >
-                    <option value="Value & ROI Reframing">Value & ROI Reframing (Turn cost into ROI)</option>
-                    <option value="Soft 5-Minute Nudge">Soft 5-Minute Nudge (Low friction ask)</option>
+                    <option value="Value & ROI Reframing">Value & ROI Reframing</option>
+                    <option value="Soft 5-Minute Nudge">Soft 5-Minute Nudge</option>
                     <option value="Polite Breakup">Polite Breakup & Future Touchpoint</option>
                   </select>
                 </div>
@@ -1222,25 +1289,16 @@ export default function StudioPage() {
                   </>
                 ) : (
                   <span>
-                    {studioMode === "sequence"
-                      ? "Generate 3-Step Sequence"
-                      : studioMode === "ab_test"
-                      ? "Generate A/B Test"
-                      : studioMode === "batch"
-                      ? "Generate Batch Campaign"
-                      : studioMode === "reply"
-                      ? "Generate Rebuttal"
-                      : studioMode === "csv_bulk"
-                      ? "Process CSV Bulk"
-                      : studioMode === "classifier"
-                      ? "Classify Reply Intent"
-                      : studioMode === "linkedin"
-                      ? "Generate LinkedIn DM"
-                      : studioMode === "twitter"
-                      ? "Generate Twitter DM"
-                      : studioMode === "cold_call"
-                      ? "Generate Call Script"
-                      : "Generate Content"}
+                    {studioMode === "sequence" ? "Generate 3-Step Sequence" :
+                     studioMode === "ab_test" ? "Generate A/B Test" :
+                     studioMode === "batch" ? "Generate Batch Campaign" :
+                     studioMode === "reply" ? "Generate Rebuttal" :
+                     studioMode === "csv_bulk" ? "Process CSV Bulk" :
+                     studioMode === "classifier" ? "Classify Reply Intent" :
+                     studioMode === "linkedin" ? "Generate LinkedIn DM" :
+                     studioMode === "twitter" ? "Generate Twitter DM" :
+                     studioMode === "cold_call" ? "Generate Call Script" :
+                     "Generate Content"}
                   </span>
                 )}
               </button>
@@ -1249,8 +1307,7 @@ export default function StudioPage() {
 
           {/* Result Output Display */}
           {variations.length > 0 && (
-            <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              {/* Analytics Dashboard */}
+            <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5 flex flex-col justify-center shadow-inner">
                   <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Deliverability Audit</p>
@@ -1268,7 +1325,6 @@ export default function StudioPage() {
                 </div>
               </div>
 
-              {/* Subject Lines (Hidden for Social and Call Scripts) */}
               {subjectLines.length > 0 && !isSocialOrCall && (
                 <div className="space-y-3">
                   <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
@@ -1307,7 +1363,6 @@ export default function StudioPage() {
                 </div>
               )}
 
-              {/* Variations */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2">
                   <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
@@ -1332,8 +1387,7 @@ export default function StudioPage() {
                   ))}
                 </div>
 
-                {/* 1-Click Persona Rewriter Bar */}
-                <div className="flex items-center gap-2 overflow-x-auto pt-2 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex items-center gap-2 overflow-x-auto pt-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-[#86868b] shrink-0">1-Click Rewrite:</span>
                   <button
                     onClick={() => handleGenerate(undefined, "Compress to less than 75 words exactly.")}
@@ -1387,7 +1441,6 @@ export default function StudioPage() {
                           >
                             Gmail
                           </button>
-
                           <button
                             onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
                             className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition border border-[#0a84ff]/20"
@@ -1426,50 +1479,71 @@ export default function StudioPage() {
             </button>
 
             <div className="text-center mb-6 pt-2">
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 inline-block mb-3 shadow-[0_0_15px_rgba(251,191,36,0.1)]">
-                ⚡ UNLOCK EXECUTIVE PRO
+              <span className={`text-xs font-bold px-3 py-1 rounded-full inline-block mb-3 shadow-[0_0_15px_rgba(10,132,255,0.1)] ${
+                proTargetTier === "enterprise" 
+                  ? "bg-purple-500/10 text-purple-400 border border-purple-500/30" 
+                  : "bg-blue-500/10 text-blue-400 border border-blue-500/30"
+              }`}>
+                ⚡ UPGRADE TO {proTargetTier.toUpperCase()}
               </span>
-              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2 tracking-tight">Upgrade to Pro</h3>
+              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2 tracking-tight">
+                {proTargetTier === "enterprise" ? "Enterprise Plan Required" : "Growth Plan Required"}
+              </h3>
               <p className="text-sm text-[#86868b]">
                 {proReason || "Unlock all executive tools and unlimited generations."}
               </p>
             </div>
 
             <div className="space-y-3 mb-8 text-sm text-[#f5f5f7]">
-              <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                <span className="text-emerald-400 font-bold">✓</span>
-                <span>
-                  <strong>Unlimited Generations</strong> (No 5/day limit)
-                </span>
-              </div>
-              <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                <span className="text-purple-400 font-bold">✓</span>
-                <span>
-                  <strong>Social DMs & Calls</strong> (LinkedIn, X, Scripts)
-                </span>
-              </div>
-              <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                <span className="text-[#0a84ff] font-bold">✓</span>
-                <span>
-                  <strong>Sequences & B2B A/B Split Testing</strong>
-                </span>
-              </div>
-              <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                <span className="text-amber-400 font-bold">✓</span>
-                <span>
-                  <strong>Custom Presets & 1-Click CRM Exports</strong>
-                </span>
-              </div>
+              {proTargetTier === "enterprise" ? (
+                <>
+                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
+                    <span className="text-purple-400 font-bold">✓</span>
+                    <span><strong>Cold Call Scripts</strong> & Reply Intent Classifier</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
+                    <span className="text-purple-400 font-bold">✓</span>
+                    <span><strong>Bulk CSV</strong> Lead List Personalization</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
+                    <span className="text-purple-400 font-bold">✓</span>
+                    <span><strong>Multi-Vertical</strong> Batch Campaigns</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
+                    <span className="text-purple-400 font-bold">✓</span>
+                    <span><strong>CSV History Export</strong> & Full Analytics</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
+                    <span className="text-blue-400 font-bold">✓</span>
+                    <span><strong>Unlimited Generations</strong> (No 50/month limit)</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
+                    <span className="text-blue-400 font-bold">✓</span>
+                    <span><strong>LinkedIn & Twitter/X DMs</strong></span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
+                    <span className="text-blue-400 font-bold">✓</span>
+                    <span><strong>3-Step Sequences</strong> & A/B Split Testing</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
+                    <span className="text-blue-400 font-bold">✓</span>
+                    <span><strong>Custom Brand Voice DNA</strong> & Presets</span>
+                  </div>
+                </>
+              )}
             </div>
 
             <Link
               href="/pricing"
               className="w-full py-4 bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold rounded-2xl text-center block transition shadow-[0_0_20px_rgba(10,132,255,0.3)] ring-1 ring-[#0a84ff]/50"
             >
-              View Pro Plans (Starter, Growth, Enterprise)
+              View {proTargetTier === "enterprise" ? "Enterprise" : "Growth"} Plan
             </Link>
 
-            <p className="text-[11px] text-center text-[#86868b] mt-4 font-medium">Powered by Lemon Squeezy • Cancel anytime</p>
+            <p className="text-[11px] text-center text-[#86868b] mt-4 font-medium">Powered by PayPal • Instant Activation</p>
           </div>
         </div>
       )}
@@ -1504,7 +1578,7 @@ export default function StudioPage() {
                   onClick={() => exportHistory("csv")}
                   className="px-3 py-1.5 rounded-full bg-[#0a84ff]/10 border border-[#0a84ff]/20 text-[#0a84ff] hover:bg-[#0a84ff]/20 transition"
                 >
-                  Export CSV {!isPro && "🔒"}
+                  Export CSV {planTier !== "enterprise" && "🔒"}
                 </button>
               </div>
             </div>
@@ -1526,9 +1600,7 @@ export default function StudioPage() {
                 filteredHistory.map((item) => (
                   <div key={item.id} className="bg-[#1c1c1e] border border-white/5 rounded-2xl p-5 space-y-3 shadow-inner">
                     <div className="flex items-center justify-between text-[11px] font-bold text-[#86868b] border-b border-white/5 pb-2 uppercase tracking-wider">
-                      <span>
-                        {item.email_type} ({item.language})
-                      </span>
+                      <span>{item.email_type} ({item.language})</span>
                       <span>{new Date(item.created_at).toLocaleDateString()}</span>
                     </div>
 
@@ -1537,7 +1609,6 @@ export default function StudioPage() {
 
                     <div className="flex items-center justify-between pt-2">
                       <div className="flex items-center space-x-2">
-                        {/* Only show Gmail button if it actually looks like an email (simple check) */}
                         {!item.email_type.includes("DM") && !item.email_type.includes("Script") && (
                           <button
                             onClick={() => openInGmail(item.subject_line, item.body)}
@@ -1581,26 +1652,22 @@ export default function StudioPage() {
             <h3 className="text-2xl font-bold tracking-tight text-[#f5f5f7] mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
             <p className="text-sm text-[#86868b] mb-6">Get 5 free AI generations every day.</p>
             <form onSubmit={handleAuth} className="space-y-4">
-              <div>
-                <input
-                  type="email"
-                  required
-                  placeholder="Email"
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                  className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
-                />
-              </div>
-              <div>
-                <input
-                  type="password"
-                  required
-                  placeholder="Password"
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
-                />
-              </div>
+              <input
+                type="email"
+                required
+                placeholder="Email"
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
+              />
+              <input
+                type="password"
+                required
+                placeholder="Password"
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
+              />
               {authMessage && (
                 <p className="text-sm font-medium text-[#ff3b30] bg-[#ff3b30]/10 border border-[#ff3b30]/20 p-3 rounded-xl">{authMessage}</p>
               )}
@@ -1631,12 +1698,8 @@ export default function StudioPage() {
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© 2026 WriteYourEmail. All rights reserved.</p>
           <div className="flex space-x-6">
-            <Link href="/terms" className="hover:text-[#f5f5f7] transition">
-              Terms
-            </Link>
-            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">
-              Privacy
-            </Link>
+            <Link href="/terms" className="hover:text-[#f5f5f7] transition">Terms</Link>
+            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">Privacy</Link>
           </div>
         </div>
       </footer>
