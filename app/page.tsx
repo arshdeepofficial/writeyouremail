@@ -7,14 +7,11 @@ import {
   Zap, 
   ShieldCheck, 
   Mail, 
-  BarChart3, 
   Target, 
   CheckCircle2,
-  ChevronRight,
   Send,
-  Linkedin,
-  Twitter,
-  Phone
+  Phone,
+  MessageSquare
 } from "lucide-react";
 
 export default function LandingPage() {
@@ -36,7 +33,7 @@ export default function LandingPage() {
             <div className="w-8 h-8 bg-gradient-to-br from-[#0a84ff] to-[#5e5ce6] text-white flex items-center justify-center font-bold text-sm rounded-xl shadow-lg shadow-[#0a84ff]/20 group-hover:shadow-[#0a84ff]/40 transition-all">
               W
             </div>
-            <span className="font-bold tracking-tight">WriteYourEmail</span>
+            <span className="font-bold tracking-tight text-white">WriteYourEmail</span>
           </Link>
           <div className="flex items-center space-x-8">
             <Link href="/pricing" className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition hidden sm:block">
@@ -55,7 +52,7 @@ export default function LandingPage() {
       <main className="relative z-10 pt-32 pb-20">
         {/* HERO SECTION */}
         <section className="max-w-7xl mx-auto px-6 text-center mb-24">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1c1c1e] border border-white/10 text-[#0a84ff] text-xs font-bold uppercase tracking-wider mb-8 animate-fade-in shadow-xl shadow-[#0a84ff]/10">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1c1c1e] border border-white/10 text-[#0a84ff] text-xs font-bold uppercase tracking-wider mb-8 shadow-xl shadow-[#0a84ff]/10">
             <Sparkles className="w-4 h-4" /> V7.0 Titan Engine Live
           </div>
 
@@ -79,11 +76,11 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Abstract UI Mockup (CSS Only for super fast loading and professional look) */}
+          {/* Abstract UI Mockup */}
           <div className="relative max-w-5xl mx-auto rounded-t-3xl bg-[#141415] border border-white/10 shadow-2xl overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
             
-            {/* Mac Window Header */}
+            {/* Window Header */}
             <div className="h-12 border-b border-white/5 flex items-center px-4 gap-2 bg-[#000000]/50 backdrop-blur-md">
               <div className="w-3 h-3 rounded-full bg-[#ff453a]" />
               <div className="w-3 h-3 rounded-full bg-[#ffd60a]" />
@@ -111,7 +108,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-            {/* Bottom Fade to blend into background */}
             <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#000000] to-transparent" />
           </div>
         </section>
@@ -122,8 +118,7 @@ export default function LandingPage() {
             <p className="text-xs font-bold text-[#86868b] uppercase tracking-widest mb-6">
               Empowering outreach for high-performing teams
             </p>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale">
-              {/* Abstract shapes representing logos */}
+            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale text-white">
               <div className="flex items-center gap-2 font-bold text-xl"><div className="w-6 h-6 bg-white rounded-md" /> Acme Corp</div>
               <div className="flex items-center gap-2 font-bold text-xl"><div className="w-6 h-6 bg-white rounded-full" /> GlobalTech</div>
               <div className="flex items-center gap-2 font-bold text-xl"><div className="w-6 h-6 bg-white rotate-45" /> Nexus</div>
@@ -135,7 +130,7 @@ export default function LandingPage() {
         {/* BENTO BOX FEATURES GRID */}
         <section className="max-w-7xl mx-auto px-6 mb-32">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">Everything you need to close.</h2>
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4 text-white">Everything you need to close.</h2>
             <p className="text-[#86868b] text-lg">A complete toolkit for modern outbound sales.</p>
           </div>
 
@@ -145,15 +140,23 @@ export default function LandingPage() {
               <div className="absolute top-0 right-0 w-64 h-64 bg-[#0a84ff]/10 rounded-full blur-[80px] -mr-20 -mt-20 transition-all group-hover:bg-[#0a84ff]/20" />
               <div className="relative z-10">
                 <Target className="w-10 h-10 text-[#0a84ff] mb-6" />
-                <h3 className="text-2xl font-bold mb-3">11 Omni-Channel Modes</h3>
+                <h3 className="text-2xl font-bold mb-3 text-white">11 Omni-Channel Modes</h3>
                 <p className="text-[#86868b] mb-8 max-w-md">
                   Don't just stick to email. Generate highly personalized outreach for every platform your prospects live on.
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium"><Mail className="w-4 h-4" /> Cold Email</span>
-                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium"><Linkedin className="w-4 h-4 text-[#0a66c2]" /> LinkedIn DM</span>
-                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium"><Twitter className="w-4 h-4 text-white" /> Twitter/X</span>
-                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium"><Phone className="w-4 h-4 text-emerald-500" /> Cold Call</span>
+                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
+                    <Mail className="w-4 h-4 text-[#0a84ff]" /> Cold Email
+                  </span>
+                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
+                    <svg className="w-4 h-4 fill-[#0a66c2]" viewBox="0 0 24 24"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/></svg> LinkedIn DM
+                  </span>
+                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
+                    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> Twitter/X DM
+                  </span>
+                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
+                    <Phone className="w-4 h-4 text-emerald-500" /> Cold Call
+                  </span>
                 </div>
               </div>
             </div>
@@ -163,7 +166,7 @@ export default function LandingPage() {
               <div className="absolute bottom-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px] -mr-10 -mb-10 transition-all group-hover:bg-emerald-500/20" />
               <div className="relative z-10">
                 <ShieldCheck className="w-10 h-10 text-emerald-400 mb-6" />
-                <h3 className="text-2xl font-bold mb-3">Spam Shield</h3>
+                <h3 className="text-2xl font-bold mb-3 text-white">Spam Shield</h3>
                 <p className="text-[#86868b]">
                   Automatic 1-click trigger word sanitization ensures maximum inbox deliverability. Keep your domain reputation pristine.
                 </p>
@@ -175,7 +178,7 @@ export default function LandingPage() {
                <div className="absolute top-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-[60px] -ml-10 -mt-10 transition-all group-hover:bg-purple-500/20" />
                <div className="relative z-10">
                  <Send className="w-10 h-10 text-purple-400 mb-6" />
-                 <h3 className="text-2xl font-bold mb-3">1-Click Launch</h3>
+                 <h3 className="text-2xl font-bold mb-3 text-white">1-Click Launch</h3>
                  <p className="text-[#86868b]">
                    Push generated drafts directly into Gmail or your desktop mail app with pre-filled subjects and bodies.
                  </p>
@@ -186,7 +189,7 @@ export default function LandingPage() {
             <div className="md:col-span-2 bg-[#141415] rounded-[2rem] border border-white/5 p-8 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col sm:flex-row items-center justify-between gap-8">
                <div className="relative z-10 w-full sm:w-1/2">
                  <Zap className="w-10 h-10 text-amber-400 mb-6" />
-                 <h3 className="text-2xl font-bold mb-3">Groq Powered</h3>
+                 <h3 className="text-2xl font-bold mb-3 text-white">Groq Powered</h3>
                  <p className="text-[#86868b]">
                    Lightning-fast generation using a resilient 3-tier model fallback loop (Llama 3, Mixtral, GPT). Silent retry logic means you never see an error.
                  </p>
@@ -194,7 +197,7 @@ export default function LandingPage() {
                <div className="w-full sm:w-1/2 h-32 bg-[#1c1c1e] rounded-xl border border-white/5 flex items-center justify-center relative overflow-hidden">
                  <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px]" />
                  <div className="px-6 py-3 bg-black border border-white/10 rounded-lg text-xs font-mono text-emerald-400 z-10 shadow-2xl">
-                   {">"} generation_complete in 0.8s
+                   &gt; generation_complete in 0.8s
                  </div>
                </div>
             </div>
@@ -204,7 +207,6 @@ export default function LandingPage() {
         {/* CTA SECTION */}
         <section className="max-w-5xl mx-auto px-6 mb-20">
           <div className="bg-gradient-to-br from-[#0a84ff] to-[#5e5ce6] rounded-[3rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl shadow-[#0a84ff]/20">
-            <div className="absolute top-0 right-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay" />
             <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white mb-6 relative z-10">
               Ready to book more meetings?
             </h2>
@@ -237,7 +239,7 @@ export default function LandingPage() {
             <div className="w-6 h-6 bg-gradient-to-br from-[#0a84ff] to-[#5e5ce6] text-white flex items-center justify-center font-bold text-[10px] rounded-md">
               W
             </div>
-            <span className="font-semibold text-sm tracking-tight">WriteYourEmail</span>
+            <span className="font-semibold text-sm tracking-tight text-white">WriteYourEmail</span>
           </div>
           
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-medium text-[#86868b]">
@@ -248,7 +250,7 @@ export default function LandingPage() {
           </div>
 
           <div className="text-xs text-[#52525b]">
-            © {new Date().getFullYear()} WriteYourEmail.
+            © {new Date().getFullYear()} WriteYourEmail. All rights reserved.
           </div>
         </div>
       </footer>
