@@ -1,10 +1,19 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WriteYourEmail — AI Email Writer",
-  description: "Write perfect emails in seconds using AI. Free, no signup required.",
+  metadataBase: new URL("https://writeyouremail.com"),
+  title: "WriteYourEmail — AI Email Generator & Outreach Studio",
+  description:
+    "Generate high-converting cold emails, LinkedIn DMs, and sales sequences in seconds with AI.",
+  alternates: {
+    canonical: "./",
+  },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -14,14 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="antialiased">
-        {children}
-        {/* Lemon Squeezy Overlay Script */}
-        <Script
-          src="https://assets.lemonsqueezy.com/lemon.js"
-          strategy="lazyOnload"
-        />
-      </body>
+      <body className="bg-[#0a0a0a] text-white antialiased">{children}</body>
     </html>
   );
 }

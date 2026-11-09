@@ -99,7 +99,7 @@ export default function TermsPage() {
           <section className="bg-[#141415] p-6 rounded-2xl border border-white/5">
             <h2 className="text-lg font-bold text-white mb-3">7. Contact Information</h2>
             <p>
-              For any legal or technical inquiries regarding these terms, please contact us via your account support panel or at support@writeyouremail.com.
+              For any legal or technical inquiries regarding these terms, please contact us via your account support panel or at arshdeep.singh.official@outlook.com.
             </p>
           </section>
         </div>
