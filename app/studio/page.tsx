@@ -71,17 +71,33 @@ type StudioMode =
   | "reply" 
   | "linkedin" 
   | "twitter" 
+  | "whatsapp"
+  | "vsl_script"
+  | "proposal"
+  | "telegram"
+  | "sequence" 
+  | "ab_test"
   | "cold_call"
   | "classifier" 
-  | "sequence" 
-  | "ab_test" 
   | "batch" 
-  | "csv_bulk";
+  | "csv_bulk"
+  | "reddit_dm"
+  | "threads_dm"
+  | "direct_mail"
+  | "sms_sequence";
 
-// Tier Access Matrix
+// 19-Mode Tier Access Matrix
 const STARTER_MODES: StudioMode[] = ["create", "polish", "reply"];
-const GROWTH_MODES: StudioMode[] = [...STARTER_MODES, "sequence", "ab_test", "linkedin", "twitter"];
-const ENTERPRISE_MODES: StudioMode[] = [...GROWTH_MODES, "cold_call", "classifier", "batch", "csv_bulk"];
+const GROWTH_MODES: StudioMode[] = [
+  ...STARTER_MODES, 
+  "sequence", "ab_test", "linkedin", "twitter", 
+  "whatsapp", "vsl_script", "proposal", "telegram"
+];
+const ENTERPRISE_MODES: StudioMode[] = [
+  ...GROWTH_MODES, 
+  "cold_call", "classifier", "batch", "csv_bulk", 
+  "reddit_dm", "threads_dm", "direct_mail", "sms_sequence"
+];
 
 export default function StudioPage() {
   const [studioMode, setStudioMode] = useState<StudioMode>("create");
@@ -149,7 +165,11 @@ export default function StudioPage() {
 
   const resultRef = useRef<HTMLDivElement>(null);
 
-  const isSocialOrCall = studioMode === "linkedin" || studioMode === "twitter" || studioMode === "cold_call";
+  const isSocialOrCall = [
+    "linkedin", "twitter", "whatsapp", "vsl_script", 
+    "proposal", "telegram", "cold_call", "reddit_dm", 
+    "threads_dm", "direct_mail", "sms_sequence"
+  ].includes(studioMode);
 
   useEffect(() => {
     if (mobileMenuOpen || historyModalOpen || proModalOpen || authModalOpen) {
@@ -158,6 +178,40 @@ export default function StudioPage() {
       document.body.style.overflow = "unset";
     }
   }, [mobileMenuOpen, historyModalOpen, proModalOpen, authModalOpen]);
+
+  const fetchUserUsage = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("usage_tracking")
+        .select("count, is_pro, last_reset, plan_tier, subscription_ends_at")
+        .eq("user_id", userId)
+        .single();
+
+      if (!error && data) {
+        const now = new Date();
+        const expiry = data.subscription_ends_at ? new Date(data.subscription_ends_at) : null;
+
+        if (expiry && now > expiry) {
+          setIsPro(false);
+          setDailyUsage(data.count || 0);
+          setPlanTier("free");
+        } else {
+          setIsPro(data.is_pro || false);
+          setDailyUsage(data.count || 0);
+          setPlanTier(data.plan_tier || "free");
+        }
+      } else if (error) {
+        await supabase.from("usage_tracking").insert([{
+          user_id: userId,
+          count: 0,
+          is_pro: false,
+          plan_tier: "free",
+        }]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -196,45 +250,6 @@ export default function StudioPage() {
     setProModalOpen(true);
   };
 
-    const fetchUserUsage = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("usage_tracking")
-        .select("count, is_pro, last_reset, plan_tier, subscription_ends_at")
-        .eq("user_id", userId)
-        .single();
-
-      if (!error && data) {
-        const now = new Date();
-        const expiry = data.subscription_ends_at
-          ? new Date(data.subscription_ends_at)
-          : null;
-
-        // Subscription expired → treat as free
-        if (expiry && now > expiry) {
-          setIsPro(false);
-          setDailyUsage(data.count || 0);
-          setPlanTier("free");
-        } else {
-          // Still active (or free user with no expiry)
-          setIsPro(data.is_pro || false);
-          setDailyUsage(data.count || 0);
-          setPlanTier(data.plan_tier || "free");
-        }
-      } else if (error) {
-        await supabase.from("usage_tracking").insert([
-          {
-            user_id: userId,
-            count: 0,
-            is_pro: false,
-            plan_tier: "free",
-          },
-        ]);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
   const fetchUserHistory = async (userId: string) => {
     try {
       const { data, error } = await supabase.from("emails").select("*").eq("user_id", userId).order("created_at", { ascending: false });
@@ -260,11 +275,10 @@ export default function StudioPage() {
 
   // TIER ACCESS LOGIC
   const checkModeAccess = (targetMode: StudioMode): boolean => {
-    // Free & Guest Users: Only basic modes
     if (!isPro) {
       if (!STARTER_MODES.includes(targetMode)) {
         triggerProModal(
-          "This feature requires a Pro Plan. LinkedIn DMs, Twitter DMs, Sequences, Cold Call Scripts, and Bulk Tools are exclusive to paid plans.",
+          "This feature requires a Pro Plan. WhatsApp Sequences, Loom Scripts, Proposals, and Enterprise Channels require an active plan.",
           "growth"
         );
         return false;
@@ -272,11 +286,10 @@ export default function StudioPage() {
       return true;
     }
 
-    // Starter Plan: Only basic modes
     if (planTier === "starter") {
       if (!STARTER_MODES.includes(targetMode)) {
         triggerProModal(
-          "Your Starter Plan ($19) includes Standard Emails, Polish, and Objection Replies. Upgrade to Growth ($39) to unlock LinkedIn DMs, Twitter DMs, Sequences, and A/B Split Testing.",
+          "Your Starter Plan ($19) includes Standard Emails, Polish, and Objection Replies. Upgrade to Growth ($39) for WhatsApp, Loom Scripts, Proposals, LinkedIn, and Sequences.",
           "growth"
         );
         return false;
@@ -284,11 +297,10 @@ export default function StudioPage() {
       return true;
     }
 
-    // Growth Plan: Basic + Growth modes
     if (planTier === "growth") {
       if (!GROWTH_MODES.includes(targetMode)) {
         triggerProModal(
-          "Your Growth Plan ($39) includes DMs and Sequences. Upgrade to Enterprise ($79) to unlock Cold Call Scripts, Intent Classifier, Multi-Vertical Batching, and Bulk CSV Personalization.",
+          "Your Growth Plan ($39) includes WhatsApp, Loom Scripts, and Sequences. Upgrade to Enterprise ($79) for Direct Mail, SMS Sequences, Reddit Outreach, Threads, and Bulk CSV.",
           "enterprise"
         );
         return false;
@@ -296,7 +308,6 @@ export default function StudioPage() {
       return true;
     }
 
-    // Enterprise Plan: All modes
     return true;
   };
 
@@ -309,27 +320,11 @@ export default function StudioPage() {
   const saveToHistory = async (subjects: SubjectLine[], vars: EmailVariation[]) => {
     const primarySubject = subjects[0]?.subject || "Generated Content";
     const primaryBody = vars[0]?.body || "";
-    
-    const modeLabels: Record<StudioMode, string> = {
-      create: emailType,
-      sequence: "3-Step Sequence",
-      reply: "Objection Response",
-      ab_test: "A/B Split Test",
-      batch: "Multi-Vertical Batch",
-      csv_bulk: "Bulk CSV Leads",
-      classifier: "AI Reply Intent",
-      polish: "Magic Polish",
-      linkedin: "LinkedIn DM",
-      twitter: "Twitter/X DM",
-      cold_call: "Cold Call Script"
-    };
-    
-    let typeLabel = modeLabels[studioMode] || "Generated Content";
 
     const newRecord: SavedEmailRecord = {
       id: Date.now().toString(),
       created_at: new Date().toISOString(),
-      email_type: typeLabel,
+      email_type: studioMode.toUpperCase(),
       subject_line: primarySubject,
       body: primaryBody,
       language: targetLanguage,
@@ -355,58 +350,7 @@ export default function StudioPage() {
     }
   };
 
-  const deleteHistoryItem = async (id: string) => {
-    if (user) {
-      await supabase.from("emails").delete().eq("id", id);
-      fetchUserHistory(user.id);
-    } else {
-      const updated = savedHistory.filter((item) => item.id !== id);
-      setSavedHistory(updated);
-      localStorage.setItem("guest_email_history", JSON.stringify(updated));
-    }
-  };
-
-  const exportHistory = (format: "txt" | "csv") => {
-    if (!isPro) {
-      triggerProModal("1-Click Email History Export is a Pro feature.", "growth");
-      return;
-    }
-    if (savedHistory.length === 0) return;
-
-    if (format === "txt") {
-      const content = savedHistory.map((item, idx) => (
-        `=== ITEM #${idx + 1} (${new Date(item.created_at).toLocaleDateString()}) ===\nType: ${item.email_type}\nSubject: ${item.subject_line}\n\nBODY:\n${item.body}\n\n`
-      )).join("\n---\n\n");
-      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "WriteYourEmail_History.txt";
-      a.click();
-    } else {
-      // CSV export requires Enterprise
-      if (planTier !== "enterprise") {
-        triggerProModal("CSV Export is an Enterprise feature.", "enterprise");
-        return;
-      }
-      const csvRows = [
-        ["Date", "Type", "Subject", "Body"],
-        ...savedHistory.map((item) => [
-          new Date(item.created_at).toLocaleDateString(),
-          `"${item.email_type.replace(/"/g, '""')}"`,
-          `"${item.subject_line.replace(/"/g, '""')}"`,
-          `"${item.body.replace(/"/g, '""')}"`,
-        ]),
-      ];
-      const blob = new Blob([csvRows.map((e) => e.join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "WriteYourEmail_History.csv";
-      a.click();
-    }
-  };
-
   const incrementUsageAfterSuccess = async () => {
-    // Growth & Enterprise: Unlimited, no counter needed
     if (isPro && (planTier === "growth" || planTier === "enterprise")) return;
 
     if (!user) {
@@ -432,27 +376,19 @@ export default function StudioPage() {
   const handleGenerate = async (e?: React.FormEvent, overrideTone?: string) => {
     if (e) e.preventDefault();
 
-    // Enforce tier mode access
     if (!checkModeAccess(studioMode)) return;
 
-    // QUOTA ENFORCEMENT
     if (!overrideTone) {
-      // Guest limit
       if (!user && guestUsage >= 2) {
         setAuthModalOpen(true);
         return;
       }
-      // Free user limit
       if (user && !isPro && dailyUsage >= 5) {
         triggerProModal("You have reached your 5 daily free generations! Upgrade to Pro for unlimited access.", "growth");
         return;
       }
-      // Starter plan limit (50/month)
       if (isPro && planTier === "starter" && dailyUsage >= 50) {
-        triggerProModal(
-          "You have used all 50 AI generations on your Starter Plan this month. Upgrade to Growth ($39) for Unlimited Generations!",
-          "growth"
-        );
+        triggerProModal("You have used all 50 AI generations on your Starter Plan this month. Upgrade to Growth ($39) for Unlimited!", "growth");
         return;
       }
     }
@@ -518,30 +454,6 @@ export default function StudioPage() {
     return COMMON_SPAM_WORDS.filter((word) => lower.includes(word));
   };
 
-  const savePreset = () => {
-    if (planTier !== "growth" && planTier !== "enterprise") {
-      return triggerProModal("Saving Custom Prompt Presets requires the Growth Plan.", "growth");
-    }
-    const name = window.prompt("Enter a name for this custom preset (e.g. 'SaaS Agency Pitch'):");
-    if (name) {
-      const newPreset: PromptPreset = { id: Date.now().toString(), name, context, emailType, tone, icpPersona };
-      const updated = [...presets, newPreset];
-      setPresets(updated);
-      localStorage.setItem("email_presets", JSON.stringify(updated));
-      alert("Preset saved successfully!");
-    }
-  };
-
-  const loadPreset = (presetId: string) => {
-    const p = presets.find((x) => x.id === presetId);
-    if (p) {
-      setContext(p.context);
-      setEmailType(p.emailType);
-      setTone(p.tone);
-      setIcpPersona(p.icpPersona);
-    }
-  };
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthMessage("");
@@ -570,40 +482,12 @@ export default function StudioPage() {
     setMobileMenuOpen(false);
   };
 
-  const copySubject = (text: string, index: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedSubject(index);
-    setTimeout(() => setCopiedSubject(null), 2000);
-  };
-
   const copyBody = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopiedBody(true);
     setTimeout(() => setCopiedBody(false), 2000);
   };
 
-  const openInGmail = (subjectText: string, bodyText: string) => {
-    window.open(
-      `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`,
-      "_blank"
-    );
-  };
-
-  const openInMailClient = (subjectText: string, bodyText: string) => {
-    window.location.href = `mailto:?subject=${encodeURIComponent(subjectText)}&body=${encodeURIComponent(bodyText)}`;
-  };
-
-  const currentBody = variations[selectedTab]?.body || "";
-  const activeSpamTriggers = detectSpamTriggers(currentBody);
-
-  const filteredHistory = savedHistory.filter(
-    (item) =>
-      item.subject_line.toLowerCase().includes(historySearch.toLowerCase()) ||
-      item.body.toLowerCase().includes(historySearch.toLowerCase()) ||
-      item.email_type.toLowerCase().includes(historySearch.toLowerCase())
-  );
-
-  // Determine Usage Display
   const usageDisplay = () => {
     if (!user) return `${guestUsage}/2 Guest`;
     if (planTier === "enterprise") return "Enterprise ∞";
@@ -612,93 +496,32 @@ export default function StudioPage() {
     return `${dailyUsage}/5 Free`;
   };
 
-  const planBadge = () => {
-    if (planTier === "enterprise") return { label: "ENTERPRISE", color: "from-purple-500/10 to-pink-500/10 border-purple-500/30 text-purple-400" };
-    if (planTier === "growth") return { label: "GROWTH", color: "from-blue-500/10 to-cyan-500/10 border-blue-500/30 text-blue-400" };
-    if (planTier === "starter") return { label: "STARTER", color: "from-amber-500/10 to-yellow-500/10 border-amber-500/30 text-amber-400" };
-    return null;
-  };
-
-  const badge = planBadge();
+  const currentBody = variations[selectedTab]?.body || "";
+  const activeSpamTriggers = detectSpamTriggers(currentBody);
 
   return (
-    <div
-      className="relative w-full overflow-x-hidden min-h-screen bg-[#0a0a0a] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white"
-      style={{
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-      }}
-    >
-      {/* Apple Ambient Glow */}
+    <div className="relative w-full overflow-x-hidden min-h-screen bg-[#0a0a0a] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white">
+      {/* Ambient Glow */}
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[120px] pointer-events-none rounded-full" />
 
       {/* Header */}
-      <header
-        className={`sticky top-0 z-50 border-b border-white/5 transition-colors duration-300 ${
-          mobileMenuOpen ? "bg-[#0a0a0a]" : "bg-[#0a0a0a]/70 backdrop-blur-2xl saturate-150"
-        }`}
-      >
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a0a]/70 backdrop-blur-2xl saturate-150">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center space-x-8">
-            <Link
-              href="/"
-              className="flex items-center space-x-2 font-semibold tracking-tight text-lg z-50"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
-                ✉️
-              </span>
-              <span>WriteYourEmail Studio</span>
-            </Link>
-
-            <nav className="hidden md:flex items-center space-x-6 text-sm text-[#86868b] font-medium">
-              <Link href="/" className="hover:text-[#f5f5f7] transition-colors">
-                Home
-              </Link>
-              <Link href="/pricing" className="hover:text-[#f5f5f7] transition-colors">
-                Pricing
-              </Link>
-            </nav>
-          </div>
+          <Link href="/" className="flex items-center space-x-2 font-semibold tracking-tight text-lg">
+            <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
+              ✉️
+            </span>
+            <span>WriteYourEmail Titan</span>
+          </Link>
 
           <div className="hidden md:flex items-center space-x-4">
-            {badge ? (
-              <span className={`text-xs font-bold px-3 py-1 rounded-full bg-gradient-to-r ${badge.color} border shadow-[0_0_15px_rgba(10,132,255,0.1)]`}>
-                ⚡ {badge.label} MEMBER
-              </span>
-            ) : (
-              <button
-                onClick={() =>
-                  triggerProModal(
-                    "Upgrade to Pro to unlock unlimited daily generations, 3-step outreach sequences, and custom brand voice.",
-                    "growth"
-                  )
-                }
-                className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-white transition flex items-center gap-1 ring-1 ring-white/10"
-              >
-                <span>🚀 Free Plan</span> — <span className="text-[#0a84ff]">Upgrade</span>
-              </button>
-            )}
+            <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/5 text-white border border-white/10">
+              {usageDisplay()}
+            </span>
 
-            <button
-              onClick={() => setHistoryModalOpen(true)}
-              className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition flex items-center gap-1.5"
-            >
-              <span>History</span>
-              {savedHistory.length > 0 && (
-                <span className="bg-[#2c2c2e] text-[#f5f5f7] text-[10px] px-1.5 py-0.5 rounded-full">
-                  {savedHistory.length}
-                </span>
-              )}
-            </button>
-
-                {user ? (
-              <div className="flex items-center space-x-4 ml-2 border-l border-white/10 pl-4">
-                <Link 
-                  href="/profile" 
-                  className="text-sm font-medium text-[#f5f5f7] hover:text-[#0a84ff] transition flex items-center gap-1.5"
-                  title="View Profile"
-                >
+            {user ? (
+              <div className="flex items-center space-x-4 border-l border-white/10 pl-4">
+                <Link href="/profile" className="text-sm font-medium hover:text-[#0a84ff] transition flex items-center gap-1.5">
                   <span className="w-5 h-5 bg-white/10 rounded-full flex items-center justify-center text-[10px]">👤</span>
                   {user.email.split('@')[0]}
                 </Link>
@@ -707,789 +530,143 @@ export default function StudioPage() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center space-x-3 ml-2 border-l border-white/10 pl-4">
-                <button
-                  onClick={() => {
-                    setIsSignUp(false);
-                    setAuthModalOpen(true);
-                  }}
-                  className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition"
-                >
-                  Log In
-                </button>
-                <button
-                  onClick={() => {
-                    setIsSignUp(true);
-                    setAuthModalOpen(true);
-                  }}
-                  className="text-sm font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-1.5 rounded-full transition shadow-sm"
-                >
-                  Sign Up
-                </button>
-              </div>
+              <button
+                onClick={() => { setIsSignUp(false); setAuthModalOpen(true); }}
+                className="text-sm font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-1.5 rounded-full transition shadow-sm"
+              >
+                Sign Up / Log In
+              </button>
             )}
           </div>
-
-          <button
-            className="md:hidden text-[#86868b] hover:text-[#f5f5f7] z-50 p-2 -mr-2"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            )}
-          </button>
         </div>
       </header>
 
-      {/* Mobile Drawer */}
-      <div
-        className={`fixed inset-0 z-40 bg-[#0a0a0a] md:hidden pt-20 px-6 transition-all duration-300 ease-in-out ${
-          mobileMenuOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
-        }`}
-      >
-        <nav className="flex flex-col text-lg font-medium text-[#f5f5f7]">
-          <Link href="/" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
-            Home
-          </Link>
-          <Link href="/pricing" onClick={() => setMobileMenuOpen(false)} className="border-b border-white/10 py-4">
-            Pricing
-          </Link>
-
-          <div className="pt-8 flex flex-col space-y-4">
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                setHistoryModalOpen(true);
-              }}
-              className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold"
-            >
-              Saved History ({savedHistory.length})
-            </button>
-                        {user ? (
-              <>
-                <Link 
-                  href="/profile" 
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-center text-[#f5f5f7] py-2 text-base font-semibold hover:text-[#0a84ff] transition"
-                >
-                  My Profile ({user.email.split('@')[0]})
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold"
-                >
-                  Log Out
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => {
-                    setIsSignUp(false);
-                    setAuthModalOpen(true);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="text-center bg-[#1c1c1e] text-[#f5f5f7] py-3 rounded-xl text-base font-semibold"
-                >
-                  Log In
-                </button>
-                <button
-                  onClick={() => {
-                    setIsSignUp(true);
-                    setAuthModalOpen(true);
-                    setMobileMenuOpen(false);
-                  }}
-                  className="text-center bg-[#f5f5f7] text-black py-3 rounded-xl text-base font-semibold"
-                >
-                  Sign Up
-                </button>
-              </>
-            )}
-          </div>
-        </nav>
-      </div>
-
       {/* Generator Workspace */}
-      <section id="generator" className="py-12 px-4 sm:px-6 max-w-[1050px] mx-auto">
+      <section id="generator" className="py-12 px-4 sm:px-6 max-w-[1100px] mx-auto">
         <div className="bg-[#141415]/80 backdrop-blur-3xl border border-white/5 rounded-[2rem] p-6 sm:p-10 shadow-[0_0_80px_rgba(10,132,255,0.03)] relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">Studio v7.0 Titan</h2>
-              <p className="text-sm text-[#86868b] mt-1">Omni-Channel Outreach · CSV Bulk · Presets · CRM Tags</p>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              {presets.length > 0 && (
-                <select
-                  onChange={(e) => loadPreset(e.target.value)}
-                  className="text-sm px-4 py-2 bg-[#222224] text-[#f5f5f7] rounded-full outline-none border border-white/5 cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50"
-                >
-                  <option value="">Load Preset...</option>
-                  {presets.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <span className="text-sm px-4 py-2 bg-[#222224] rounded-full text-[#86868b] font-medium border border-white/5">
-                {usageDisplay()}
-              </span>
+              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">19 Omni-Channel Outreach Engine</h2>
+              <p className="text-sm text-[#86868b] mt-1">WhatsApp · Loom VSL · Proposals · Direct Mail · Telegram · SMS</p>
             </div>
           </div>
 
-          {/* Mode Selector Dock (Hidden Scrollbar) */}
-          <div className="flex items-center gap-2 bg-[#1c1c1e] p-1.5 rounded-2xl w-full mb-8 overflow-x-auto whitespace-nowrap border border-white/5 shadow-inner [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            <button
-              type="button"
-              onClick={() => handleSelectMode("create")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
-                studioMode === "create" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              ✉️ Create New
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectMode("polish")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
-                studioMode === "polish" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              ✨ Magic Polish
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectMode("reply")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all ${
-                studioMode === "reply" ? "bg-[#2c2c2e] text-white shadow-md ring-1 ring-white/10" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              🥊 Objection Reply
-            </button>
-            <div className="w-[1px] h-6 bg-white/10 mx-1 shrink-0" />
-            <button
-              type="button"
-              onClick={() => handleSelectMode("linkedin")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "linkedin" ? "bg-[#0077b5] text-white shadow-md ring-1 ring-[#0077b5]/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>💼 LinkedIn DM</span>
-              {planTier !== "growth" && planTier !== "enterprise" && (
-                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-bold">GROWTH</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectMode("twitter")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "twitter" ? "bg-white text-black shadow-md ring-1 ring-white/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>🐦 Twitter/X DM</span>
-              {planTier !== "growth" && planTier !== "enterprise" && (
-                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-bold">GROWTH</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectMode("sequence")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "sequence" ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>🔁 Sequence</span>
-              {planTier !== "growth" && planTier !== "enterprise" && (
-                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-bold">GROWTH</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectMode("ab_test")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "ab_test" ? "bg-[#0a84ff] text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>⚖️ A/B Split</span>
-              {planTier !== "growth" && planTier !== "enterprise" && (
-                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-1.5 py-0.5 rounded-full font-bold">GROWTH</span>
-              )}
-            </button>
-            <div className="w-[1px] h-6 bg-white/10 mx-1 shrink-0" />
-            <button
-              type="button"
-              onClick={() => handleSelectMode("cold_call")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "cold_call" ? "bg-rose-600 text-white shadow-md ring-1 ring-rose-500/50" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>📞 Call Script</span>
-              {planTier !== "enterprise" && (
-                <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">ENTERPRISE</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectMode("classifier")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "classifier" ? "bg-pink-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>🧠 Classifier</span>
-              {planTier !== "enterprise" && (
-                <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">ENTERPRISE</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectMode("batch")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "batch" ? "bg-emerald-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>📦 Batch</span>
-              {planTier !== "enterprise" && (
-                <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">ENTERPRISE</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectMode("csv_bulk")}
-              className={`text-sm font-medium px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
-                studioMode === "csv_bulk" ? "bg-orange-600 text-white shadow-md ring-1 ring-white/20" : "text-[#86868b] hover:bg-[#2c2c2e]/50 hover:text-[#f5f5f7]"
-              }`}
-            >
-              <span>📄 CSV Bulk</span>
-              {planTier !== "enterprise" && (
-                <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.5 rounded-full font-bold">ENTERPRISE</span>
-              )}
-            </button>
+          {/* 19-Mode Selector Dock */}
+          <div className="flex items-center gap-2 bg-[#1c1c1e] p-2 rounded-2xl w-full mb-8 overflow-x-auto whitespace-nowrap border border-white/5 shadow-inner [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {/* Basic Modes */}
+            <button type="button" onClick={() => handleSelectMode("create")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "create" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>✉️ Create Email</button>
+            <button type="button" onClick={() => handleSelectMode("polish")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "polish" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>✨ Magic Polish</button>
+            <button type="button" onClick={() => handleSelectMode("reply")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "reply" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>🥊 Objection Reply</button>
+
+            <div className="w-[1px] h-5 bg-white/10 mx-1 shrink-0" />
+
+            {/* Growth Tier Modes */}
+            <button type="button" onClick={() => handleSelectMode("whatsapp")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1 ${studioMode === "whatsapp" ? "bg-emerald-600 text-white" : "text-[#86868b] hover:text-white"}`}>💬 WhatsApp</button>
+            <button type="button" onClick={() => handleSelectMode("vsl_script")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1 ${studioMode === "vsl_script" ? "bg-indigo-600 text-white" : "text-[#86868b] hover:text-white"}`}>🎥 Loom / VSL Script</button>
+            <button type="button" onClick={() => handleSelectMode("proposal")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1 ${studioMode === "proposal" ? "bg-green-600 text-white" : "text-[#86868b] hover:text-white"}`}>📄 Upwork Proposal</button>
+            <button type="button" onClick={() => handleSelectMode("telegram")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1 ${studioMode === "telegram" ? "bg-sky-500 text-white" : "text-[#86868b] hover:text-white"}`}>✈️ Telegram DM</button>
+            <button type="button" onClick={() => handleSelectMode("linkedin")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "linkedin" ? "bg-[#0077b5] text-white" : "text-[#86868b] hover:text-white"}`}>💼 LinkedIn DM</button>
+            <button type="button" onClick={() => handleSelectMode("sequence")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "sequence" ? "bg-purple-600 text-white" : "text-[#86868b] hover:text-white"}`}>🔁 3-Step Sequence</button>
+
+            <div className="w-[1px] h-5 bg-white/10 mx-1 shrink-0" />
+
+            {/* Enterprise Tier Modes */}
+            <button type="button" onClick={() => handleSelectMode("reddit_dm")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "reddit_dm" ? "bg-orange-600 text-white" : "text-[#86868b] hover:text-white"}`}>🤖 Reddit DM</button>
+            <button type="button" onClick={() => handleSelectMode("threads_dm")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "threads_dm" ? "bg-pink-600 text-white" : "text-[#86868b] hover:text-white"}`}>🌀 Threads DM</button>
+            <button type="button" onClick={() => handleSelectMode("direct_mail")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "direct_mail" ? "bg-amber-600 text-white" : "text-[#86868b] hover:text-white"}`}>📮 Direct Mail Letter</button>
+            <button type="button" onClick={() => handleSelectMode("sms_sequence")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "sms_sequence" ? "bg-cyan-600 text-white" : "text-[#86868b] hover:text-white"}`}>📱 SMS Sequence</button>
+            <button type="button" onClick={() => handleSelectMode("cold_call")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "cold_call" ? "bg-rose-600 text-white" : "text-[#86868b] hover:text-white"}`}>📞 Call Script</button>
+            <button type="button" onClick={() => handleSelectMode("csv_bulk")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "csv_bulk" ? "bg-teal-600 text-white" : "text-[#86868b] hover:text-white"}`}>📊 CSV Bulk</button>
           </div>
 
           <form onSubmit={handleGenerate} className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                  Output Language
-                </label>
-                <select
-                  value={targetLanguage}
-                  onChange={(e) => setTargetLanguage(e.target.value)}
-                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition outline-none appearance-none cursor-pointer shadow-sm"
-                >
-                  {LANGUAGES.map((lang) => (
-                    <option key={lang} value={lang}>{lang}</option>
-                  ))}
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Output Language</label>
+                <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none">
+                  {LANGUAGES.map((lang) => (<option key={lang} value={lang}>{lang}</option>))}
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                  ICP Persona Targeting
-                </label>
-                <select
-                  value={icpPersona}
-                  onChange={(e) => setIcpPersona(e.target.value)}
-                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition outline-none appearance-none cursor-pointer shadow-sm"
-                >
-                  {ICP_PERSONAS.map((icp) => (
-                    <option key={icp} value={icp}>{icp}</option>
-                  ))}
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">ICP Persona</label>
+                <select value={icpPersona} onChange={(e) => setIcpPersona(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none">
+                  {ICP_PERSONAS.map((icp) => (<option key={icp} value={icp}>{icp}</option>))}
                 </select>
               </div>
             </div>
 
-            {/* Advanced Campaign Tools Panel */}
-            <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-white/5 space-y-4 shadow-inner">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-[#f5f5f7] uppercase tracking-wider flex items-center gap-2">
-                  ⚙️ Advanced Campaign Engine
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-[#86868b] mb-2 flex justify-between">
-                    <span>Brand Voice DNA</span>
-                    {(planTier !== "growth" && planTier !== "enterprise") && <span className="text-[10px] text-blue-400 font-bold tracking-wider">GROWTH</span>}
-                  </label>
-                  <input
-                    type="text"
-                    disabled={planTier !== "growth" && planTier !== "enterprise"}
-                    placeholder={(planTier === "growth" || planTier === "enterprise") ? "e.g. Direct Silicon Valley executive" : "🔒 Growth Plan Required"}
-                    value={brandVoice}
-                    onChange={(e) => setBrandVoice(e.target.value)}
-                    className={`w-full border border-white/5 rounded-xl p-3 text-sm outline-none transition ${
-                      (planTier === "growth" || planTier === "enterprise") ? "bg-[#222224] text-[#f5f5f7] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d]" : "bg-[#1a1a1c] text-[#86868b] cursor-not-allowed opacity-70"
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#86868b] mb-2 flex justify-between">
-                    <span>Prospect Bio / URL Icebreaker</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. https://stripe.com or 'VP of Sales'"
-                    value={prospectBio}
-                    onChange={(e) => setProspectBio(e.target.value)}
-                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-2 border-t border-white/5">
-                <input
-                  type="checkbox"
-                  id="crmTagsCheckbox"
-                  checked={crmTags}
-                  onChange={(e) => setCrmTags(e.target.checked)}
-                  className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer bg-[#222224] border-white/10"
-                />
-                <label htmlFor="crmTagsCheckbox" className="text-sm text-[#86868b] cursor-pointer font-medium">
-                  Use CRM Merge Tags{" "}
-                  <code className="text-xs bg-[#2a2a2d] px-1.5 py-0.5 rounded text-[#f5f5f7] ml-1 ring-1 ring-white/5">{`{{first_name}}`}</code>
-                </label>
-              </div>
-            </div>
-
-            {/* Mode-Specific Fields */}
-            {studioMode === "batch" && (
+            {/* Dynamic Inputs Based on Selected Mode */}
+            {studioMode === "proposal" ? (
               <div>
-                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                  Target Industries (Comma Separated)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. SaaS, Real Estate, Healthcare"
-                  value={targetIndustries}
-                  onChange={(e) => setTargetIndustries(e.target.value)}
-                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                />
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Paste Upwork / Fiverr Job Description</label>
+                <textarea rows={5} required placeholder="Paste the client's job post here..." value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none resize-none" />
+              </div>
+            ) : studioMode === "reddit_dm" ? (
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Paste Reddit Post / Comment Being Addressed</label>
+                <textarea rows={4} required placeholder="Paste the post or problem context..." value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none resize-none" />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Pitch Context & Campaign Goal</label>
+                <textarea rows={4} required placeholder="Describe your product, offer, or campaign goal..." value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none resize-none" />
               </div>
             )}
-
-            {studioMode === "csv_bulk" && (
-              <div>
-                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                  Paste CSV Data (Name, Company, Industry, etc.)
-                </label>
-                <textarea
-                  rows={5}
-                  required
-                  placeholder="John Doe, Acme Corp, SaaS&#10;Jane Smith, Globex, Real Estate"
-                  value={csvData}
-                  onChange={(e) => setCsvData(e.target.value)}
-                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                />
-              </div>
-            )}
-
-            {studioMode === "classifier" && (
-              <div>
-                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                  Paste Incoming Email to Classify Intent
-                </label>
-                <textarea
-                  rows={5}
-                  required
-                  placeholder="Paste the prospect's reply here to analyze their intent..."
-                  value={incomingEmailText}
-                  onChange={(e) => setIncomingEmailText(e.target.value)}
-                  className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                />
-              </div>
-            )}
-
-            {studioMode === "reply" ? (
-              <>
-                <div>
-                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                    Paste Prospect Email / Objection Received
-                  </label>
-                  <textarea
-                    rows={4}
-                    required
-                    placeholder="e.g. 'Thanks for reaching out, but your solution is way too expensive for our Q3 budget right now.'"
-                    value={incomingEmailText}
-                    onChange={(e) => setIncomingEmailText(e.target.value)}
-                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                    Select Rebuttal / Reply Strategy
-                  </label>
-                  <select
-                    value={replyStrategy}
-                    onChange={(e) => setReplyStrategy(e.target.value)}
-                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                  >
-                    <option value="Value & ROI Reframing">Value & ROI Reframing</option>
-                    <option value="Soft 5-Minute Nudge">Soft 5-Minute Nudge</option>
-                    <option value="Polite Breakup">Polite Breakup & Future Touchpoint</option>
-                  </select>
-                </div>
-              </>
-            ) : studioMode === "polish" ? (
-              <>
-                <div>
-                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                    Paste Your Existing Draft
-                  </label>
-                  <textarea
-                    rows={5}
-                    required
-                    placeholder="Paste your draft or raw notes here..."
-                    value={draftText}
-                    onChange={(e) => setDraftText(e.target.value)}
-                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                    Select Polish Goal
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      "Fix grammar, typos & improve flow",
-                      "Make shorter & punchier",
-                      "Make strong & confident",
-                      "Make politely firm (set boundaries)",
-                    ].map((goal) => (
-                      <button
-                        type="button"
-                        key={goal}
-                        onClick={() => setPolishGoal(goal)}
-                        className={`text-sm px-4 py-2 rounded-xl transition-all font-medium ${
-                          polishGoal === goal
-                            ? "bg-[#0a84ff] text-white shadow-md ring-1 ring-[#0a84ff]/50"
-                            : "bg-[#222224] border border-white/5 text-[#86868b] hover:bg-[#2a2a2d] hover:text-[#f5f5f7]"
-                        }`}
-                      >
-                        {goal}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            ) : studioMode !== "classifier" && studioMode !== "csv_bulk" ? (
-              <>
-                <div className={`grid grid-cols-1 sm:grid-cols-${isSocialOrCall ? '2' : '3'} gap-4`}>
-                  {!isSocialOrCall && (
-                    <div>
-                      <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                        Outreach Type
-                      </label>
-                      <select
-                        value={emailType}
-                        onChange={(e) => setEmailType(e.target.value)}
-                        className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                      >
-                        <option value="cold_outreach">Cold Outreach / Sales</option>
-                        <option value="follow_up">Follow Up</option>
-                        <option value="networking">Networking / Connect</option>
-                        <option value="investor_pitch">Investor / VC Pitch</option>
-                        <option value="pr_outreach">PR / Media Outreach</option>
-                        <option value="job_application">Job / Career Inquiry</option>
-                        <option value="newsletter_sponsor">Newsletter Sponsorship</option>
-                        <option value="contract_pitch">Contract / Proposal Pitch</option>
-                      </select>
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                      Tone of Voice
-                    </label>
-                    <select
-                      value={tone}
-                      onChange={(e) => setTone(e.target.value)}
-                      className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                    >
-                      <option value="professional">Professional & Direct</option>
-                      <option value="persuasive">Persuasive & Confident</option>
-                      <option value="friendly">Friendly & Warm</option>
-                      <option value="urgent">Urgent & Compelling</option>
-                      <option value="storytelling">Storytelling & Narrative</option>
-                      <option value="empathetic">Empathetic & Understanding</option>
-                      <option value="data_driven">Data-Driven & Analytical</option>
-                      <option value="authoritative">Authoritative & Expert</option>
-                      <option value="humorous">Humorous & Witty</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
-                      Recipient Name
-                    </label>
-                    <input
-                      type="text"
-                      disabled={crmTags}
-                      placeholder={crmTags ? "{{first_name}}" : "Recipient Name"}
-                      value={recipient}
-                      onChange={(e) => setRecipient(e.target.value)}
-                      className="w-full bg-[#222224] border border-white/5 disabled:opacity-50 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                    />
-                  </div>
-                </div>
-
-                {!isSocialOrCall && (
-                  <div className="bg-[#1c1c1e]/60 p-4 rounded-2xl border border-white/5 space-y-3 shadow-inner">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
-                        🖋️ HTML Signature & DocuSign
-                      </label>
-                      <input
-                        type="checkbox"
-                        checked={includeSignature}
-                        onChange={(e) => setIncludeSignature(e.target.checked)}
-                        className="w-4 h-4 rounded accent-[#0a84ff] cursor-pointer bg-[#222224] border-white/10"
-                      />
-                    </div>
-                    {includeSignature && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                        <input
-                          type="text"
-                          placeholder="Sender Title (e.g. VP of Sales)"
-                          value={senderTitle}
-                          onChange={(e) => setSenderTitle(e.target.value)}
-                          className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                        />
-                        <input
-                          type="url"
-                          placeholder="DocuSign / Pitch Link"
-                          value={docuSignLink}
-                          onChange={(e) => setDocuSignLink(e.target.value)}
-                          className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-semibold text-[#86868b] uppercase tracking-wider">
-                      {isSocialOrCall ? "Context & Goal" : "Context & Pitch Goal"}
-                    </label>
-                    <button type="button" onClick={savePreset} className="text-xs text-[#0a84ff] font-medium hover:text-[#0071e3] transition">
-                      + Save as Preset
-                    </button>
-                  </div>
-                  <textarea
-                    rows={4}
-                    required
-                    placeholder={
-                      studioMode === "linkedin" ? "e.g. Pitching my SaaS. Goal is to connect and book a quick chat." :
-                      studioMode === "twitter" ? "e.g. Pitching design service via DM. Keep it very short and casual." :
-                      studioMode === "cold_call" ? "e.g. Calling VP of Sales to pitch our CRM. Need a strong hook." :
-                      "Pitching SaaS tool. Goal is to book a 15-min demo call."
-                    }
-                    value={context}
-                    onChange={(e) => setContext(e.target.value)}
-                    className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] resize-none focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-                  />
-                </div>
-              </>
-            ) : null}
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
-              <input
-                type="text"
-                disabled={crmTags}
-                placeholder={crmTags ? "{{sender_name}}" : "Your Name"}
-                value={sender}
-                onChange={(e) => setSender(e.target.value)}
-                className="bg-[#222224] border border-white/5 disabled:opacity-50 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] w-full sm:w-1/2 focus:ring-2 focus:ring-[#0a84ff]/50 focus:bg-[#2a2a2d] transition shadow-sm"
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-xl text-sm transition disabled:opacity-50 flex items-center justify-center space-x-2 shadow-[0_0_20px_rgba(10,132,255,0.3)] ring-1 ring-[#0a84ff]/50"
-              >
-                {loading ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Processing...</span>
-                  </>
-                ) : (
-                  <span>
-                    {studioMode === "sequence" ? "Generate 3-Step Sequence" :
-                     studioMode === "ab_test" ? "Generate A/B Test" :
-                     studioMode === "batch" ? "Generate Batch Campaign" :
-                     studioMode === "reply" ? "Generate Rebuttal" :
-                     studioMode === "csv_bulk" ? "Process CSV Bulk" :
-                     studioMode === "classifier" ? "Classify Reply Intent" :
-                     studioMode === "linkedin" ? "Generate LinkedIn DM" :
-                     studioMode === "twitter" ? "Generate Twitter DM" :
-                     studioMode === "cold_call" ? "Generate Call Script" :
-                     "Generate Content"}
-                  </span>
-                )}
+              <input type="text" placeholder="Your Name / Sender Title" value={sender} onChange={(e) => setSender(e.target.value)} className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none w-full sm:w-1/2" />
+              <button type="submit" disabled={loading} className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-xl text-sm transition shadow-lg">
+                {loading ? "Generating..." : `Generate ${studioMode.replace('_', ' ').toUpperCase()}`}
               </button>
             </div>
           </form>
 
           {/* Result Output Display */}
           {variations.length > 0 && (
-            <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-8">
+            <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5 flex flex-col justify-center shadow-inner">
+                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5">
                   <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Deliverability Audit</p>
                   <p className={`text-sm font-bold ${activeSpamTriggers.length === 0 ? "text-emerald-400" : "text-amber-400"}`}>
-                    {activeSpamTriggers.length === 0 ? "Inbox Ready (0 Triggers)" : `${activeSpamTriggers.length} Spam Words Found`}
+                    {activeSpamTriggers.length === 0 ? "Inbox Ready (0 Spam Triggers)" : `${activeSpamTriggers.length} Spam Words Found`}
                   </p>
                 </div>
-                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5 flex flex-col justify-center shadow-inner">
+                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5">
                   <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Reading Grade</p>
-                  <p className="text-sm font-bold text-[#f5f5f7]">{analytics?.readingLevel || "5th Grade (Optimal)"}</p>
+                  <p className="text-sm font-bold text-[#f5f5f7]">{analytics?.readingLevel || "5th Grade"}</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5 flex flex-col justify-center shadow-inner">
-                  <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Tone Sentiment</p>
+                <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5">
+                  <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Sentiment</p>
                   <p className="text-sm font-bold text-[#0a84ff]">{analytics?.sentiment || "Assertive"}</p>
                 </div>
               </div>
 
-              {subjectLines.length > 0 && !isSocialOrCall && (
-                <div className="space-y-3">
-                  <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
-                    Subject Line Studio
-                  </span>
-                  <div className="space-y-2">
-                    {subjectLines.map((subj, idx) => (
-                      <div
-                        key={idx}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#1c1c1e] border border-white/5 p-4 rounded-2xl gap-3 shadow-sm hover:bg-[#222224] transition"
-                      >
-                        <span className="text-sm font-medium text-[#f5f5f7]">{subj.subject}</span>
-                        <div className="flex items-center space-x-3 shrink-0">
-                          {subj.openRateForecast && (
-                            <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                              Forecast: {subj.openRateForecast}
-                            </span>
-                          )}
-                          <span
-                            className={`text-[10px] font-bold uppercase px-2.5 py-1 rounded-full ${
-                              subj.score >= 90 ? "bg-[#34c759]/10 text-[#34c759] border border-[#34c759]/20" : "bg-[#ff9f0a]/10 text-[#ff9f0a] border border-[#ff9f0a]/20"
-                            }`}
-                          >
-                            {subj.spamRisk}
-                          </span>
-                          <button
-                            onClick={() => copySubject(subj.subject, idx)}
-                            className="text-xs font-medium text-[#0a84ff] hover:text-white hover:bg-[#0a84ff] bg-[#0a84ff]/10 px-3 py-1.5 rounded-full transition ring-1 ring-[#0a84ff]/30"
-                          >
-                            {copiedSubject === idx ? "Copied" : "Copy"}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-2">
-                  <span className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
-                    Output Options
-                  </span>
-                  <span className="text-xs text-[#86868b] font-medium">
-                    {variations[selectedTab]?.readingTime}
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {variations.map((v, i) => (
-                    <button
-                      key={v.id || i}
-                      onClick={() => setSelectedTab(i)}
-                      className={`text-sm font-medium px-5 py-2 rounded-full transition-all ${
-                        selectedTab === i ? "bg-[#f5f5f7] text-black shadow-md" : "bg-[#1c1c1e] border border-white/5 text-[#86868b] hover:bg-[#222224] hover:text-[#f5f5f7]"
-                      }`}
-                    >
-                      {v.title}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2 overflow-x-auto pt-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#86868b] shrink-0">1-Click Rewrite:</span>
-                  <button
-                    onClick={() => handleGenerate(undefined, "Compress to less than 75 words exactly.")}
-                    className="text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 px-3 py-1.5 rounded-full transition shrink-0"
-                  >
-                    ✂️ Compress &lt;75 Words
-                  </button>
-                  <button
-                    onClick={() => handleGenerate(undefined, "Executive C-Suite Short & Concise")}
-                    className="text-xs font-medium bg-[#1c1c1e] border border-white/5 hover:bg-[#222224] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
-                  >
-                    ⚡ C-Suite Brief
-                  </button>
-                  <button
-                    onClick={() => handleGenerate(undefined, "Warm, Friendly & Casual")}
-                    className="text-xs font-medium bg-[#1c1c1e] border border-white/5 hover:bg-[#222224] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
-                  >
-                    ☕ Casual
-                  </button>
-                  <button
-                    onClick={() => handleGenerate(undefined, "Direct Response Aggressive Call to Action")}
-                    className="text-xs font-medium bg-[#1c1c1e] border border-white/5 hover:bg-[#222224] text-[#f5f5f7] px-3 py-1.5 rounded-full transition shrink-0"
-                  >
-                    🎯 Direct-Response CTA
+              <div className="relative bg-[#1c1c1e] border border-white/5 rounded-2xl p-6 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px]">
+                <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/5">
+                  <span className="text-xs font-semibold text-[#34c759]">✓ Generated Successfully</span>
+                  <button onClick={() => copyBody(variations[selectedTab]?.body)} className="text-xs bg-white text-black px-4 py-1.5 rounded-full font-semibold">
+                    {copiedBody ? "Copied!" : "Copy Output"}
                   </button>
                 </div>
+                {variations[selectedTab]?.body}
+              </div>
 
-                <div className="relative bg-[#1c1c1e] border border-white/5 rounded-2xl p-6 sm:p-8 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px] shadow-inner mt-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-5 pb-4 border-b border-white/5">
-                    <span className="text-xs font-semibold text-[#34c759] flex items-center gap-1 bg-[#34c759]/10 px-2.5 py-1 rounded-full border border-[#34c759]/20">
-                      ✓ Auto-saved
-                    </span>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      {docuSignLink && !isSocialOrCall && (
-                        <a
-                          href={docuSignLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-medium bg-[#ff9f0a]/10 hover:bg-[#ff9f0a]/20 text-[#ff9f0a] px-4 py-2 rounded-full transition flex items-center gap-1 border border-[#ff9f0a]/20"
-                        >
-                          🖋️ Test DocuSign
-                        </a>
-                      )}
-
-                      {!isSocialOrCall && (
-                        <>
-                          <button
-                            onClick={() => openInGmail(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
-                            className="text-xs font-medium bg-[#ff3b30]/10 hover:bg-[#ff3b30]/20 text-[#ff3b30] px-4 py-2 rounded-full transition border border-[#ff3b30]/20"
-                          >
-                            Gmail
-                          </button>
-                          <button
-                            onClick={() => openInMailClient(subjectLines[0]?.subject || "Email", variations[selectedTab]?.body)}
-                            className="text-xs font-medium bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] px-4 py-2 rounded-full transition border border-[#0a84ff]/20"
-                          >
-                            Mail App
-                          </button>
-                        </>
-                      )}
-
-                      <button
-                        onClick={() => copyBody(variations[selectedTab]?.body)}
-                        className="text-xs font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-2 rounded-full transition shadow-md"
-                      >
-                        {copiedBody ? "Copied!" : "Copy Text"}
-                      </button>
+              {/* NATIVE SPONSORED PARTNER CARD */}
+              <div className="mt-6 bg-gradient-to-r from-[#1c1c1e] via-[#141415] to-[#1c1c1e] border border-white/10 rounded-2xl p-5 shadow-lg relative overflow-hidden group">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">RECOMMENDED INFRASTRUCTURE</span>
+                      <h4 className="text-sm font-bold text-[#f5f5f7]">Warm Up Domain & Send at Scale</h4>
                     </div>
+                    <p className="text-xs text-[#86868b]">
+                      Automate unlimited inbox sending and domain warming with Instantly.ai.
+                    </p>
                   </div>
 
-                  {variations[selectedTab]?.body}
+                  <a href="https://instantly.ai" target="_blank" rel="noopener noreferrer" className="shrink-0 bg-[#0a84ff] hover:bg-[#0071e3] text-white px-4 py-2 rounded-xl text-xs font-semibold transition">
+                    Try Instantly ↗
+                  </a>
                 </div>
               </div>
             </div>
@@ -1500,239 +677,40 @@ export default function StudioPage() {
       {/* PRO UPGRADE MODAL */}
       {proModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
-          <div className="bg-[#141415] border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full relative shadow-[0_0_80px_rgba(10,132,255,0.1)] overflow-hidden">
-            <button
-              onClick={() => setProModalOpen(false)}
-              className="absolute top-6 right-6 bg-[#222224] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition border border-white/5"
-            >
-              ✕
-            </button>
-
-            <div className="text-center mb-6 pt-2">
-              <span className={`text-xs font-bold px-3 py-1 rounded-full inline-block mb-3 shadow-[0_0_15px_rgba(10,132,255,0.1)] ${
-                proTargetTier === "enterprise" 
-                  ? "bg-purple-500/10 text-purple-400 border border-purple-500/30" 
-                  : "bg-blue-500/10 text-blue-400 border border-blue-500/30"
-              }`}>
-                ⚡ UPGRADE TO {proTargetTier.toUpperCase()}
+          <div className="bg-[#141415] border border-white/10 rounded-[2.5rem] p-8 max-w-md w-full relative shadow-2xl">
+            <button onClick={() => setProModalOpen(false)} className="absolute top-6 right-6 text-[#86868b] hover:text-white">✕</button>
+            <div className="text-center mb-6">
+              <span className="text-xs font-bold text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/30">
+                UPGRADE TO {proTargetTier.toUpperCase()}
               </span>
-              <h3 className="text-2xl font-bold text-[#f5f5f7] mb-2 tracking-tight">
-                {proTargetTier === "enterprise" ? "Enterprise Plan Required" : "Growth Plan Required"}
-              </h3>
-              <p className="text-sm text-[#86868b]">
-                {proReason || "Unlock all executive tools and unlimited generations."}
-              </p>
+              <h3 className="text-2xl font-bold text-[#f5f5f7] mt-3 mb-1">Unlock {proTargetTier.toUpperCase()} Mode</h3>
+              <p className="text-sm text-[#86868b]">{proReason}</p>
             </div>
-
-            <div className="space-y-3 mb-8 text-sm text-[#f5f5f7]">
-              {proTargetTier === "enterprise" ? (
-                <>
-                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                    <span className="text-purple-400 font-bold">✓</span>
-                    <span><strong>Cold Call Scripts</strong> & Reply Intent Classifier</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                    <span className="text-purple-400 font-bold">✓</span>
-                    <span><strong>Bulk CSV</strong> Lead List Personalization</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                    <span className="text-purple-400 font-bold">✓</span>
-                    <span><strong>Multi-Vertical</strong> Batch Campaigns</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                    <span className="text-purple-400 font-bold">✓</span>
-                    <span><strong>CSV History Export</strong> & Full Analytics</span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                    <span className="text-blue-400 font-bold">✓</span>
-                    <span><strong>Unlimited Generations</strong> (No 50/month limit)</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                    <span className="text-blue-400 font-bold">✓</span>
-                    <span><strong>LinkedIn & Twitter/X DMs</strong></span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                    <span className="text-blue-400 font-bold">✓</span>
-                    <span><strong>3-Step Sequences</strong> & A/B Split Testing</span>
-                  </div>
-                  <div className="p-3.5 rounded-xl bg-[#1c1c1e] border border-white/5 flex items-center gap-3 shadow-inner">
-                    <span className="text-blue-400 font-bold">✓</span>
-                    <span><strong>Custom Brand Voice DNA</strong> & Presets</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            <Link
-              href="/pricing"
-              className="w-full py-4 bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold rounded-2xl text-center block transition shadow-[0_0_20px_rgba(10,132,255,0.3)] ring-1 ring-[#0a84ff]/50"
-            >
-              View {proTargetTier === "enterprise" ? "Enterprise" : "Growth"} Plan
+            <Link href="/pricing" className="w-full py-4 bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold rounded-2xl text-center block transition">
+              View {proTargetTier === "enterprise" ? "Enterprise ($79)" : "Growth ($39)"} Plan
             </Link>
-
-            <p className="text-[11px] text-center text-[#86868b] mt-4 font-medium">Powered by PayPal • Instant Activation</p>
-          </div>
-        </div>
-      )}
-
-      {/* History Modal */}
-      {historyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xl p-0 sm:p-4">
-          <div className="bg-[#141415] border border-white/10 rounded-t-[2rem] sm:rounded-[2rem] p-6 max-w-2xl w-full h-[85vh] sm:max-h-[80vh] flex flex-col relative shadow-[0_0_80px_rgba(0,0,0,0.5)]">
-            <div className="flex items-center justify-between pb-4 border-b border-white/5">
-              <div>
-                <h3 className="text-xl font-bold tracking-tight text-[#f5f5f7]">Saved History</h3>
-                <p className="text-sm text-[#86868b]">Search, copy, or export past content.</p>
-              </div>
-              <button
-                onClick={() => setHistoryModalOpen(false)}
-                className="bg-[#222224] border border-white/5 text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="py-3 flex items-center justify-between border-b border-white/5 text-xs text-[#86868b] font-medium">
-              <span>{savedHistory.length} saved records</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => exportHistory("txt")}
-                  className="px-3 py-1.5 rounded-full bg-[#1c1c1e] border border-white/5 hover:bg-[#222224] text-[#f5f5f7] transition"
-                >
-                  Export TXT {!isPro && "🔒"}
-                </button>
-                <button
-                  onClick={() => exportHistory("csv")}
-                  className="px-3 py-1.5 rounded-full bg-[#0a84ff]/10 border border-[#0a84ff]/20 text-[#0a84ff] hover:bg-[#0a84ff]/20 transition"
-                >
-                  Export CSV {planTier !== "enterprise" && "🔒"}
-                </button>
-              </div>
-            </div>
-
-            <div className="py-4">
-              <input
-                type="text"
-                placeholder="Search history..."
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
-              />
-            </div>
-
-            <div className="overflow-y-auto flex-1 space-y-4 pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
-              {filteredHistory.length === 0 ? (
-                <div className="text-center py-12 text-[#86868b] text-sm font-medium">No saved content found.</div>
-              ) : (
-                filteredHistory.map((item) => (
-                  <div key={item.id} className="bg-[#1c1c1e] border border-white/5 rounded-2xl p-5 space-y-3 shadow-inner">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-[#86868b] border-b border-white/5 pb-2 uppercase tracking-wider">
-                      <span>{item.email_type} ({item.language})</span>
-                      <span>{new Date(item.created_at).toLocaleDateString()}</span>
-                    </div>
-
-                    <p className="text-sm font-semibold text-[#f5f5f7] truncate">{item.subject_line}</p>
-                    <p className="text-sm text-[#86868b] line-clamp-3 whitespace-pre-wrap">{item.body}</p>
-
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="flex items-center space-x-2">
-                        {!item.email_type.includes("DM") && !item.email_type.includes("Script") && (
-                          <button
-                            onClick={() => openInGmail(item.subject_line, item.body)}
-                            className="text-xs font-medium bg-[#ff3b30]/10 border border-[#ff3b30]/20 text-[#ff3b30] px-3 py-1.5 rounded-full hover:bg-[#ff3b30]/20 transition"
-                          >
-                            Gmail
-                          </button>
-                        )}
-                        <button
-                          onClick={() => copyBody(item.body)}
-                          className="text-xs font-medium bg-[#f5f5f7] text-black px-3 py-1.5 rounded-full hover:bg-white transition shadow-sm"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => deleteHistoryItem(item.id)}
-                        className="text-xs font-medium text-[#86868b] hover:text-[#ff3b30] transition"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         </div>
       )}
 
       {/* Auth Modal */}
       {authModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl p-4">
-          <div className="bg-[#141415] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full relative shadow-[0_0_80px_rgba(10,132,255,0.1)]">
-            <button
-              onClick={() => setAuthModalOpen(false)}
-              className="absolute top-6 right-6 bg-[#222224] text-[#86868b] hover:text-[#f5f5f7] w-8 h-8 rounded-full flex items-center justify-center transition border border-white/5"
-            >
-              ✕
-            </button>
-            <h3 className="text-2xl font-bold tracking-tight text-[#f5f5f7] mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
-            <p className="text-sm text-[#86868b] mb-6">Get 5 free AI generations every day.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xl p-4">
+          <div className="bg-[#141415] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full relative">
+            <button onClick={() => setAuthModalOpen(false)} className="absolute top-6 right-6 text-[#86868b]">✕</button>
+            <h3 className="text-xl font-bold text-white mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
+            <p className="text-sm text-[#86868b] mb-6">Get 5 free AI generations daily.</p>
             <form onSubmit={handleAuth} className="space-y-4">
-              <input
-                type="email"
-                required
-                placeholder="Email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
-              />
-              <input
-                type="password"
-                required
-                placeholder="Password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                className="w-full bg-[#1c1c1e] border border-white/5 text-[#f5f5f7] rounded-xl p-4 text-sm outline-none placeholder-[#86868b] focus:ring-2 focus:ring-[#0a84ff]/50 transition shadow-inner"
-              />
-              {authMessage && (
-                <p className="text-sm font-medium text-[#ff3b30] bg-[#ff3b30]/10 border border-[#ff3b30]/20 p-3 rounded-xl">{authMessage}</p>
-              )}
-              <button
-                type="submit"
-                className="w-full bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold py-4 rounded-xl text-sm transition shadow-[0_0_20px_rgba(10,132,255,0.3)] ring-1 ring-[#0a84ff]/50 mt-2"
-              >
+              <input type="email" required placeholder="Email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-[#1c1c1e] border border-white/5 text-white rounded-xl p-3.5 text-sm outline-none" />
+              <input type="password" required placeholder="Password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-[#1c1c1e] border border-white/5 text-white rounded-xl p-3.5 text-sm outline-none" />
+              {authMessage && <p className="text-xs text-red-400">{authMessage}</p>}
+              <button type="submit" className="w-full bg-[#0a84ff] text-white font-semibold py-3.5 rounded-xl text-sm">
                 {isSignUp ? "Sign Up" : "Log In"}
               </button>
             </form>
-            <div className="mt-6 text-center">
-              <button
-                onClick={() => {
-                  setIsSignUp(!isSignUp);
-                  setAuthMessage("");
-                }}
-                className="text-sm font-medium text-[#0a84ff] hover:text-[#0071e3] transition"
-              >
-                {isSignUp ? "Already have an account? Log In" : "Need an account? Sign Up"}
-              </button>
-            </div>
           </div>
         </div>
       )}
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-12 text-center text-sm font-medium text-[#86868b]">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 WriteYourEmail. All rights reserved.</p>
-          <div className="flex space-x-6">
-            <Link href="/terms" className="hover:text-[#f5f5f7] transition">Terms</Link>
-            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">Privacy</Link>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
