@@ -14,11 +14,10 @@ import {
 import Link from "next/link";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
-// Initialize Supabase Client directly
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Initialize Supabase safely for browser
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 /* ------------------------------------------------------------------ */
 /*  TIER & MODE CONFIGURATION                                         */
 /* ------------------------------------------------------------------ */
@@ -1590,50 +1589,46 @@ export default function StudioPage() {
 
             {user ? (
               <PayPalScriptProvider
-                options={{
-                  "client-id": process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID!,
-                  currency: "USD",
-                  intent: "capture",
-                }}
-              >
-                <PayPalButtons
-  style={{ layout: "vertical", shape: "pill", label: "pay", height: 48 }}
-  createOrder={(data: any, actions: any) => {
-    const price = targetTier === "starter" ? "19.00" : targetTier === "growth" ? "39.00" : "79.00";
-    return actions.order.create({
-      purchase_units: [
-        {
-          amount: { value: price, currency_code: "USD" },
-          description: `WriteYourEmail.com ${targetTier} — 30 day access`,
-          custom_id: user?.id,
-        },
-      ],
-    });
+  options={{
+    clientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "",
+    currency: "USD",
+    intent: "capture",
   }}
-  onApprove={async (data: any, actions: any) => {
-    // Check if order exists to satisfy TypeScript
-    if (!actions.order) return Promise.reject("No order found");
-    
-    const capture = await actions.order.capture();
-    
-    if (capture?.status === "COMPLETED") {
-      await fetch("/api/paypal/capture-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderID: data.orderID,
-          user_id: user?.id,
-          tier: targetTier,
-        }),
+>
+  <PayPalButtons
+    style={{ layout: "vertical", shape: "pill", label: "pay", height: 48 }}
+    createOrder={(data: any, actions: any) => {
+      const price = targetTier === "starter" ? "19.00" : targetTier === "growth" ? "39.00" : "79.00";
+      return actions.order.create({
+        purchase_units: [
+          {
+            amount: { value: price, currency_code: "USD" },
+            description: `WriteYourEmail.com ${targetTier} — 30 day access`,
+            custom_id: user?.id,
+          },
+        ],
       });
-      setShowUpgrade(false);
-      bootstrap(); // Refreshes user usage state
-      alert(`🎉 Welcome to ${targetTier.toUpperCase()}! Your access is now active.`);
-    }
-  }}
-/>
-                
-              </PayPalScriptProvider>
+    }}
+    onApprove={async (data: any, actions: any) => {
+      if (!actions.order) return;
+      const capture = await actions.order.capture();
+      if (capture?.status === "COMPLETED") {
+        await fetch("/api/paypal/capture-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderID: data.orderID,
+            user_id: user?.id,
+            tier: targetTier,
+          }),
+        });
+        setShowUpgrade(false);
+        bootstrap();
+        alert(`🎉 Welcome to ${targetTier.toUpperCase()}! Your access is now active.`);
+      }
+    }}
+  />
+</PayPalScriptProvider>
             ) : (
               <Link
                 href="/auth"
