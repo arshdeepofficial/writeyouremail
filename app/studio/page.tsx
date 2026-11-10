@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, FormEvent } from "react";
+import dynamic from "next/dynamic";
 import { createClient } from "@supabase/supabase-js";
 import {
   Mail, Sparkles, ShieldAlert, RefreshCw, Zap,
@@ -12,7 +13,16 @@ import {
   Send, User, History, Lock, CheckCircle2, ChevronDown, Copy, X
 } from "lucide-react";
 import Link from "next/link";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+
+// Safely import PayPal components on the client-side only (bypasses Vercel SSR build error)
+const PayPalScriptProvider = dynamic(
+  () => import("@paypal/react-paypal-js").then((m) => m.PayPalScriptProvider),
+  { ssr: false }
+);
+const PayPalButtons = dynamic(
+  () => import("@paypal/react-paypal-js").then((m) => m.PayPalButtons),
+  { ssr: false }
+);
 
 // Initialize Supabase safely for browser
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
