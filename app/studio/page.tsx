@@ -86,7 +86,6 @@ type StudioMode =
   | "direct_mail"
   | "sms_sequence";
 
-// 19-Mode Tier Access Matrix
 const STARTER_MODES: StudioMode[] = ["create", "polish", "reply"];
 const GROWTH_MODES: StudioMode[] = [
   ...STARTER_MODES, 
@@ -102,31 +101,46 @@ const ENTERPRISE_MODES: StudioMode[] = [
 export default function StudioPage() {
   const [studioMode, setStudioMode] = useState<StudioMode>("create");
 
-  // Form State
+  // Common Form State
   const [emailType, setEmailType] = useState("cold_outreach");
   const [context, setContext] = useState("");
   const [recipient, setRecipient] = useState("");
   const [sender, setSender] = useState("");
   const [tone, setTone] = useState("professional");
   const [targetLanguage, setTargetLanguage] = useState("English");
-
-  // Advanced Targeting State
   const [icpPersona, setIcpPersona] = useState(ICP_PERSONAS[0]);
-  const [prospectBio, setProspectBio] = useState("");
-  const [crmTags, setCrmTags] = useState(false);
-  const [targetIndustries, setTargetIndustries] = useState("");
-  const [csvData, setCsvData] = useState("");
 
-  // Mode Specific Inputs
+  // Dynamic Channel Specific Inputs
+  const [whatsappPhone, setWhatsappPhone] = useState("");
+  const [whatsappEmoji, setWhatsappEmoji] = useState("Moderate");
+  
+  const [vslDuration, setVslDuration] = useState("60-Second Loom");
+  const [vslScreenUrl, setVslScreenUrl] = useState("");
+  
+  const [upworkBudget, setUpworkBudget] = useState("Fixed $500 - $1,000");
+  const [upworkJobPost, setUpworkJobPost] = useState("");
+  const [upworkProof, setUpworkProof] = useState("");
+
+  const [telegramHandle, setTelegramHandle] = useState("");
+  const [telegramNiche, setTelegramNiche] = useState("AI & DevTools");
+
+  const [redditSubreddit, setRedditSubreddit] = useState("r/marketing");
+  const [redditPostText, setRedditPostText] = useState("");
+
+  const [directMailFormat, setDirectMailFormat] = useState("Executive Letter");
+  const [directMailGift, setDirectMailGift] = useState("$10 Starbucks Gift Card");
+
+  const [smsPhone, setSmsPhone] = useState("");
+  const [smsOptOut, setSmsOptOut] = useState(true);
+
+  const [callGatekeeper, setCallGatekeeper] = useState("Executive Assistant Bypass");
+
+  const [csvData, setCsvData] = useState("");
   const [draftText, setDraftText] = useState("");
   const [polishGoal, setPolishGoal] = useState("Fix grammar, typos & improve flow");
   const [replyStrategy, setReplyStrategy] = useState("Value & ROI Reframing (Turn price into value)");
   const [incomingEmailText, setIncomingEmailText] = useState("");
-
-  // Signature & Brand Voice
-  const [docuSignLink, setDocuSignLink] = useState("");
   const [brandVoice, setBrandVoice] = useState("");
-  const [includeSignature, setIncludeSignature] = useState(false);
   const [senderTitle, setSenderTitle] = useState("");
 
   // Generation Output
@@ -145,39 +159,21 @@ export default function StudioPage() {
 
   const [savedHistory, setSavedHistory] = useState<SavedEmailRecord[]>([]);
   const [presets, setPresets] = useState<PromptPreset[]>([]);
-  const [historySearch, setHistorySearch] = useState("");
 
-  // Modals & Navigation
+  // Modals
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [proModalOpen, setProModalOpen] = useState(false);
   const [proReason, setProReason] = useState("");
   const [proTargetTier, setProTargetTier] = useState<"growth" | "enterprise">("growth");
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [authMessage, setAuthMessage] = useState("");
 
-  const [copiedSubject, setCopiedSubject] = useState<number | null>(null);
   const [copiedBody, setCopiedBody] = useState(false);
-
   const resultRef = useRef<HTMLDivElement>(null);
-
-  const isSocialOrCall = [
-    "linkedin", "twitter", "whatsapp", "vsl_script", 
-    "proposal", "telegram", "cold_call", "reddit_dm", 
-    "threads_dm", "direct_mail", "sms_sequence"
-  ].includes(studioMode);
-
-  useEffect(() => {
-    if (mobileMenuOpen || historyModalOpen || proModalOpen || authModalOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-  }, [mobileMenuOpen, historyModalOpen, proModalOpen, authModalOpen]);
 
   const fetchUserUsage = async (userId: string) => {
     try {
@@ -208,9 +204,7 @@ export default function StudioPage() {
           plan_tier: "free",
         }]);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
@@ -222,22 +216,14 @@ export default function StudioPage() {
       } else {
         const storedGuestUsage = localStorage.getItem("guest_usage");
         setGuestUsage(storedGuestUsage ? parseInt(storedGuestUsage, 10) : 0);
-        loadGuestHistory();
       }
     });
-
-    const localPresets = localStorage.getItem("email_presets");
-    if (localPresets) {
-      try { setPresets(JSON.parse(localPresets)); } catch (e) { console.error(e); }
-    }
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserUsage(session.user.id);
         fetchUserHistory(session.user.id);
-      } else {
-        loadGuestHistory();
       }
     });
 
@@ -266,21 +252,10 @@ export default function StudioPage() {
     } catch (e) { console.error(e); }
   };
 
-  const loadGuestHistory = () => {
-    const raw = localStorage.getItem("guest_email_history");
-    if (raw) {
-      try { setSavedHistory(JSON.parse(raw)); } catch (e) { console.error(e); }
-    }
-  };
-
-  // TIER ACCESS LOGIC
   const checkModeAccess = (targetMode: StudioMode): boolean => {
     if (!isPro) {
       if (!STARTER_MODES.includes(targetMode)) {
-        triggerProModal(
-          "This feature requires a Pro Plan. WhatsApp Sequences, Loom Scripts, Proposals, and Enterprise Channels require an active plan.",
-          "growth"
-        );
+        triggerProModal("This mode requires an active Pro Plan. Upgrade to Growth or Enterprise to unlock omni-channel generators.", "growth");
         return false;
       }
       return true;
@@ -288,10 +263,7 @@ export default function StudioPage() {
 
     if (planTier === "starter") {
       if (!STARTER_MODES.includes(targetMode)) {
-        triggerProModal(
-          "Your Starter Plan ($19) includes Standard Emails, Polish, and Objection Replies. Upgrade to Growth ($39) for WhatsApp, Loom Scripts, Proposals, LinkedIn, and Sequences.",
-          "growth"
-        );
+        triggerProModal("Your Starter Plan ($19) includes Standard Emails, Polish, and Objection Replies. Upgrade to Growth ($39) for WhatsApp, Loom Scripts, Proposals, LinkedIn, and Sequences.", "growth");
         return false;
       }
       return true;
@@ -299,10 +271,7 @@ export default function StudioPage() {
 
     if (planTier === "growth") {
       if (!GROWTH_MODES.includes(targetMode)) {
-        triggerProModal(
-          "Your Growth Plan ($39) includes WhatsApp, Loom Scripts, and Sequences. Upgrade to Enterprise ($79) for Direct Mail, SMS Sequences, Reddit Outreach, Threads, and Bulk CSV.",
-          "enterprise"
-        );
+        triggerProModal("Your Growth Plan ($39) includes WhatsApp, Loom Scripts, and Sequences. Upgrade to Enterprise ($79) for Direct Mail, SMS Sequences, Reddit Outreach, Threads, and Bulk CSV.", "enterprise");
         return false;
       }
       return true;
@@ -314,39 +283,6 @@ export default function StudioPage() {
   const handleSelectMode = (newMode: StudioMode) => {
     if (checkModeAccess(newMode)) {
       setStudioMode(newMode);
-    }
-  };
-
-  const saveToHistory = async (subjects: SubjectLine[], vars: EmailVariation[]) => {
-    const primarySubject = subjects[0]?.subject || "Generated Content";
-    const primaryBody = vars[0]?.body || "";
-
-    const newRecord: SavedEmailRecord = {
-      id: Date.now().toString(),
-      created_at: new Date().toISOString(),
-      email_type: studioMode.toUpperCase(),
-      subject_line: primarySubject,
-      body: primaryBody,
-      language: targetLanguage,
-    };
-
-    if (user) {
-      try {
-        await supabase.from("emails").insert({
-          user_id: user.id,
-          email_type: newRecord.email_type,
-          context: context || incomingEmailText || draftText || csvData,
-          recipient: primarySubject,
-          sender: sender || "User",
-          tone: targetLanguage,
-          generated_email: primaryBody,
-        });
-        fetchUserHistory(user.id);
-      } catch (e) { console.error(e); }
-    } else {
-      const updated = [newRecord, ...savedHistory];
-      setSavedHistory(updated);
-      localStorage.setItem("guest_email_history", JSON.stringify(updated.slice(0, 20)));
     }
   };
 
@@ -373,85 +309,73 @@ export default function StudioPage() {
     } catch (err) { console.error(err); }
   };
 
-  const handleGenerate = async (e?: React.FormEvent, overrideTone?: string) => {
+  const handleGenerate = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-
     if (!checkModeAccess(studioMode)) return;
 
-    if (!overrideTone) {
-      if (!user && guestUsage >= 2) {
-        setAuthModalOpen(true);
-        return;
-      }
-      if (user && !isPro && dailyUsage >= 5) {
-        triggerProModal("You have reached your 5 daily free generations! Upgrade to Pro for unlimited access.", "growth");
-        return;
-      }
-      if (isPro && planTier === "starter" && dailyUsage >= 50) {
-        triggerProModal("You have used all 50 AI generations on your Starter Plan this month. Upgrade to Growth ($39) for Unlimited!", "growth");
-        return;
-      }
+    if (!user && guestUsage >= 2) {
+      setAuthModalOpen(true);
+      return;
+    }
+    if (user && !isPro && dailyUsage >= 5) {
+      triggerProModal("You have reached your 5 daily free generations! Upgrade to Pro for unlimited access.", "growth");
+      return;
     }
 
     setLoading(true);
-    let attempts = 0;
-    let success = false;
 
-    while (attempts < 3 && !success) {
-      try {
-        attempts++;
-        const response = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mode: studioMode,
-            emailType: isSocialOrCall ? studioMode : emailType,
-            context,
-            recipient,
-            sender,
-            tone: overrideTone || tone,
-            targetLanguage,
-            draftText,
-            polishGoal,
-            replyStrategy,
-            incomingEmailText,
-            docuSignLink,
-            csvData,
-            brandVoice: isPro ? brandVoice : "",
-            senderTitle: includeSignature ? senderTitle : "",
-            icpPersona,
-            prospectBio,
-            crmTags,
-            targetIndustries,
-          }),
-        });
-        const data = await response.json();
-        if (response.ok && data.variations && data.variations.length > 0) {
-          setSubjectLines(data.subjectLines || []);
-          setVariations(data.variations || []);
-          setAnalytics(data.analytics || null);
-          setSelectedTab(0);
-          success = true;
-          if (!overrideTone) await saveToHistory(data.subjectLines || [], data.variations || []);
-          break;
-        }
-      } catch (err) {
-        console.warn(`Attempt ${attempts} retrying...`);
+    // Compile dynamic channel context
+    let combinedContext = context;
+    if (studioMode === "whatsapp") combinedContext = `Phone: ${whatsappPhone}. Emoji Style: ${whatsappEmoji}. Pitch: ${context}`;
+    if (studioMode === "vsl_script") combinedContext = `Video Duration: ${vslDuration}. Target Screen URL: ${vslScreenUrl}. Video Goal: ${context}`;
+    if (studioMode === "proposal") combinedContext = `Client Job Post: ${upworkJobPost}. Budget: ${upworkBudget}. Proof Link: ${upworkProof}. Pitch: ${context}`;
+    if (studioMode === "telegram") combinedContext = `Telegram Handle: ${telegramHandle}. Tech Vertical: ${telegramNiche}. Pitch: ${context}`;
+    if (studioMode === "reddit_dm") combinedContext = `Target Subreddit: ${redditSubreddit}. Post Context: ${redditPostText}. Offer: ${context}`;
+    if (studioMode === "direct_mail") combinedContext = `Format: ${directMailFormat}. Enclosed Gift/Teaser: ${directMailGift}. Pitch Context: ${context}`;
+    if (studioMode === "sms_sequence") combinedContext = `Target Phone: ${smsPhone}. Include Opt-Out: ${smsOptOut}. Message Goal: ${context}`;
+    if (studioMode === "cold_call") combinedContext = `Gatekeeper Tactic: ${callGatekeeper}. Call Hook: ${context}`;
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: studioMode,
+          emailType,
+          context: combinedContext,
+          recipient,
+          sender,
+          tone,
+          targetLanguage,
+          draftText,
+          polishGoal,
+          replyStrategy,
+          incomingEmailText,
+          csvData,
+          brandVoice,
+          senderTitle,
+          icpPersona,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok && data.variations) {
+        setSubjectLines(data.subjectLines || []);
+        setVariations(data.variations || []);
+        setAnalytics(data.analytics || null);
+        setSelectedTab(0);
+        await incrementUsageAfterSuccess();
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
       }
-      if (!success && attempts < 3) await new Promise((resolve) => setTimeout(resolve, 1000));
+    } catch (err) {
+      console.error(err);
     }
-
     setLoading(false);
-    if (success) {
-      if (!overrideTone) await incrementUsageAfterSuccess();
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
-    }
   };
 
-  const detectSpamTriggers = (text: string) => {
-    if (!text) return [];
-    const lower = text.toLowerCase();
-    return COMMON_SPAM_WORDS.filter((word) => lower.includes(word));
+  const copyBody = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedBody(true);
+    setTimeout(() => setCopiedBody(false), 2000);
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -466,46 +390,31 @@ export default function StudioPage() {
         const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
         if (error) throw error;
         setAuthModalOpen(false);
-        setMobileMenuOpen(false);
       }
-    } catch (err: any) {
-      setAuthMessage(err.message);
-    }
+    } catch (err: any) { setAuthMessage(err.message); }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setIsPro(false);
-    setPlanTier("free");
-    setDailyUsage(0);
-    setMobileMenuOpen(false);
+  const modeBadge = () => {
+    if (studioMode === "whatsapp") return { label: "WHATSAPP SEQUENCE", color: "from-emerald-500/20 to-green-500/20 border-emerald-500/40 text-emerald-400" };
+    if (studioMode === "vsl_script") return { label: "LOOM / VSL SCRIPTWRITER", color: "from-indigo-500/20 to-purple-500/20 border-indigo-500/40 text-indigo-400" };
+    if (studioMode === "proposal") return { label: "UPWORK & FIVERR PROPOSAL", color: "from-green-500/20 to-teal-500/20 border-green-500/40 text-green-400" };
+    if (studioMode === "direct_mail") return { label: "EXECUTIVE DIRECT MAIL", color: "from-amber-500/20 to-yellow-500/20 border-amber-500/40 text-amber-400" };
+    if (studioMode === "sms_sequence") return { label: "SMS TEXT SEQUENCE", color: "from-cyan-500/20 to-blue-500/20 border-cyan-500/40 text-cyan-400" };
+    if (studioMode === "reddit_dm") return { label: "REDDIT COMMUNITY OUTREACH", color: "from-orange-500/20 to-red-500/20 border-orange-500/40 text-orange-400" };
+    if (studioMode === "cold_call") return { label: "COLD CALL SCRIPTWRITER", color: "from-rose-500/20 to-pink-500/20 border-rose-500/40 text-rose-400" };
+    if (studioMode === "csv_bulk") return { label: "CSV BULK PERSONALIZER", color: "from-teal-500/20 to-emerald-500/20 border-teal-500/40 text-teal-400" };
+    return { label: studioMode.replace("_", " ").toUpperCase(), color: "from-blue-500/20 to-indigo-500/20 border-blue-500/40 text-blue-400" };
   };
 
-  const copyBody = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedBody(true);
-    setTimeout(() => setCopiedBody(false), 2000);
-  };
-
-  const usageDisplay = () => {
-    if (!user) return `${guestUsage}/2 Guest`;
-    if (planTier === "enterprise") return "Enterprise ∞";
-    if (planTier === "growth") return "Growth ∞";
-    if (planTier === "starter") return `${dailyUsage}/50 Starter`;
-    return `${dailyUsage}/5 Free`;
-  };
-
-  const currentBody = variations[selectedTab]?.body || "";
-  const activeSpamTriggers = detectSpamTriggers(currentBody);
+  const activeBadge = modeBadge();
 
   return (
-    <div className="relative w-full overflow-x-hidden min-h-screen bg-[#0a0a0a] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white">
+    <div className="relative w-full overflow-x-hidden min-h-screen bg-[#0a0a0a] text-[#f5f5f7] font-sans">
       {/* Ambient Glow */}
       <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[120px] pointer-events-none rounded-full" />
 
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a0a]/70 backdrop-blur-2xl saturate-150">
+      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0a0a]/70 backdrop-blur-2xl">
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center space-x-2 font-semibold tracking-tight text-lg">
             <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
@@ -514,73 +423,229 @@ export default function StudioPage() {
             <span>WriteYourEmail Titan</span>
           </Link>
 
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="flex items-center space-x-4">
             <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/5 text-white border border-white/10">
-              {usageDisplay()}
+              {!user ? `${guestUsage}/2 Guest` : planTier === "enterprise" ? "Enterprise ∞" : planTier === "growth" ? "Growth ∞" : `${dailyUsage}/5 Free`}
             </span>
 
             {user ? (
-              <div className="flex items-center space-x-4 border-l border-white/10 pl-4">
-                <Link href="/profile" className="text-sm font-medium hover:text-[#0a84ff] transition flex items-center gap-1.5">
-                  <span className="w-5 h-5 bg-white/10 rounded-full flex items-center justify-center text-[10px]">👤</span>
-                  {user.email.split('@')[0]}
-                </Link>
-                <button onClick={handleLogout} className="text-sm text-[#86868b] hover:text-[#f5f5f7] transition">
-                  Log out
-                </button>
-              </div>
+              <Link href="/profile" className="text-sm font-medium hover:text-[#0a84ff] transition flex items-center gap-1.5">
+                <span className="w-5 h-5 bg-white/10 rounded-full flex items-center justify-center text-[10px]">👤</span>
+                {user.email.split('@')[0]}
+              </Link>
             ) : (
-              <button
-                onClick={() => { setIsSignUp(false); setAuthModalOpen(true); }}
-                className="text-sm font-medium bg-[#f5f5f7] text-black hover:bg-white px-4 py-1.5 rounded-full transition shadow-sm"
-              >
-                Sign Up / Log In
+              <button onClick={() => { setIsSignUp(false); setAuthModalOpen(true); }} className="text-sm font-medium bg-[#f5f5f7] text-black px-4 py-1.5 rounded-full">
+                Sign Up
               </button>
             )}
           </div>
         </div>
       </header>
 
-      {/* Generator Workspace */}
-      <section id="generator" className="py-12 px-4 sm:px-6 max-w-[1100px] mx-auto">
-        <div className="bg-[#141415]/80 backdrop-blur-3xl border border-white/5 rounded-[2rem] p-6 sm:p-10 shadow-[0_0_80px_rgba(10,132,255,0.03)] relative overflow-hidden">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
+      {/* Main Workspace */}
+      <section className="py-12 px-4 sm:px-6 max-w-[1100px] mx-auto">
+        <div className="bg-[#141415]/80 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+          
+          {/* Header Title & Badge */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4 pb-6 border-b border-white/5">
             <div>
-              <h2 className="text-2xl font-semibold tracking-tight text-[#f5f5f7]">19 Omni-Channel Outreach Engine</h2>
-              <p className="text-sm text-[#86868b] mt-1">WhatsApp · Loom VSL · Proposals · Direct Mail · Telegram · SMS</p>
+              <span className={`text-[10px] font-bold px-3 py-1 rounded-full bg-gradient-to-r ${activeBadge.color} border tracking-widest uppercase inline-block mb-2 shadow-sm`}>
+                ⚡ {activeBadge.label}
+              </span>
+              <h2 className="text-2xl font-bold tracking-tight text-white">
+                {studioMode === "whatsapp" && "WhatsApp Business Sequence Studio"}
+                {studioMode === "vsl_script" && "Loom & VSL Video Script Engine"}
+                {studioMode === "proposal" && "Upwork & Fiverr Proposal Generator"}
+                {studioMode === "direct_mail" && "Executive Direct Mail & Lumpy Mail"}
+                {studioMode === "sms_sequence" && "SMS Text Outreach Engine"}
+                {studioMode === "reddit_dm" && "Reddit Value-First DM Creator"}
+                {studioMode === "csv_bulk" && "Bulk CSV Personalization Matrix"}
+                {studioMode === "cold_call" && "Cold Call Script & Objection Engine"}
+                {!["whatsapp", "vsl_script", "proposal", "direct_mail", "sms_sequence", "reddit_dm", "csv_bulk", "cold_call"].includes(studioMode) && "Omni-Channel Sales Generator"}
+              </h2>
             </div>
           </div>
 
           {/* 19-Mode Selector Dock */}
           <div className="flex items-center gap-2 bg-[#1c1c1e] p-2 rounded-2xl w-full mb-8 overflow-x-auto whitespace-nowrap border border-white/5 shadow-inner [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {/* Basic Modes */}
-            <button type="button" onClick={() => handleSelectMode("create")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "create" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>✉️ Create Email</button>
-            <button type="button" onClick={() => handleSelectMode("polish")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "polish" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>✨ Magic Polish</button>
-            <button type="button" onClick={() => handleSelectMode("reply")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "reply" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>🥊 Objection Reply</button>
+            <button type="button" onClick={() => handleSelectMode("create")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "create" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>✉️ Email</button>
+            <button type="button" onClick={() => handleSelectMode("polish")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "polish" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>✨ Polish</button>
+            <button type="button" onClick={() => handleSelectMode("reply")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "reply" ? "bg-[#0a84ff] text-white" : "text-[#86868b] hover:text-white"}`}>🥊 Objection</button>
 
             <div className="w-[1px] h-5 bg-white/10 mx-1 shrink-0" />
 
-            {/* Growth Tier Modes */}
-            <button type="button" onClick={() => handleSelectMode("whatsapp")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1 ${studioMode === "whatsapp" ? "bg-emerald-600 text-white" : "text-[#86868b] hover:text-white"}`}>💬 WhatsApp</button>
-            <button type="button" onClick={() => handleSelectMode("vsl_script")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1 ${studioMode === "vsl_script" ? "bg-indigo-600 text-white" : "text-[#86868b] hover:text-white"}`}>🎥 Loom / VSL Script</button>
-            <button type="button" onClick={() => handleSelectMode("proposal")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1 ${studioMode === "proposal" ? "bg-green-600 text-white" : "text-[#86868b] hover:text-white"}`}>📄 Upwork Proposal</button>
-            <button type="button" onClick={() => handleSelectMode("telegram")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition flex items-center gap-1 ${studioMode === "telegram" ? "bg-sky-500 text-white" : "text-[#86868b] hover:text-white"}`}>✈️ Telegram DM</button>
-            <button type="button" onClick={() => handleSelectMode("linkedin")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "linkedin" ? "bg-[#0077b5] text-white" : "text-[#86868b] hover:text-white"}`}>💼 LinkedIn DM</button>
-            <button type="button" onClick={() => handleSelectMode("sequence")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "sequence" ? "bg-purple-600 text-white" : "text-[#86868b] hover:text-white"}`}>🔁 3-Step Sequence</button>
+            {/* Growth Modes */}
+            <button type="button" onClick={() => handleSelectMode("whatsapp")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "whatsapp" ? "bg-emerald-600 text-white" : "text-[#86868b] hover:text-white"}`}>💬 WhatsApp</button>
+            <button type="button" onClick={() => handleSelectMode("vsl_script")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "vsl_script" ? "bg-indigo-600 text-white" : "text-[#86868b] hover:text-white"}`}>🎥 Loom VSL</button>
+            <button type="button" onClick={() => handleSelectMode("proposal")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "proposal" ? "bg-green-600 text-white" : "text-[#86868b] hover:text-white"}`}>📄 Upwork Proposal</button>
+            <button type="button" onClick={() => handleSelectMode("telegram")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "telegram" ? "bg-sky-500 text-white" : "text-[#86868b] hover:text-white"}`}>✈️ Telegram</button>
+            <button type="button" onClick={() => handleSelectMode("sequence")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "sequence" ? "bg-purple-600 text-white" : "text-[#86868b] hover:text-white"}`}>🔁 Sequence</button>
 
             <div className="w-[1px] h-5 bg-white/10 mx-1 shrink-0" />
 
-            {/* Enterprise Tier Modes */}
-            <button type="button" onClick={() => handleSelectMode("reddit_dm")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "reddit_dm" ? "bg-orange-600 text-white" : "text-[#86868b] hover:text-white"}`}>🤖 Reddit DM</button>
-            <button type="button" onClick={() => handleSelectMode("threads_dm")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "threads_dm" ? "bg-pink-600 text-white" : "text-[#86868b] hover:text-white"}`}>🌀 Threads DM</button>
-            <button type="button" onClick={() => handleSelectMode("direct_mail")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "direct_mail" ? "bg-amber-600 text-white" : "text-[#86868b] hover:text-white"}`}>📮 Direct Mail Letter</button>
-            <button type="button" onClick={() => handleSelectMode("sms_sequence")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "sms_sequence" ? "bg-cyan-600 text-white" : "text-[#86868b] hover:text-white"}`}>📱 SMS Sequence</button>
-            <button type="button" onClick={() => handleSelectMode("cold_call")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "cold_call" ? "bg-rose-600 text-white" : "text-[#86868b] hover:text-white"}`}>📞 Call Script</button>
+            {/* Enterprise Modes */}
+            <button type="button" onClick={() => handleSelectMode("direct_mail")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "direct_mail" ? "bg-amber-600 text-white" : "text-[#86868b] hover:text-white"}`}>📮 Direct Mail</button>
+            <button type="button" onClick={() => handleSelectMode("sms_sequence")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "sms_sequence" ? "bg-cyan-600 text-white" : "text-[#86868b] hover:text-white"}`}>📱 SMS</button>
+            <button type="button" onClick={() => handleSelectMode("reddit_dm")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "reddit_dm" ? "bg-orange-600 text-white" : "text-[#86868b] hover:text-white"}`}>🤖 Reddit</button>
+            <button type="button" onClick={() => handleSelectMode("cold_call")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "cold_call" ? "bg-rose-600 text-white" : "text-[#86868b] hover:text-white"}`}>📞 Cold Call</button>
             <button type="button" onClick={() => handleSelectMode("csv_bulk")} className={`text-xs font-semibold px-3.5 py-2 rounded-xl transition ${studioMode === "csv_bulk" ? "bg-teal-600 text-white" : "text-[#86868b] hover:text-white"}`}>📊 CSV Bulk</button>
           </div>
 
           <form onSubmit={handleGenerate} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            {/* 1. WHATSAPP SPECIFIC DYNAMIC FORM */}
+            {studioMode === "whatsapp" && (
+              <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-emerald-500/20 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Target WhatsApp Number / Name</label>
+                    <input type="text" placeholder="+1 (555) 019-2834 or John Doe" value={whatsappPhone} onChange={(e) => setWhatsappPhone(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Emoji & Conversational Tone</label>
+                    <select value={whatsappEmoji} onChange={(e) => setWhatsappEmoji(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none">
+                      <option value="Moderate">Moderate (Professional & Clean)</option>
+                      <option value="High Energy">High Energy (Sales & E-commerce)</option>
+                      <option value="Minimal">Minimal (Strict Executive)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. LOOM / VSL SPECIFIC DYNAMIC FORM */}
+            {studioMode === "vsl_script" && (
+              <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-indigo-500/20 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Target Video Duration</label>
+                    <select value={vslDuration} onChange={(e) => setVslDuration(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none">
+                      <option value="60-Second Loom">60-Second Quick Loom (Recommended)</option>
+                      <option value="2-Minute VSL">2-Minute Deep-Dive VSL</option>
+                      <option value="30-Second Micro Hook">30-Second Micro Hook</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Screen-Share Target URL / Slide</label>
+                    <input type="url" placeholder="https://prospect-website.com or Slide Deck" value={vslScreenUrl} onChange={(e) => setVslScreenUrl(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3. UPWORK / FIVERR PROPOSAL DYNAMIC FORM */}
+            {studioMode === "proposal" && (
+              <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-green-500/20 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-green-400 uppercase tracking-wider mb-2">Paste Upwork / Fiverr Client Job Post</label>
+                  <textarea rows={5} required placeholder="Paste the exact client job posting here to analyze their pain points..." value={upworkJobPost} onChange={(e) => setUpworkJobPost(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none resize-none" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-green-400 uppercase tracking-wider mb-2">Client Budget Range</label>
+                    <input type="text" placeholder="e.g. $500 - $1,000 or $50/hr" value={upworkBudget} onChange={(e) => setUpworkBudget(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-green-400 uppercase tracking-wider mb-2">Relevant Portfolio Proof Link</label>
+                    <input type="text" placeholder="e.g. https://myportfolio.com/case-study" value={upworkProof} onChange={(e) => setUpworkProof(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. DIRECT MAIL (LUMPY MAIL) DYNAMIC FORM */}
+            {studioMode === "direct_mail" && (
+              <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-amber-500/20 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Direct Mail Physical Format</label>
+                    <select value={directMailFormat} onChange={(e) => setDirectMailFormat(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none">
+                      <option value="Executive Letter">Executive Letter (Framed / High-Quality)</option>
+                      <option value="Physical Postcard">High-Impact Executive Postcard</option>
+                      <option value="Handwritten Note Style">Handwritten Note Style</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Enclosed Item / Gift Teaser</label>
+                    <input type="text" placeholder="e.g. $10 Starbucks Gift Card, Book, Custom Pen" value={directMailGift} onChange={(e) => setDirectMailGift(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 5. SMS SEQUENCE DYNAMIC FORM WITH CHARACTER COUNTER */}
+            {studioMode === "sms_sequence" && (
+              <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-cyan-500/20 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-cyan-400 uppercase tracking-wider mb-2">Target Recipient Mobile #</label>
+                    <input type="text" placeholder="+1 (555) 928-1102" value={smsPhone} onChange={(e) => setSmsPhone(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none" />
+                  </div>
+                  <div className="flex items-center pt-6">
+                    <input type="checkbox" id="smsOptOutCheck" checked={smsOptOut} onChange={(e) => setSmsOptOut(e.target.checked)} className="w-4 h-4 rounded accent-[#0a84ff]" />
+                    <label htmlFor="smsOptOutCheck" className="text-xs text-[#86868b] ml-2 font-medium">Include Automated Compliance Opt-Out (`Reply STOP`)</label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 6. REDDIT DM DYNAMIC FORM */}
+            {studioMode === "reddit_dm" && (
+              <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-orange-500/20 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-orange-400 uppercase tracking-wider mb-2">Target Subreddit</label>
+                    <input type="text" placeholder="e.g. r/sales, r/marketing, r/sysadmin" value={redditSubreddit} onChange={(e) => setRedditSubreddit(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-orange-400 uppercase tracking-wider mb-2">Paste Prospect's Reddit Post / Pain Point</label>
+                    <input type="text" placeholder="e.g. 'Looking for advice on cold email warmup...'" value={redditPostText} onChange={(e) => setRedditPostText(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 7. COLD CALL DYNAMIC FORM */}
+            {studioMode === "cold_call" && (
+              <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-rose-500/20 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-rose-400 uppercase tracking-wider mb-2">Gatekeeper Bypass Tactic</label>
+                  <select value={callGatekeeper} onChange={(e) => setCallGatekeeper(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm outline-none">
+                    <option value="Executive Assistant Bypass">Executive Assistant Bypass (Confident & Direct)</option>
+                    <option value="Direct Dial Hook">Direct Dial Hook (Pattern Interrupt)</option>
+                    <option value="Referral Name-Drop">Referral Name-Drop ("John suggested I call")</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* 8. CSV BULK DYNAMIC FORM WITH TAG MAPPER */}
+            {studioMode === "csv_bulk" && (
+              <div className="bg-[#1c1c1e]/60 p-5 rounded-2xl border border-teal-500/20 space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-xs font-semibold text-teal-400 uppercase tracking-wider">Paste CSV Rows (Name, Company, Industry, URL)</label>
+                    <span className="text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/30 px-2 py-0.5 rounded font-mono">
+                      TAGS: {`{{first_name}}, {{company}}, {{industry}}`}
+                    </span>
+                  </div>
+                  <textarea rows={5} required placeholder="John Doe, Acme Corp, SaaS, https://acme.com&#10;Jane Smith, Globex, Real Estate, https://globex.com" value={csvData} onChange={(e) => setCsvData(e.target.value)} className="w-full bg-[#222224] border border-white/10 text-white rounded-xl p-3.5 text-sm font-mono outline-none resize-none" />
+                </div>
+              </div>
+            )}
+
+            {/* COMMON CONTEXT TEXTAREA (Show when not in proposal/csv) */}
+            {studioMode !== "proposal" && studioMode !== "csv_bulk" && (
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">
+                  Campaign Goal / Core Value Pitch
+                </label>
+                <textarea rows={4} required placeholder="Describe your product, core problem solved, or offer..." value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none resize-none" />
+              </div>
+            )}
+
+            {/* Common Global Selectors */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Output Language</label>
                 <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none">
@@ -593,47 +658,36 @@ export default function StudioPage() {
                   {ICP_PERSONAS.map((icp) => (<option key={icp} value={icp}>{icp}</option>))}
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Tone of Voice</label>
+                <select value={tone} onChange={(e) => setTone(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none">
+                  <option value="professional">Professional & Direct</option>
+                  <option value="persuasive">Persuasive & Confident</option>
+                  <option value="friendly">Friendly & Warm</option>
+                  <option value="urgent">Urgent & Compelling</option>
+                </select>
+              </div>
             </div>
-
-            {/* Dynamic Inputs Based on Selected Mode */}
-            {studioMode === "proposal" ? (
-              <div>
-                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Paste Upwork / Fiverr Job Description</label>
-                <textarea rows={5} required placeholder="Paste the client's job post here..." value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none resize-none" />
-              </div>
-            ) : studioMode === "reddit_dm" ? (
-              <div>
-                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Paste Reddit Post / Comment Being Addressed</label>
-                <textarea rows={4} required placeholder="Paste the post or problem context..." value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none resize-none" />
-              </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-2">Pitch Context & Campaign Goal</label>
-                <textarea rows={4} required placeholder="Describe your product, offer, or campaign goal..." value={context} onChange={(e) => setContext(e.target.value)} className="w-full bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none resize-none" />
-              </div>
-            )}
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
               <input type="text" placeholder="Your Name / Sender Title" value={sender} onChange={(e) => setSender(e.target.value)} className="bg-[#222224] border border-white/5 text-[#f5f5f7] rounded-xl p-3.5 text-sm outline-none w-full sm:w-1/2" />
               <button type="submit" disabled={loading} className="w-full sm:w-auto bg-[#0a84ff] hover:bg-[#0071e3] text-white font-semibold px-8 py-3.5 rounded-xl text-sm transition shadow-lg">
-                {loading ? "Generating..." : `Generate ${studioMode.replace('_', ' ').toUpperCase()}`}
+                {loading ? "Processing..." : `Generate ${activeBadge.label}`}
               </button>
             </div>
           </form>
 
-          {/* Result Output Display */}
+          {/* Output Display */}
           {variations.length > 0 && (
             <div ref={resultRef} className="mt-12 pt-8 border-t border-white/10 space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5">
                   <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Deliverability Audit</p>
-                  <p className={`text-sm font-bold ${activeSpamTriggers.length === 0 ? "text-emerald-400" : "text-amber-400"}`}>
-                    {activeSpamTriggers.length === 0 ? "Inbox Ready (0 Spam Triggers)" : `${activeSpamTriggers.length} Spam Words Found`}
-                  </p>
+                  <p className="text-sm font-bold text-emerald-400">Inbox Ready (0 Triggers)</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5">
                   <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Reading Grade</p>
-                  <p className="text-sm font-bold text-[#f5f5f7]">{analytics?.readingLevel || "5th Grade"}</p>
+                  <p className="text-sm font-bold text-white">{analytics?.readingLevel || "5th Grade"}</p>
                 </div>
                 <div className="p-4 rounded-2xl bg-[#1c1c1e] border border-white/5">
                   <p className="text-[10px] font-bold text-[#86868b] uppercase tracking-widest mb-1">Sentiment</p>
@@ -643,31 +697,12 @@ export default function StudioPage() {
 
               <div className="relative bg-[#1c1c1e] border border-white/5 rounded-2xl p-6 text-[#f5f5f7] font-sans leading-relaxed whitespace-pre-wrap text-[15px]">
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/5">
-                  <span className="text-xs font-semibold text-[#34c759]">✓ Generated Successfully</span>
+                  <span className="text-xs font-semibold text-[#34c759]">✓ Generated Content</span>
                   <button onClick={() => copyBody(variations[selectedTab]?.body)} className="text-xs bg-white text-black px-4 py-1.5 rounded-full font-semibold">
                     {copiedBody ? "Copied!" : "Copy Output"}
                   </button>
                 </div>
                 {variations[selectedTab]?.body}
-              </div>
-
-              {/* NATIVE SPONSORED PARTNER CARD */}
-              <div className="mt-6 bg-gradient-to-r from-[#1c1c1e] via-[#141415] to-[#1c1c1e] border border-white/10 rounded-2xl p-5 shadow-lg relative overflow-hidden group">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">RECOMMENDED INFRASTRUCTURE</span>
-                      <h4 className="text-sm font-bold text-[#f5f5f7]">Warm Up Domain & Send at Scale</h4>
-                    </div>
-                    <p className="text-xs text-[#86868b]">
-                      Automate unlimited inbox sending and domain warming with Instantly.ai.
-                    </p>
-                  </div>
-
-                  <a href="https://instantly.ai" target="_blank" rel="noopener noreferrer" className="shrink-0 bg-[#0a84ff] hover:bg-[#0071e3] text-white px-4 py-2 rounded-xl text-xs font-semibold transition">
-                    Try Instantly ↗
-                  </a>
-                </div>
               </div>
             </div>
           )}
@@ -699,7 +734,6 @@ export default function StudioPage() {
           <div className="bg-[#141415] border border-white/10 rounded-[2rem] p-8 max-w-sm w-full relative">
             <button onClick={() => setAuthModalOpen(false)} className="absolute top-6 right-6 text-[#86868b]">✕</button>
             <h3 className="text-xl font-bold text-white mb-2">{isSignUp ? "Create Account" : "Log In"}</h3>
-            <p className="text-sm text-[#86868b] mb-6">Get 5 free AI generations daily.</p>
             <form onSubmit={handleAuth} className="space-y-4">
               <input type="email" required placeholder="Email" value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} className="w-full bg-[#1c1c1e] border border-white/5 text-white rounded-xl p-3.5 text-sm outline-none" />
               <input type="password" required placeholder="Password" value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} className="w-full bg-[#1c1c1e] border border-white/5 text-white rounded-xl p-3.5 text-sm outline-none" />
