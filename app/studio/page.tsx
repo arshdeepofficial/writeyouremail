@@ -1,7 +1,9 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useState, useEffect, useRef, FormEvent } from "react";
-import dynamic from "next/dynamic";
+import dynamicImport from "next/dynamic";
 import { createClient } from "@supabase/supabase-js";
 import {
   Mail, Sparkles, ShieldAlert, RefreshCw, Zap,
@@ -14,17 +16,17 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-// Safely import PayPal components on the client-side only (bypasses Vercel SSR build error)
-const PayPalScriptProvider = dynamic(
+// Safely import PayPal components client-side only
+const PayPalScriptProvider = dynamicImport(
   () => import("@paypal/react-paypal-js").then((m) => m.PayPalScriptProvider),
   { ssr: false }
 );
-const PayPalButtons = dynamic(
+const PayPalButtons = dynamicImport(
   () => import("@paypal/react-paypal-js").then((m) => m.PayPalButtons),
   { ssr: false }
 );
 
-// Initialize Supabase safely for browser
+// Initialize Supabase safely
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -141,10 +143,31 @@ const LABEL_CLS =
 /*  COMPONENT                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function StudioPage() {
-  // core state
+ export default function StudioPage() {
+  const [mounted, setMounted] = useState(false);
+
+  // ---- core state ----
   const [activeMode, setActiveMode] = useState<ModeId>("create");
   const [prompt, setPrompt] = useState("");
+  // ... (rest of your state variables)
+
+  useEffect(() => {
+    setMounted(true);
+    bootstrap();
+    const { data: listener } = supabase.auth.onAuthStateChange(() => bootstrap());
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // Prevent prerendering crashes on Vercel build server
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-[#000000] text-white flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // ... (rest of StudioPage return JSX)
   const [extra, setExtra] = useState<Record<string, string>>({});
   const [senderName, setSenderName] = useState("");
   const [language, setLanguage] = useState("English");
