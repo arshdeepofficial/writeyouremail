@@ -1,32 +1,41 @@
-// app/studio/components/HistorySidebar.tsx
 "use client";
+
+// app/studio/components/HistorySidebar.tsx
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { History, Clock, ChevronRight } from 'lucide-react';
 import { MODES } from '../lib/modeSchemas';
 
-// Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-interface HistoryItem {
+export interface HistoryItem {
   id: string;
   mode: string;
   content: string;
   created_at: string;
 }
 
-interface HistorySidebarProps {
+export interface HistorySidebarProps {
   userId: string | undefined;
-  refreshTrigger: number; // Used to trigger a re-fetch when a new generation completes
+  refreshTrigger: number;
+  latestItem?: HistoryItem | null;
   onSelectHistory: (content: string) => void;
 }
 
-export default function HistorySidebar({ userId, refreshTrigger, onSelectHistory }: HistorySidebarProps) {
+export default function HistorySidebar({ userId, refreshTrigger, latestItem, onSelectHistory }: HistorySidebarProps) {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Prepend latest generated item instantly
+  useEffect(() => {
+    if (latestItem) {
+      setHistory(prev => [latestItem, ...prev.filter(item => item.id !== latestItem.id)]);
+    }
+  }, [latestItem]);
+
+  // Fetch history from Supabase
   useEffect(() => {
     async function fetchHistory() {
       if (!userId || !supabaseUrl || !supabaseKey) return;
@@ -38,10 +47,11 @@ export default function HistorySidebar({ userId, refreshTrigger, onSelectHistory
           .select('id, mode, content, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
-          .limit(20); // Show last 20 generations
+          .limit(25);
 
-        if (error) throw error;
-        setHistory(data || []);
+        if (!error && data) {
+          setHistory(data);
+        }
       } catch (err) {
         console.error("Error fetching history:", err);
       } finally {
@@ -52,22 +62,18 @@ export default function HistorySidebar({ userId, refreshTrigger, onSelectHistory
     fetchHistory();
   }, [userId, refreshTrigger]);
 
-  // Helper to format date cleanly
   const formatDate = (isoString: string) => {
-    const date = new Date(isoString);
-    const today = new Date();
-    const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth();
-    
-    if (isToday) {
-      return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    try {
+      const date = new Date(isoString);
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return 'Just now';
     }
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
-  // Helper to get friendly mode name
   const getModeName = (modeId: string) => {
     const mode = MODES.find(m => m.id === modeId);
-    return mode ? mode.name : 'Outreach';
+    return mode ? mode.name : 'Outreach Message';
   };
 
   if (!userId) {
@@ -121,7 +127,7 @@ export default function HistorySidebar({ userId, refreshTrigger, onSelectHistory
           padding: '12px'
         }}
       >
-        {isLoading ? (
+        {isLoading && history.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px', color: '#6e6e73', fontSize: '13px' }}>
             Loading history...
           </div>

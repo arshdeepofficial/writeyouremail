@@ -198,7 +198,7 @@ export default function StudioPage() {
             Upgrade Plan
           </button>
 
-          {/* Interactive User Profile Trigger */}
+          {/* User Account Button */}
           {user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <button
