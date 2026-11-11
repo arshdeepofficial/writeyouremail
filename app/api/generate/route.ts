@@ -1,136 +1,185 @@
-import { NextResponse } from 'next/server';
-import { Groq } from 'groq-sdk';
-import { createClient } from '@supabase/supabase-js';
+// app/api/generate/route.ts
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import Groq from "groq-sdk";
+import { MODES, PlanTier } from "../../studio/lib/modeSchemas";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+// Vercel Serverless Function timeout configuration
+export const maxDuration = 30;
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Initialize Supabase Service Role Client (Bypasses RLS to update usage securely)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { persistSession: false },
+});
 
-// Verified Active Groq Models (Updated for 2025/2026)
-const ACTIVE_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-70b-versatile',
-  'llama-3.1-8b-instant',
-  'gemma2-9b-it'
-];
+// Initialize Groq SDK
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+});
+
+const USAGE_LIMITS: Record<PlanTier, number> = {
+  free: 5,
+  starter: 50,
+  growth: 999999, // Unlimited
+  enterprise: 999999, // Unlimited
+};
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const {
-      mode = 'create',
-      prompt = '',
-      senderName = '',
-      language = 'English',
-      tone = 'Professional & Direct',
-      persona = 'Default / General',
-      user_id = null,
-      ...extras
-    } = body;
+    const { modeId, formData, userId } = body;
 
-    if (!prompt || !prompt.trim()) {
-      return NextResponse.json({ error: 'Prompt is required.' }, { status: 400 });
-    }
-
-    // Build channel-specific context
-    let channelContext = `Target Channel Mode: ${mode.toUpperCase()}\n`;
-    if (senderName) channelContext += `Sender Name/Title: ${senderName}\n`;
-    if (persona) channelContext += `ICP Target Persona: ${persona}\n`;
-
-    Object.keys(extras).forEach((key) => {
-      if (extras[key]) {
-        channelContext += `${key.replace(/_/g, ' ')}: ${extras[key]}\n`;
-      }
-    });
-
-    const systemPrompt = `You are an elite omni-channel sales copywriter and deliverability expert.
-Generate highly realistic, human, high-converting copy for the specified channel.
-
-Output Settings:
-- Language: ${language}
-- Tone: ${tone}
-- Context & Custom Fields:
-${channelContext}
-
-Formatting Guidelines:
-- Cold Email: Punchy hook, low friction CTA. Include 2-3 catchy subject line options at the top.
-- WhatsApp / SMS / Social DMs (LinkedIn, Twitter/X, Instagram, Threads, Slack, Telegram, Discord, FB): Natural conversational chat format, concise.
-- Cold Call Script / Voicemail Drop: Spoken dialogue script with clear visual/verbal cues and objection handles.
-- Loom VSL Script: Video script with [On Screen] cues and spoken voiceover lines.
-- Direct Mail: Formal letter or postcard format with strong headline, body, CTA, and P.S.
-- Upwork / Freelance Proposal: Focus on solving client's problem first, show relevant proof, ask a closing question.
-- CSV Bulk: Generate template structure with clear tag variables.
-
-Generate output now:`;
-
-    let content = '';
-    let lastErrorMessage = '';
-
-    // Loop through active models until one succeeds
-    for (const modelName of ACTIVE_MODELS) {
-      try {
-        const completion = await groq.chat.completions.create({
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
-          ],
-          model: modelName,
-          temperature: 0.7,
-          max_tokens: 2048,
-        });
-
-        const resultText = completion.choices[0]?.message?.content || '';
-        if (resultText.trim()) {
-          content = resultText;
-          break; // Successfully generated! Stop loop.
-        }
-      } catch (err: any) {
-        lastErrorMessage = err?.message || String(err);
-        console.warn(`Groq model ${modelName} failed (${lastErrorMessage}). Trying fallback...`);
-      }
-    }
-
-    if (!content) {
+    if (!modeId || !formData) {
       return NextResponse.json(
-        { error: `AI generation temporary issue: ${lastErrorMessage || 'Service busy, please retry in a moment.'}` },
-        { status: 500 }
+        { error: "Missing required fields (modeId, formData)" },
+        { status: 400 }
       );
     }
 
-    // Record generation history & increment usage in Supabase if user_id present
-    if (user_id) {
+    let newUsageCount = 0;
+    let planTier: PlanTier = "free";
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ─── 1. VERIFY & UPDATE USAGE LIMITS (If Logged In) ───
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (userId) {
+      const { data: usageData, error: usageError } = await supabase
+        .from("usage_tracking")
+        .select("count, plan_tier, subscription_ends_at, last_reset")
+        .eq("user_id", userId)
+        .single();
+
+      if (usageError) {
+        console.error("Usage fetch error:", usageError);
+        return NextResponse.json({ error: "Database error" }, { status: 500 });
+      }
+
+      const currentCount = usageData?.count || 0;
+      planTier = (usageData?.plan_tier as PlanTier) || "free";
+      const limit = USAGE_LIMITS[planTier] || 5;
+      
+      // Enforce prepaid expiration if not free
+      if (planTier !== "free" && usageData?.subscription_ends_at) {
+        const endsAt = new Date(usageData.subscription_ends_at).getTime();
+        if (Date.now() > endsAt) {
+          return NextResponse.json({ error: "Subscription expired. Please renew." }, { status: 403 });
+        }
+      }
+
+      if (currentCount >= limit) {
+        return NextResponse.json(
+          { error: `You have reached your limit of ${limit} generations.` },
+          { status: 403 }
+        );
+      }
+
+      newUsageCount = currentCount + 1;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ─── 2. CONSTRUCT THE AI PROMPT DYNAMICALLY ───
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const modeConfig = MODES.find((m) => m.id === modeId);
+    if (!modeConfig) {
+      return NextResponse.json({ error: "Invalid mode selected" }, { status: 400 });
+    }
+
+    let promptData = "";
+    for (const [key, value] of Object.entries(formData)) {
+      // Find the label for better AI context
+      const fieldConfig = modeConfig.fields.find(f => f.id === key);
+      const label = fieldConfig ? fieldConfig.label : key;
+      promptData += `- ${label}: ${value}\n`;
+    }
+
+    const systemPrompt = `You are an elite, world-class copywriter and sales strategist. 
+Your task is to generate a highly converting message for the following category: ${modeConfig.name}.
+Goal: ${modeConfig.description}
+
+Here are the specific inputs provided by the user:
+${promptData}
+
+INSTRUCTIONS:
+1. Write ONLY the final output. Do not include conversational filler like "Here is your email:" or "Hope this helps!".
+2. Optimize for maximum conversion, psychological impact, and clarity.
+3. Keep it professional, highly personalized, and tailored to the platform format (e.g., short for SMS/Twitter, structured for Email).`;
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ─── 3. CALL THE AI (Zero Error Fallback Array) ───
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    // Per your instructions, using "openai/gpt-oss-20b" as primary. 
+    // If that specific node drops, we silently cascade to ultra-reliable active models.
+    const models = [
+      "openai/gpt-oss-20b", 
+      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant"
+    ];
+
+    let aiResult = "";
+    let lastError = null;
+
+    for (const model of models) {
       try {
-        await supabase.from('emails').insert({
-          user_id,
-          prompt,
-          content,
-          mode,
-          created_at: new Date().toISOString()
+        const completion = await groq.chat.completions.create({
+          messages: [
+            { role: "system", content: systemPrompt },
+          ],
+          model: model,
+          temperature: 0.7,
+          max_tokens: 1024,
         });
 
-        const { data: usage } = await supabase
-          .from('usage_tracking')
-          .select('count')
-          .eq('user_id', user_id)
-          .single();
-
-        if (usage) {
-          await supabase
-            .from('usage_tracking')
-            .update({ count: (usage.count || 0) + 1 })
-            .eq('user_id', user_id);
+        if (completion.choices?.[0]?.message?.content) {
+          aiResult = completion.choices[0].message.content.trim();
+          break; // Success! Exit the loop.
         }
-      } catch (dbErr) {
-        console.error('Supabase DB logging error:', dbErr);
+      } catch (err) {
+        console.warn(`Model ${model} failed, trying next...`, err);
+        lastError = err;
       }
     }
 
-    return NextResponse.json({ content });
+    if (!aiResult) {
+      console.error("All AI models failed:", lastError);
+      return NextResponse.json(
+        { error: "AI service is currently experiencing heavy load. Please try again." },
+        { status: 503 }
+      );
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ─── 4. LOG SUCCESS TO DATABASE ───
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (userId) {
+      // 1. Update Usage
+      await supabase
+        .from("usage_tracking")
+        .update({ count: newUsageCount })
+        .eq("user_id", userId);
+
+      // 2. Log History
+      await supabase.from("emails").insert({
+        user_id: userId,
+        mode: modeId,
+        content: aiResult,
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    // Return successfully to frontend hook
+    return NextResponse.json({ 
+      result: aiResult,
+      newUsageCount: newUsageCount
+    });
 
   } catch (error: any) {
-    console.error('API Route Error:', error);
-    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
+    console.error("API Error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
