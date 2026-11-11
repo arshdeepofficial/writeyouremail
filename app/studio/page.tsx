@@ -1,40 +1,42 @@
-// app/studio/page.tsx
 "use client";
 
+// app/studio/page.tsx
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import ModeDock from './components/ModeDock';
 import DynamicForm from './components/DynamicForm';
 import OutputPanel from './components/OutputPanel';
-import HistorySidebar from './components/HistorySidebar';
+import HistorySidebar, { HistoryItem } from './components/HistorySidebar';
 import PricingModal from './components/PricingModal';
 import AuthModal from './components/AuthModal';
+import ProfileModal from './components/ProfileModal';
 import SupportChatbot from './components/SupportChatbot';
 import { useGenerate } from './lib/useGenerate';
 import { usePlanGate } from './lib/usePlanGate';
-import { PlanTier, MODES } from './lib/modeSchemas';
-import { Sparkles, User, Zap, LogOut } from 'lucide-react';
+import { PlanTier } from './lib/modeSchemas';
+import { Sparkles, Zap, User, LogOut } from 'lucide-react';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function StudioPage() {
-  // State
   const [user, setUser] = useState<any>(null);
   const [userTier, setUserTier] = useState<PlanTier>('free');
   const [usageCount, setUsageCount] = useState<number>(0);
+  const [subscriptionEndsAt, setSubscriptionEndsAt] = useState<string | null>(null);
   const [selectedModeId, setSelectedModeId] = useState<string>('create');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [aiOutput, setAiOutput] = useState<string | null>(null);
   const [historyRefresh, setHistoryRefresh] = useState<number>(0);
+  const [latestHistoryItem, setLatestHistoryItem] = useState<HistoryItem | null>(null);
 
   // Modals
   const [showPricing, setShowPricing] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'signin' | 'signup'>('signup');
 
-  // Custom Hooks
   const { generate, isGenerating, genError, setGenError } = useGenerate();
   const { canAccessMode, hasCredits, getCreditsRemainingStatus } = usePlanGate(
     userTier,
@@ -42,7 +44,6 @@ export default function StudioPage() {
     !user
   );
 
-  // Fetch session & user subscription info
   useEffect(() => {
     async function loadUserSession() {
       const { data: { session } } = await supabase.auth.getSession();
@@ -62,6 +63,7 @@ export default function StudioPage() {
       } else {
         setUserTier('free');
         setUsageCount(0);
+        setSubscriptionEndsAt(null);
       }
     });
 
@@ -70,14 +72,17 @@ export default function StudioPage() {
 
   const fetchUserData = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('usage_tracking')
         .select('count, plan_tier, subscription_ends_at')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code === 'PGRST116') {
-        // Record doesn't exist yet, insert default
+      if (data) {
+        setUserTier((data.plan_tier as PlanTier) || 'free');
+        setUsageCount(data.count || 0);
+        setSubscriptionEndsAt(data.subscription_ends_at || null);
+      } else {
         await supabase.from('usage_tracking').insert({
           user_id: userId,
           count: 0,
@@ -86,15 +91,9 @@ export default function StudioPage() {
         });
         setUserTier('free');
         setUsageCount(0);
-        return;
-      }
-
-      if (data) {
-        setUserTier((data.plan_tier as PlanTier) || 'free');
-        setUsageCount(data.count || 0);
       }
     } catch (err) {
-      console.error("Error fetching user usage data:", err);
+      console.error("Error fetching user data:", err);
     }
   };
 
@@ -113,7 +112,7 @@ export default function StudioPage() {
           setUsageCount(newCount);
           setHistoryRefresh(prev => prev + 1);
         } else {
-          setUsageCount(prev => prev + 1); // Local guest count increment
+          setUsageCount(prev => prev + 1);
         }
       }
     });
@@ -124,6 +123,7 @@ export default function StudioPage() {
     setUser(null);
     setUserTier('free');
     setUsageCount(0);
+    setSubscriptionEndsAt(null);
   };
 
   return (
@@ -137,9 +137,7 @@ export default function StudioPage() {
       overflow: 'hidden',
       fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", Roboto, sans-serif'
     }}>
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {/* ─── TOP NAVIGATION BAR ─── */}
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* Top Bar */}
       <header style={{
         height: '60px',
         borderBottom: '1px solid #2a2a2c',
@@ -150,7 +148,6 @@ export default function StudioPage() {
         padding: '0 24px',
         flexShrink: 0
       }}>
-        {/* Brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '32px',
@@ -168,9 +165,7 @@ export default function StudioPage() {
           </span>
         </div>
 
-        {/* Right Section: Status, Upgrade & Auth */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {/* Usage Badge */}
           <div style={{
             padding: '6px 12px',
             borderRadius: '20px',
@@ -186,7 +181,6 @@ export default function StudioPage() {
             {getCreditsRemainingStatus()}
           </div>
 
-          {/* Upgrade Button */}
           <button
             onClick={() => setShowPricing(true)}
             style={{
@@ -204,10 +198,32 @@ export default function StudioPage() {
             Upgrade Plan
           </button>
 
-          {/* User Account Button / Sign In */}
+          {/* Interactive User Profile Trigger */}
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '13px', color: '#8e8e93' }}>{user.email}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                onClick={() => setShowProfile(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 12px',
+                  borderRadius: '10px',
+                  backgroundColor: '#1c1c1e',
+                  border: '1px solid #2a2a2c',
+                  color: '#fff',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{ width: '20px', height: '20px', borderRadius: '10px', backgroundColor: '#0a84ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <User size={12} color="#fff" />
+                </div>
+                <span>{user.email}</span>
+              </button>
+
               <button
                 onClick={handleSignOut}
                 style={{
@@ -245,23 +261,19 @@ export default function StudioPage() {
         </div>
       </header>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {/* ─── STUDIO MAIN WORKSPACE ─── */}
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* Main Studio Area */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Left Column: 30 Omni-Channel Mode Dock */}
         <ModeDock
           selectedModeId={selectedModeId}
           onSelectMode={(modeId) => {
             setSelectedModeId(modeId);
-            setFormData({}); // Reset form inputs when switching mode
+            setFormData({});
             setGenError(null);
           }}
           canAccessMode={canAccessMode}
           onUpgradeClick={() => setShowPricing(true)}
         />
 
-        {/* Center-Left Column: Dynamic Input Form */}
         <div 
           className="hide-scrollbar"
           style={{
@@ -283,24 +295,21 @@ export default function StudioPage() {
           />
         </div>
 
-        {/* Center-Right Column: Generated AI Output Panel */}
         <OutputPanel
           result={aiOutput}
           isGenerating={isGenerating}
           error={genError}
         />
 
-        {/* Rightmost Column: History Sidebar */}
         <HistorySidebar
           userId={user?.id}
           refreshTrigger={historyRefresh}
+          latestItem={latestHistoryItem}
           onSelectHistory={(content) => setAiOutput(content)}
         />
       </div>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {/* ─── MODALS & FLOATING ASSISTANT ─── */}
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {/* Modals */}
       {showPricing && (
         <PricingModal
           userId={user?.id}
@@ -312,9 +321,9 @@ export default function StudioPage() {
           }}
           onSuccess={(newTier, endsAt) => {
             setUserTier(newTier);
+            setSubscriptionEndsAt(endsAt);
             setUsageCount(0);
             setShowPricing(false);
-            alert(`Plan upgraded to ${newTier.toUpperCase()}! Your 30-day access is now active.`);
           }}
         />
       )}
@@ -330,10 +339,20 @@ export default function StudioPage() {
         />
       )}
 
-      {/* Inline Support Chatbot */}
+      {showProfile && user && (
+        <ProfileModal
+          user={user}
+          userTier={userTier}
+          usageCount={usageCount}
+          subscriptionEndsAt={subscriptionEndsAt}
+          onClose={() => setShowProfile(false)}
+          onUpgradeClick={() => setShowPricing(true)}
+          onSignOut={handleSignOut}
+        />
+      )}
+
       <SupportChatbot />
 
-      {/* Global CSS resets for smooth scrollbars */}
       <style jsx global>{`
         * { box-sizing: border-box; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
