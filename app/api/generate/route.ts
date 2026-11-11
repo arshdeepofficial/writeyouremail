@@ -8,11 +8,12 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Active, non-decommissioned Groq models with auto-fallback
-const MODELS = [
+// Verified Active Groq Models (Updated for 2025/2026)
+const ACTIVE_MODELS = [
   'llama-3.3-70b-versatile',
+  'llama-3.1-70b-versatile',
   'llama-3.1-8b-instant',
-  'mixtral-8x7b-32768'
+  'gemma2-9b-it'
 ];
 
 export async function POST(req: Request) {
@@ -33,12 +34,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Prompt is required.' }, { status: 400 });
     }
 
-    // Build channel-specific context for all 30 modes
+    // Build channel-specific context
     let channelContext = `Target Channel Mode: ${mode.toUpperCase()}\n`;
     if (senderName) channelContext += `Sender Name/Title: ${senderName}\n`;
     if (persona) channelContext += `ICP Target Persona: ${persona}\n`;
 
-    // Process all dynamic extras (e.g., emojis, gatekeeper tactic, job post, gift, rate, etc.)
     Object.keys(extras).forEach((key) => {
       if (extras[key]) {
         channelContext += `${key.replace(/_/g, ' ')}: ${extras[key]}\n`;
@@ -66,37 +66,40 @@ Formatting Guidelines:
 Generate output now:`;
 
     let content = '';
-    let lastError = null;
+    let lastErrorMessage = '';
 
-    // Multi-model fallback loop
-    for (const model of MODELS) {
+    // Loop through active models until one succeeds
+    for (const modelName of ACTIVE_MODELS) {
       try {
         const completion = await groq.chat.completions.create({
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: prompt }
           ],
-          model: model,
+          model: modelName,
           temperature: 0.7,
           max_tokens: 2048,
         });
 
-        content = completion.choices[0]?.message?.content || '';
-        if (content) break; // Successfully generated content!
+        const resultText = completion.choices[0]?.message?.content || '';
+        if (resultText.trim()) {
+          content = resultText;
+          break; // Successfully generated! Stop loop.
+        }
       } catch (err: any) {
-        console.warn(`Groq model ${model} failed, attempting fallback...`, err?.message);
-        lastError = err;
+        lastErrorMessage = err?.message || String(err);
+        console.warn(`Groq model ${modelName} failed (${lastErrorMessage}). Trying fallback...`);
       }
     }
 
     if (!content) {
       return NextResponse.json(
-        { error: lastError?.message || 'All AI models failed to respond. Please try again.' },
+        { error: `AI generation temporary issue: ${lastErrorMessage || 'Service busy, please retry in a moment.'}` },
         { status: 500 }
       );
     }
 
-    // Save to user history and update generation usage if user_id is provided
+    // Record generation history & increment usage in Supabase if user_id present
     if (user_id) {
       try {
         await supabase.from('emails').insert({
@@ -120,7 +123,7 @@ Generate output now:`;
             .eq('user_id', user_id);
         }
       } catch (dbErr) {
-        console.error('Supabase recording error:', dbErr);
+        console.error('Supabase DB logging error:', dbErr);
       }
     }
 
