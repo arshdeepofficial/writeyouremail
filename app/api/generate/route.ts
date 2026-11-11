@@ -4,13 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 import Groq from "groq-sdk";
 import { MODES, PlanTier } from "../../studio/lib/modeSchemas";
 
-// Vercel Serverless Function timeout configuration
 export const maxDuration = 30;
 
-// Initialize Supabase Service Role Client (Bypasses RLS to update usage securely)
+// Initialize Supabase Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: { persistSession: false },
 });
 
@@ -38,48 +37,55 @@ export async function POST(req: Request) {
       );
     }
 
-    let newUsageCount = 0;
+    let newUsageCount = 1;
     let planTier: PlanTier = "free";
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ─── 1. VERIFY & UPDATE USAGE LIMITS (If Logged In) ───
+    // ─── 1. VERIFY & UPDATE USAGE LIMITS (Safe Auto-Upsert) ───
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (userId) {
-      const { data: usageData, error: usageError } = await supabase
-        .from("usage_tracking")
-        .select("count, plan_tier, subscription_ends_at, last_reset")
-        .eq("user_id", userId)
-        .single();
+      try {
+        const { data: usageData, error: usageError } = await supabase
+          .from("usage_tracking")
+          .select("count, plan_tier, subscription_ends_at")
+          .eq("user_id", userId)
+          .maybeSingle(); // Safe query: returns null if row doesn't exist instead of throwing error
 
-      if (usageError) {
-        console.error("Usage fetch error:", usageError);
-        return NextResponse.json({ error: "Database error" }, { status: 500 });
-      }
-
-      const currentCount = usageData?.count || 0;
-      planTier = (usageData?.plan_tier as PlanTier) || "free";
-      const limit = USAGE_LIMITS[planTier] || 5;
-      
-      // Enforce prepaid expiration if not free
-      if (planTier !== "free" && usageData?.subscription_ends_at) {
-        const endsAt = new Date(usageData.subscription_ends_at).getTime();
-        if (Date.now() > endsAt) {
-          return NextResponse.json({ error: "Subscription expired. Please renew." }, { status: 403 });
+        if (usageError) {
+          console.warn("Usage fetch warning (defaulting to free):", usageError);
         }
-      }
 
-      if (currentCount >= limit) {
-        return NextResponse.json(
-          { error: `You have reached your limit of ${limit} generations.` },
-          { status: 403 }
-        );
-      }
+        const currentCount = usageData?.count ?? 0;
+        planTier = (usageData?.plan_tier as PlanTier) || "free";
+        const limit = USAGE_LIMITS[planTier] || 5;
 
-      newUsageCount = currentCount + 1;
+        // Check prepaid expiration if paid user
+        if (planTier !== "free" && usageData?.subscription_ends_at) {
+          const endsAt = new Date(usageData.subscription_ends_at).getTime();
+          if (Date.now() > endsAt) {
+            return NextResponse.json(
+              { error: "Subscription expired. Please renew your plan." },
+              { status: 403 }
+            );
+          }
+        }
+
+        // Check credit limit
+        if (currentCount >= limit) {
+          return NextResponse.json(
+            { error: `You have reached your limit of ${limit} generations. Please upgrade to continue.` },
+            { status: 403 }
+          );
+        }
+
+        newUsageCount = currentCount + 1;
+      } catch (dbErr) {
+        console.warn("Database pre-check error (proceeding as free):", dbErr);
+      }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ─── 2. CONSTRUCT THE AI PROMPT DYNAMICALLY ───
+    // ─── 2. CONSTRUCT PROMPT ───
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const modeConfig = MODES.find((m) => m.id === modeId);
     if (!modeConfig) {
@@ -88,8 +94,7 @@ export async function POST(req: Request) {
 
     let promptData = "";
     for (const [key, value] of Object.entries(formData)) {
-      // Find the label for better AI context
-      const fieldConfig = modeConfig.fields.find(f => f.id === key);
+      const fieldConfig = modeConfig.fields.find((f) => f.id === key);
       const label = fieldConfig ? fieldConfig.label : key;
       promptData += `- ${label}: ${value}\n`;
     }
@@ -104,18 +109,16 @@ ${promptData}
 INSTRUCTIONS:
 1. Write ONLY the final output. Do not include conversational filler like "Here is your email:" or "Hope this helps!".
 2. Optimize for maximum conversion, psychological impact, and clarity.
-3. Keep it professional, highly personalized, and tailored to the platform format (e.g., short for SMS/Twitter, structured for Email).`;
+3. Keep it professional, highly personalized, and tailored to the platform format.`;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ─── 3. CALL THE AI (Zero Error Fallback Array) ───
+    // ─── 3. CALL ACTIVE AI MODELS ───
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    
-    // Per your instructions, using "openai/gpt-oss-20b" as primary. 
-    // If that specific node drops, we silently cascade to ultra-reliable active models.
     const models = [
-      "openai/gpt-oss-20b", 
       "llama-3.3-70b-versatile",
-      "llama-3.1-8b-instant"
+      "llama-3.1-70b-versatile",
+      "llama-3.1-8b-instant",
+      "gemma2-9b-it"
     ];
 
     let aiResult = "";
@@ -124,9 +127,7 @@ INSTRUCTIONS:
     for (const model of models) {
       try {
         const completion = await groq.chat.completions.create({
-          messages: [
-            { role: "system", content: systemPrompt },
-          ],
+          messages: [{ role: "system", content: systemPrompt }],
           model: model,
           temperature: 0.7,
           max_tokens: 1024,
@@ -134,10 +135,10 @@ INSTRUCTIONS:
 
         if (completion.choices?.[0]?.message?.content) {
           aiResult = completion.choices[0].message.content.trim();
-          break; // Success! Exit the loop.
+          break; // Success!
         }
       } catch (err) {
-        console.warn(`Model ${model} failed, trying next...`, err);
+        console.warn(`Model ${model} failed, trying fallback...`, err);
         lastError = err;
       }
     }
@@ -145,40 +146,45 @@ INSTRUCTIONS:
     if (!aiResult) {
       console.error("All AI models failed:", lastError);
       return NextResponse.json(
-        { error: "AI service is currently experiencing heavy load. Please try again." },
+        { error: "AI service is currently busy. Please click Generate again." },
         { status: 503 }
       );
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ─── 4. LOG SUCCESS TO DATABASE ───
+    // ─── 4. LOG TO DATABASE (UPSERT AUTO-CREATES MISSING ROWS) ───
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (userId) {
-      // 1. Update Usage
-      await supabase
-        .from("usage_tracking")
-        .update({ count: newUsageCount })
-        .eq("user_id", userId);
+      try {
+        // Automatically creates row if missing or updates if existing
+        await supabase.from("usage_tracking").upsert({
+          user_id: userId,
+          count: newUsageCount,
+          plan_tier: planTier,
+          last_reset: new Date().toISOString(),
+        }, { onConflict: "user_id" });
 
-      // 2. Log History
-      await supabase.from("emails").insert({
-        user_id: userId,
-        mode: modeId,
-        content: aiResult,
-        created_at: new Date().toISOString(),
-      });
+        // Save email history
+        await supabase.from("emails").insert({
+          user_id: userId,
+          mode: modeId,
+          content: aiResult,
+          created_at: new Date().toISOString(),
+        });
+      } catch (saveErr) {
+        console.warn("Failed to persist history/usage (non-fatal):", saveErr);
+      }
     }
 
-    // Return successfully to frontend hook
-    return NextResponse.json({ 
+    return NextResponse.json({
       result: aiResult,
-      newUsageCount: newUsageCount
+      newUsageCount: newUsageCount,
     });
 
   } catch (error: any) {
     console.error("API Error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: error.message || "Internal server error" },
       { status: 500 }
     );
   }
