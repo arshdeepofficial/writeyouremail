@@ -1,5 +1,6 @@
-// app/studio/components/OutputPanel.tsx
 "use client";
+
+// app/studio/components/OutputPanel.tsx
 import React, { useState } from 'react';
 import { Copy, Check, AlertCircle, Bot } from 'lucide-react';
 
@@ -82,9 +83,9 @@ export default function OutputPanel({ result, isGenerating, error }: OutputPanel
         {/* Loading State */}
         {isGenerating && (
           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="skeleton-pulse" style={{ height: '16px', width: '80%', borderRadius: '8px', backgroundColor: '#2a2a2c' }} />
-            <div className="skeleton-pulse" style={{ height: '16px', width: '95%', borderRadius: '8px', backgroundColor: '#2a2a2c', animationDelay: '0.1s' }} />
-            <div className="skeleton-pulse" style={{ height: '16px', width: '60%', borderRadius: '8px', backgroundColor: '#2a2a2c', animationDelay: '0.2s' }} />
+            <div style={{ height: '16px', width: '80%', borderRadius: '8px', backgroundColor: '#2a2a2c', opacity: 0.6 }} />
+            <div style={{ height: '16px', width: '95%', borderRadius: '8px', backgroundColor: '#2a2a2c', opacity: 0.6 }} />
+            <div style={{ height: '16px', width: '60%', borderRadius: '8px', backgroundColor: '#2a2a2c', opacity: 0.6 }} />
           </div>
         )}
 
@@ -141,7 +142,7 @@ export default function OutputPanel({ result, isGenerating, error }: OutputPanel
               className="hide-scrollbar"
               style={{
                 padding: '24px',
-                paddingTop: '60px', // Space for copy button
+                paddingTop: '60px',
                 color: '#e5e5ea',
                 fontSize: '15px',
                 lineHeight: '1.6',
@@ -156,16 +157,6 @@ export default function OutputPanel({ result, isGenerating, error }: OutputPanel
           </>
         )}
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.4; }
-        }
-        .skeleton-pulse {
-          animation: pulse 1.5s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
-}s
+}
