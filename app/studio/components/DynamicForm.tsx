@@ -1,3 +1,5 @@
+"use client";
+
 // app/studio/components/DynamicForm.tsx
 import React from 'react';
 import { MODES } from '../lib/modeSchemas';
@@ -20,7 +22,6 @@ export default function DynamicForm({
   isGenerating,
   hasCredits
 }: DynamicFormProps) {
-  
   const currentMode = MODES.find((m) => m.id === modeId);
 
   if (!currentMode) {
@@ -31,7 +32,6 @@ export default function DynamicForm({
     );
   }
 
-  // Common input styling to match Apple HIG dark mode
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '14px 16px',
@@ -48,32 +48,17 @@ export default function DynamicForm({
   return (
     <form 
       onSubmit={onSubmit} 
-      style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '20px' 
-      }}
+      style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}
     >
-      {/* Header Info */}
       <div style={{ marginBottom: '8px' }}>
-        <h2 style={{ 
-          margin: '0 0 6px 0', 
-          fontSize: '22px', 
-          fontWeight: 600,
-          color: '#ffffff' 
-        }}>
+        <h2 style={{ margin: '0 0 6px 0', fontSize: '22px', fontWeight: 600, color: '#ffffff' }}>
           {currentMode.name}
         </h2>
-        <p style={{ 
-          margin: 0, 
-          fontSize: '14px', 
-          color: '#8e8e93' 
-        }}>
+        <p style={{ margin: 0, fontSize: '14px', color: '#8e8e93' }}>
           {currentMode.description}
         </p>
       </div>
 
-      {/* Dynamic Fields generator */}
       {currentMode.fields.map((field) => (
         <div key={field.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <label 
@@ -127,7 +112,6 @@ export default function DynamicForm({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
-              {/* Custom dropdown arrow */}
               <div style={{
                 position: 'absolute',
                 right: '16px',
@@ -156,7 +140,6 @@ export default function DynamicForm({
         </div>
       ))}
 
-      {/* Submit Button */}
       <button
         type="submit"
         disabled={isGenerating || !hasCredits}
@@ -183,18 +166,6 @@ export default function DynamicForm({
           transition: 'all 0.2s ease',
           opacity: isGenerating ? 0.8 : 1
         }}
-        onMouseOver={(e) => {
-          if (!isGenerating && hasCredits) {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 10px 25px rgba(10, 132, 255, 0.4)';
-          }
-        }}
-        onMouseOut={(e) => {
-          if (!isGenerating && hasCredits) {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(10, 132, 255, 0.3)';
-          }
-        }}
       >
         {isGenerating ? (
           <>
@@ -210,17 +181,6 @@ export default function DynamicForm({
           </>
         )}
       </button>
-
-      {/* Global animation for the spinner */}
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-      `}</style>
     </form>
   );
 }

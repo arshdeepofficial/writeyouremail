@@ -1,4 +1,5 @@
 // app/studio/components/OutputPanel.tsx
+"use client";
 import React, { useState } from 'react';
 import { Copy, Check, AlertCircle, Bot } from 'lucide-react';
 

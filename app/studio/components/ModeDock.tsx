@@ -1,21 +1,26 @@
+"use client";
+
 // app/studio/components/ModeDock.tsx
 import React from 'react';
 import { MODES, PlanTier } from '../lib/modeSchemas';
 import { 
   Mail, Sparkles, MessageSquareReply, RefreshCw, Inbox, 
-  Users, Twitter, MessageCircle, Video, Briefcase, 
-  Send, Instagram, ListOrdered, Hash, Gamepad2, 
+  Users, MessageCircle, Video, Briefcase, 
+  Send, ListOrdered, Hash, Gamepad2, 
   PhoneCall, Smartphone, AtSign, Mailbox, Table, 
   Music, Mic, Voicemail, MessageSquare, Shield, 
-  Calendar, Target, Lock 
+  Calendar, Target, Lock, Share2, Camera
 } from 'lucide-react';
 
-// Safely map string icon names from our schema to actual Lucide components
+// Map string icon names safely using verified standard Lucide icons
 const IconMap: Record<string, React.FC<any>> = {
   Mail, Sparkles, MessageSquareReply, RefreshCw, Inbox,
-  Linkedin: Users, // Fallback for removed brand icons
-  Twitter, MessageCircle, Video, Briefcase,
-  Send, Instagram, ListOrdered, Hash, Gamepad2,
+  Linkedin: Share2,
+  Twitter: AtSign,
+  MessageCircle, Video, Briefcase,
+  Send, 
+  Instagram: Camera, 
+  ListOrdered, Hash, Gamepad2,
   PhoneCall, Smartphone, AtSign, Mailbox, Table,
   Music, Mic, Voicemail, MessageSquare, Shield,
   Users, Calendar, Target
@@ -35,7 +40,6 @@ export default function ModeDock({
   onUpgradeClick
 }: ModeDockProps) {
   
-  // Group modes by their tier for organized UI
   const starterModes = MODES.filter(m => m.tier === 'starter');
   const growthModes = MODES.filter(m => m.tier === 'growth');
   const enterpriseModes = MODES.filter(m => m.tier === 'enterprise');
@@ -58,7 +62,7 @@ export default function ModeDock({
         {modes.map((mode) => {
           const isSelected = selectedModeId === mode.id;
           const isLocked = !canAccessMode(mode.tier);
-          const IconComponent = IconMap[mode.iconName] || MessageSquare; // Fallback
+          const IconComponent = IconMap[mode.iconName] || MessageSquare;
 
           return (
             <button

@@ -1,4 +1,5 @@
 // app/studio/components/PricingModal.tsx
+"use client";
 import React, { useEffect, useState } from 'react';
 import { X, Check, Shield } from 'lucide-react';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';

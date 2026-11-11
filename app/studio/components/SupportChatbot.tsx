@@ -1,3 +1,4 @@
+"use client";
 // app/studio/components/SupportChatbot.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, MessageCircle } from 'lucide-react';
