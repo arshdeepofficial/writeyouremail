@@ -106,8 +106,11 @@ export default function StudioPage() {
     setAiOutput(null);
 
     await generate(selectedModeId, formData, user?.id, {
-      onSuccess: (result, newCount) => {
+      onSuccess: (result, newCount, historyItem) => {
         setAiOutput(result);
+        if (historyItem) {
+          setLatestHistoryItem(historyItem);
+        }
         if (user) {
           setUsageCount(newCount);
           setHistoryRefresh(prev => prev + 1);

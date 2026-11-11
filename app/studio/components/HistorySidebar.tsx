@@ -28,14 +28,17 @@ export default function HistorySidebar({ userId, refreshTrigger, latestItem, onS
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Prepend latest generated item instantly
+  // Instantly prepend new item to list
   useEffect(() => {
     if (latestItem) {
-      setHistory(prev => [latestItem, ...prev.filter(item => item.id !== latestItem.id)]);
+      setHistory(prev => {
+        const filtered = prev.filter(item => item.id !== latestItem.id);
+        return [latestItem, ...filtered];
+      });
     }
   }, [latestItem]);
 
-  // Fetch history from Supabase
+  // Fetch initial history from Supabase
   useEffect(() => {
     async function fetchHistory() {
       if (!userId || !supabaseUrl || !supabaseKey) return;
@@ -49,7 +52,7 @@ export default function HistorySidebar({ userId, refreshTrigger, latestItem, onS
           .order('created_at', { ascending: false })
           .limit(25);
 
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           setHistory(data);
         }
       } catch (err) {

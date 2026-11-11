@@ -2,7 +2,7 @@
 import { useState } from 'react';
 
 interface GenerateOptions {
-  onSuccess?: (result: string, newUsageCount: number) => void;
+  onSuccess?: (result: string, newUsageCount: number, historyItem?: any) => void;
   onError?: (error: string) => void;
 }
 
@@ -43,24 +43,21 @@ export function useGenerate() {
           throw new Error('AI returned an empty response');
         }
 
-        // Success!
         success = true;
         if (options?.onSuccess) {
-          options.onSuccess(data.result, data.newUsageCount);
+          options.onSuccess(data.result, data.newUsageCount, data.historyItem);
         }
         
       } catch (err: any) {
         console.error(`Generation attempt ${attempt} failed:`, err);
         
         if (attempt >= maxRetries) {
-          // Only show error to user after all silent retries fail
           const errorMessage = err.message || 'AI service is currently overloaded. Please try again.';
           setGenError(errorMessage);
           if (options?.onError) {
             options.onError(errorMessage);
           }
         } else {
-          // Wait 1.5 seconds before retrying to let the API breathe
           await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
