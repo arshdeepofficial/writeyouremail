@@ -12,18 +12,21 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
-} from "lucide-react";
+} from "lucide-[#1c1c1e]" ? "lucide-react" : "lucide-react";
 
 interface OutputPanelProps {
-  content: any;
+  content?: any;
+  result?: any;
   loading?: boolean;
+  isGenerating?: boolean;
   genError?: string | null;
+  error?: string | null;
 }
 
 function normalizeContent(content: any) {
   if (!content) return null;
 
-  // New rich object from API
+  // Rich object from API
   if (typeof content === "object" && (content.body || content.subject)) {
     return {
       subject: content.subject || "",
@@ -37,7 +40,7 @@ function normalizeContent(content: any) {
     };
   }
 
-  // Legacy string (history items / old gens)
+  // Legacy string or plaintext
   if (typeof content === "string") {
     const subjectMatch = content.match(/^Subject:\s*(.*)$/im);
     const subject = subjectMatch ? subjectMatch[1].trim() : "";
@@ -59,14 +62,22 @@ function normalizeContent(content: any) {
 
 export default function OutputPanel({
   content,
+  result,
   loading = false,
+  isGenerating = false,
   genError = null,
+  error = null,
 }: OutputPanelProps) {
   const [copied, setCopied] = useState<"all" | "sanitized" | "plain" | null>(null);
   const [showAB, setShowAB] = useState(true);
   const [showSanitized, setShowSanitized] = useState(false);
 
-  const data = useMemo(() => normalizeContent(content), [content]);
+  // Fallback prop aliasing for backwards compatibility with page.tsx
+  const activeContent = result !== undefined ? result : content;
+  const isLoading = Boolean(isGenerating || loading);
+  const activeError = error || genError;
+
+  const data = useMemo(() => normalizeContent(activeContent), [activeContent]);
   const score = data?.spamScore;
 
   const copyText = async (text: string, key: "all" | "sanitized" | "plain") => {
@@ -75,7 +86,7 @@ export default function OutputPanel({
       setCopied(key);
       setTimeout(() => setCopied(null), 2000);
     } catch {
-      // silent — no alert() popups per product rules
+      // Silent copy fallback
     }
   };
 
@@ -95,7 +106,7 @@ export default function OutputPanel({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex-1 bg-[#0a0a0a] flex items-center justify-center border-l border-[#1c1c1e]">
         <div className="text-center">
@@ -108,7 +119,7 @@ export default function OutputPanel({
     );
   }
 
-  if (genError) {
+  if (activeError) {
     return (
       <div className="flex-1 bg-[#0a0a0a] flex items-center justify-center border-l border-[#1c1c1e] p-6">
         <div className="max-w-md w-full p-5 rounded-2xl border border-[#ff453a40] bg-[#ff453a10]">
@@ -116,7 +127,7 @@ export default function OutputPanel({
             <ShieldAlert size={18} />
             Generation failed
           </div>
-          <p className="text-[#d1d1d6] text-sm leading-relaxed">{genError}</p>
+          <p className="text-[#d1d1d6] text-sm leading-relaxed">{activeError}</p>
         </div>
       </div>
     );
@@ -173,18 +184,21 @@ export default function OutputPanel({
 
         <div className="flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={openInGmail}
             className="flex items-center gap-2 px-4 py-2 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white rounded-full text-sm font-medium transition-all"
           >
             <ExternalLink size={14} /> Gmail
           </button>
           <button
+            type="button"
             onClick={openInOutlook}
             className="flex items-center gap-2 px-4 py-2 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white rounded-full text-sm font-medium transition-all"
           >
             <ExternalLink size={14} /> Outlook
           </button>
           <button
+            type="button"
             onClick={() => copyText(fullCopy, "all")}
             className="flex items-center gap-2 px-4 py-2 bg-[#0a84ff] hover:bg-[#007aff] text-white rounded-full text-sm font-medium transition-all"
           >
@@ -194,7 +208,7 @@ export default function OutputPanel({
         </div>
       </div>
 
-      {/* Spam triggers */}
+      {/* Spam Triggers */}
       {data.spamTriggers?.length > 0 && (
         <div className="mb-8 p-4 bg-[#ff453a10] border border-[#ff453a30] rounded-xl">
           <h4 className="text-[#ff453a] text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -213,7 +227,7 @@ export default function OutputPanel({
         </div>
       )}
 
-      {/* A/B subjects */}
+      {/* A/B Subject Line Variations */}
       {data.subjectVariations?.length > 0 && (
         <div className="mb-8 border border-[#1c1c1e] rounded-xl overflow-hidden">
           <button
@@ -249,7 +263,7 @@ export default function OutputPanel({
         </div>
       )}
 
-      {/* Primary output */}
+      {/* Primary Output Content */}
       <div className="space-y-6">
         {data.subject ? (
           <div>
@@ -271,7 +285,7 @@ export default function OutputPanel({
           </div>
         </div>
 
-        {/* Plain text one-click */}
+        {/* Plain Text Button */}
         <div className="flex flex-wrap gap-2 pt-2">
           <button
             type="button"
@@ -283,7 +297,7 @@ export default function OutputPanel({
           </button>
         </div>
 
-        {/* Sanitized version */}
+        {/* Sanitized Version (Spam-Free) */}
         {data.sanitizedBody ? (
           <div className="mt-6 pt-6 border-t border-[#1c1c1e]">
             <button
