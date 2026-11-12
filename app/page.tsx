@@ -1,255 +1,519 @@
 "use client";
 
+import React, { useState } from "react";
 import Link from "next/link";
-import { 
-  Sparkles, 
-  ArrowRight, 
-  Zap, 
-  ShieldCheck, 
-  Mail, 
-  Target, 
+import Logo from "./studio/components/Logo";
+import {
+  ArrowRight,
+  Check,
+  Zap,
+  ShieldCheck,
+  BarChart3,
+  Sparkles,
+  Mail,
+  MessageSquare,
+  Star,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
+  ExternalLink,
+  ShieldAlert,
   Send,
-  Phone
+  Layers,
+  MousePointerClick,
+  Users,
 } from "lucide-react";
 
 export default function LandingPage() {
-  return (
-    <div
-      className="min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white relative overflow-x-hidden"
-      style={{
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-      }}
-    >
-      {/* Ambient Apple Radial Glow */}
-      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1200px] h-[600px] bg-gradient-to-b from-[#0a84ff]/20 via-[#0a84ff]/5 to-transparent blur-[140px] pointer-events-none rounded-full" />
+  const [activeTab, setActiveTab] = useState<"cold" | "linkedin" | "reply">("cold");
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-      {/* Header Navigation */}
-      <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-[#000000]/70 backdrop-blur-2xl saturate-150 transition-all">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2 font-semibold text-lg tracking-tight group">
-            <div className="w-8 h-8 bg-gradient-to-br from-[#0a84ff] to-[#5e5ce6] text-white flex items-center justify-center font-bold text-sm rounded-xl shadow-lg shadow-[#0a84ff]/20 group-hover:shadow-[#0a84ff]/40 transition-all">
-              W
-            </div>
-            <span className="font-bold tracking-tight text-white">WriteYourEmail</span>
-          </Link>
-          <div className="flex items-center space-x-8">
-            <Link href="/pricing" className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition hidden sm:block">
+  const toggleFaq = (index: number) => {
+    setOpenFaq(openFaq === index ? null : index);
+  };
+
+  return (
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-[#0a84ff30] selection:text-[#0a84ff] overflow-x-hidden">
+      {/* 1. Header Navigation */}
+      <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-black/70 border-b border-[#1c1c1e]">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Logo size={36} showText={true} />
+          </div>
+
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#86868b]">
+            <a href="#features" className="hover:text-white transition-colors">
+              Features
+            </a>
+            <a href="#modes" className="hover:text-white transition-colors">
+              30 Outreach Modes
+            </a>
+            <a href="#pricing" className="hover:text-white transition-colors">
               Pricing
-            </Link>
+            </a>
+            <a href="#faq" className="hover:text-white transition-colors">
+              FAQ
+            </a>
+          </nav>
+
+          <div className="flex items-center gap-4">
             <Link
               href="/studio"
-              className="text-sm bg-white text-black px-5 py-2.5 rounded-full font-semibold hover:bg-[#e5e5ea] transition-colors shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+              className="px-5 py-2.5 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-sm rounded-full transition-all duration-200 shadow-lg shadow-[#0a84ff30] flex items-center gap-2 group"
             >
-              Enter Studio
+              Open Studio
+              <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="relative z-10 pt-32 pb-20">
-        {/* HERO SECTION */}
-        <section className="max-w-7xl mx-auto px-6 text-center mb-24">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#1c1c1e] border border-white/10 text-[#0a84ff] text-xs font-bold uppercase tracking-wider mb-8 shadow-xl shadow-[#0a84ff]/10">
-            <Sparkles className="w-4 h-4" /> V7.0 Titan Engine Live
+      {/* 2. Hero Section */}
+      <section className="pt-36 pb-20 px-6 max-w-7xl mx-auto text-center relative">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-gradient-to-r from-[#0a84ff20] via-[#bf5af220] to-transparent blur-[120px] pointer-events-none rounded-full" />
+
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#141415] border border-[#2c2c2e] text-xs font-semibold text-[#0a84ff] mb-8">
+          <Sparkles size={14} />
+          <span>New: Phase 1 Deliverability & Spam Sanitizer Engine Live</span>
+        </div>
+
+        <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight max-w-5xl mx-auto leading-[1.1] mb-6 bg-gradient-to-b from-white via-[#e1e1e6] to-[#86868b] bg-clip-text text-transparent">
+          Write High-Converting Outreach That Never Hits Spam.
+        </h1>
+
+        <p className="text-lg md:text-xl text-[#86868b] max-w-2xl mx-auto mb-10 leading-relaxed">
+          30 omni-channel AI outreach modes tailored for Cold Email, LinkedIn DMs, WhatsApp, and Sales Sequences. Powered by real-time deliverability scoring and 5 A/B subject lines.
+        </p>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+          <Link
+            href="/studio"
+            className="w-full sm:w-auto px-8 py-4 bg-[#0a84ff] hover:bg-[#007aff] text-white font-bold text-base rounded-full transition-all duration-200 shadow-xl shadow-[#0a84ff30] flex items-center justify-center gap-3 group"
+          >
+            Start Writing Free
+            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+          <a
+            href="#demo"
+            className="w-full sm:w-auto px-8 py-4 bg-[#141415] hover:bg-[#1c1c1e] text-white font-semibold text-base rounded-full border border-[#2c2c2e] transition-all flex items-center justify-center gap-2"
+          >
+            Explore 30 Modes
+          </a>
+        </div>
+
+        {/* Social Proof Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto pt-8 border-t border-[#1c1c1e] text-left">
+          <div>
+            <div className="text-3xl font-bold text-white mb-1">98.4%</div>
+            <div className="text-xs text-[#86868b]">Average Deliverability Score</div>
           </div>
+          <div>
+            <div className="text-3xl font-bold text-[#bf5af2] mb-1">30 Modes</div>
+            <div className="text-xs text-[#86868b]">Omni-Channel Coverage</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-[#30d158] mb-1">5 Variations</div>
+            <div className="text-xs text-[#86868b]">Subject Line A/B Matrix</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-[#0a84ff] mb-1">1-Click</div>
+            <div className="text-xs text-[#86868b]">Open in Gmail & Outlook</div>
+          </div>
+        </div>
+      </section>
 
-          <h1 className="text-5xl sm:text-7xl md:text-[5.5rem] font-black tracking-tighter mb-8 bg-gradient-to-b from-white via-[#f5f5f7] to-[#86868b] bg-clip-text text-transparent leading-[1.05] max-w-5xl mx-auto">
-            Stop sending emails <br className="hidden sm:inline" /> that get ignored.
-          </h1>
-
-          <p className="text-lg sm:text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium leading-relaxed">
-            The high-converting AI outreach engine built for elite sales reps. Instantly generate emails, LinkedIn DMs, and cold call scripts that actually get replies.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
-            <Link
-              href="/studio"
-              className="w-full sm:w-auto px-8 py-4 bg-[#0a84ff] text-white text-base font-bold rounded-full hover:bg-[#0071e3] transition-all shadow-[0_0_30px_rgba(10,132,255,0.3)] hover:shadow-[0_0_40px_rgba(10,132,255,0.4)] hover:scale-[1.02] flex items-center justify-center gap-2"
-            >
-              Start Generating Free <ArrowRight className="w-5 h-5" />
-            </Link>
-            <div className="text-sm font-medium text-[#86868b] flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" /> No credit card required
+      {/* 3. Hero App Preview / Live Interactive Mockup */}
+      <section id="demo" className="py-12 px-6 max-w-6xl mx-auto">
+        <div className="rounded-3xl bg-[#141415] border border-[#2c2c2e] p-4 md:p-8 shadow-2xl relative overflow-hidden">
+          <div className="flex items-center justify-between border-b border-[#2c2c2e] pb-4 mb-6">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-[#ff5f56]" />
+              <div className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
+              <div className="w-3 h-3 rounded-full bg-[#27c93f]" />
+              <span className="ml-2 text-xs font-mono text-[#86868b]">WriteYourEmail.com / Studio Preview</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab("cold")}
+                className={`px-3 py-1 text-xs rounded-full font-medium transition-all ${
+                  activeTab === "cold" ? "bg-[#0a84ff] text-white" : "bg-[#1c1c1e] text-[#86868b]"
+                }`}
+              >
+                Cold Email
+              </button>
+              <button
+                onClick={() => setActiveTab("linkedin")}
+                className={`px-3 py-1 text-xs rounded-full font-medium transition-all ${
+                  activeTab === "linkedin" ? "bg-[#0a84ff] text-white" : "bg-[#1c1c1e] text-[#86868b]"
+                }`}
+              >
+                LinkedIn DM
+              </button>
+              <button
+                onClick={() => setActiveTab("reply")}
+                className={`px-3 py-1 text-xs rounded-full font-medium transition-all ${
+                  activeTab === "reply" ? "bg-[#0a84ff] text-white" : "bg-[#1c1c1e] text-[#86868b]"
+                }`}
+              >
+                Objection Reply
+              </button>
             </div>
           </div>
 
-          {/* Abstract UI Mockup */}
-          <div className="relative max-w-5xl mx-auto rounded-t-3xl bg-[#141415] border border-white/10 shadow-2xl overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-            
-            {/* Window Header */}
-            <div className="h-12 border-b border-white/5 flex items-center px-4 gap-2 bg-[#000000]/50 backdrop-blur-md">
-              <div className="w-3 h-3 rounded-full bg-[#ff453a]" />
-              <div className="w-3 h-3 rounded-full bg-[#ffd60a]" />
-              <div className="w-3 h-3 rounded-full bg-[#30d158]" />
-              <div className="ml-4 px-3 py-1 rounded-md bg-[#1c1c1e] text-[10px] font-medium text-[#86868b] flex items-center gap-2">
-                <ShieldCheck className="w-3 h-3" /> studio.writeyouremail.com
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            {/* Input Side */}
+            <div className="md:col-span-5 bg-[#0a0a0a] p-5 rounded-2xl border border-[#1c1c1e] space-y-4">
+              <div className="text-xs font-bold text-[#86868b] uppercase tracking-wider">
+                {activeTab === "cold" ? "Cold Outreach Prompt" : activeTab === "linkedin" ? "LinkedIn Connection" : "Objection Handler"}
               </div>
-            </div>
-
-            {/* Fake App Content */}
-            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 opacity-80">
-              <div className="col-span-1 space-y-4">
-                <div className="h-4 w-24 bg-[#2c2c2e] rounded-full" />
-                <div className="h-10 w-full bg-[#1c1c1e] rounded-xl border border-white/5" />
-                <div className="h-24 w-full bg-[#1c1c1e] rounded-xl border border-white/5" />
-                <div className="h-10 w-full bg-[#0a84ff] rounded-xl" />
-              </div>
-              <div className="col-span-2 space-y-4">
-                <div className="h-4 w-32 bg-[#2c2c2e] rounded-full" />
-                <div className="h-64 w-full bg-[#1c1c1e] rounded-xl border border-white/5 p-4 flex flex-col gap-3">
-                  <div className="h-4 w-3/4 bg-[#2c2c2e] rounded-full" />
-                  <div className="h-4 w-full bg-[#2c2c2e] rounded-full" />
-                  <div className="h-4 w-5/6 bg-[#2c2c2e] rounded-full" />
-                  <div className="h-4 w-1/2 bg-[#2c2c2e] rounded-full mt-4" />
+              <div>
+                <label className="text-xs text-[#d1d1d6] block mb-1">Prospect Name / Company</label>
+                <div className="px-3 py-2 bg-[#1c1c1e] border border-[#2c2c2e] rounded-lg text-sm text-white">
+                  {activeTab === "cold" ? "Alex Rivera @ ScaleUp Labs" : activeTab === "linkedin" ? "Sarah Chen @ Stripe" : "Marcus Vance @ Apex Corp"}
                 </div>
               </div>
-            </div>
-            <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#000000] to-transparent" />
-          </div>
-        </section>
-
-        {/* SOCIAL PROOF */}
-        <section className="border-y border-white/5 bg-[#0a0a0a] py-10 mb-24">
-          <div className="max-w-7xl mx-auto px-6 text-center">
-            <p className="text-xs font-bold text-[#86868b] uppercase tracking-widest mb-6">
-              Empowering outreach for high-performing teams
-            </p>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale text-white">
-              <div className="flex items-center gap-2 font-bold text-xl"><div className="w-6 h-6 bg-white rounded-md" /> Acme Corp</div>
-              <div className="flex items-center gap-2 font-bold text-xl"><div className="w-6 h-6 bg-white rounded-full" /> GlobalTech</div>
-              <div className="flex items-center gap-2 font-bold text-xl"><div className="w-6 h-6 bg-white rotate-45" /> Nexus</div>
-              <div className="flex items-center gap-2 font-bold text-xl"><div className="w-6 h-6 border-2 border-white rounded-full" /> Vertex</div>
-            </div>
-          </div>
-        </section>
-
-        {/* BENTO BOX FEATURES GRID */}
-        <section className="max-w-7xl mx-auto px-6 mb-32">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4 text-white">Everything you need to close.</h2>
-            <p className="text-[#86868b] text-lg">A complete toolkit for modern outbound sales.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Bento 1: 11 Modes */}
-            <div className="md:col-span-2 bg-[#141415] rounded-[2rem] border border-white/5 p-8 relative overflow-hidden group hover:border-white/10 transition-all">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-[#0a84ff]/10 rounded-full blur-[80px] -mr-20 -mt-20 transition-all group-hover:bg-[#0a84ff]/20" />
-              <div className="relative z-10">
-                <Target className="w-10 h-10 text-[#0a84ff] mb-6" />
-                <h3 className="text-2xl font-bold mb-3 text-white">11 Omni-Channel Modes</h3>
-                <p className="text-[#86868b] mb-8 max-w-md">
-                  Don&apos;t just stick to email. Generate highly personalized outreach for every platform your prospects live on.
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
-                    <Mail className="w-4 h-4 text-[#0a84ff]" /> Cold Email
-                  </span>
-                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
-                    <svg className="w-4 h-4 fill-[#0a66c2]" viewBox="0 0 24 24"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/></svg> LinkedIn DM
-                  </span>
-                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
-                    <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg> Twitter/X DM
-                  </span>
-                  <span className="flex items-center gap-2 bg-[#1c1c1e] border border-white/5 px-4 py-2 rounded-full text-sm font-medium text-white">
-                    <Phone className="w-4 h-4 text-emerald-500" /> Cold Call
-                  </span>
+              <div>
+                <label className="text-xs text-[#d1d1d6] block mb-1">Value Proposition</label>
+                <div className="px-3 py-2 bg-[#1c1c1e] border border-[#2c2c2e] rounded-lg text-sm text-white">
+                  {activeTab === "cold" ? "Automate outbound SDR workflows with AI" : activeTab === "linkedin" ? "Scaling B2B outbound pipeline without spam" : "Guaranteed 25% boost in cold email open rates"}
                 </div>
               </div>
-            </div>
-
-            {/* Bento 2: Spam Shield */}
-            <div className="md:col-span-1 bg-[#141415] rounded-[2rem] border border-white/5 p-8 relative overflow-hidden group hover:border-white/10 transition-all">
-              <div className="absolute bottom-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-full blur-[60px] -mr-10 -mb-10 transition-all group-hover:bg-emerald-500/20" />
-              <div className="relative z-10">
-                <ShieldCheck className="w-10 h-10 text-emerald-400 mb-6" />
-                <h3 className="text-2xl font-bold mb-3 text-white">Spam Shield</h3>
-                <p className="text-[#86868b]">
-                  Automatic 1-click trigger word sanitization ensures maximum inbox deliverability. Keep your domain reputation pristine.
-                </p>
-              </div>
-            </div>
-
-            {/* Bento 3: One Click Launch */}
-            <div className="md:col-span-1 bg-[#141415] rounded-[2rem] border border-white/5 p-8 relative overflow-hidden group hover:border-white/10 transition-all">
-               <div className="absolute top-0 left-0 w-48 h-48 bg-purple-500/10 rounded-full blur-[60px] -ml-10 -mt-10 transition-all group-hover:bg-purple-500/20" />
-               <div className="relative z-10">
-                 <Send className="w-10 h-10 text-purple-400 mb-6" />
-                 <h3 className="text-2xl font-bold mb-3 text-white">1-Click Launch</h3>
-                 <p className="text-[#86868b]">
-                   Push generated drafts directly into Gmail or your desktop mail app with pre-filled subjects and bodies.
-                 </p>
-               </div>
-            </div>
-
-            {/* Bento 4: Fallback Engine */}
-            <div className="md:col-span-2 bg-[#141415] rounded-[2rem] border border-white/5 p-8 relative overflow-hidden group hover:border-white/10 transition-all flex flex-col sm:flex-row items-center justify-between gap-8">
-               <div className="relative z-10 w-full sm:w-1/2">
-                 <Zap className="w-10 h-10 text-amber-400 mb-6" />
-                 <h3 className="text-2xl font-bold mb-3 text-white">Groq Powered</h3>
-                 <p className="text-[#86868b]">
-                   Lightning-fast generation using a resilient 3-tier model fallback loop (Llama 3, Mixtral, GPT). Silent retry logic means you never see an error.
-                 </p>
-               </div>
-               <div className="w-full sm:w-1/2 h-32 bg-[#1c1c1e] rounded-xl border border-white/5 flex items-center justify-center relative overflow-hidden">
-                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:14px_24px]" />
-                 <div className="px-6 py-3 bg-black border border-white/10 rounded-lg text-xs font-mono text-emerald-400 z-10 shadow-2xl">
-                   &gt; generation_complete in 0.8s
-                 </div>
-               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA SECTION */}
-        <section className="max-w-5xl mx-auto px-6 mb-20">
-          <div className="bg-gradient-to-br from-[#0a84ff] to-[#5e5ce6] rounded-[3rem] p-10 md:p-16 text-center relative overflow-hidden shadow-2xl shadow-[#0a84ff]/20">
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-white mb-6 relative z-10">
-              Ready to book more meetings?
-            </h2>
-            <p className="text-white/80 text-lg mb-10 max-w-2xl mx-auto relative z-10 font-medium">
-              Join the smart sales reps who are automating their outbound outreach. 
-              Get started for free, upgrade when you need scale.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 relative z-10">
               <Link
                 href="/studio"
-                className="w-full sm:w-auto px-8 py-4 bg-white text-black font-bold rounded-full hover:bg-[#f5f5f7] transition-all hover:scale-105"
+                className="w-full py-2.5 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-xs rounded-lg transition-all flex items-center justify-center gap-2"
               >
-                Go to Studio
-              </Link>
-              <Link
-                href="/pricing"
-                className="w-full sm:w-auto px-8 py-4 bg-black/20 text-white font-bold rounded-full border border-white/20 hover:bg-black/40 transition-all backdrop-blur-md"
-              >
-                View Pricing
+                <Zap size={14} /> Generate High-Deliverability Output
               </Link>
             </div>
-          </div>
-        </section>
-      </main>
 
-      {/* Footer */}
-      <footer className="border-t border-white/5 bg-[#000000] py-12">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-gradient-to-br from-[#0a84ff] to-[#5e5ce6] text-white flex items-center justify-center font-bold text-[10px] rounded-md">
-              W
+            {/* Output Side */}
+            <div className="md:col-span-7 bg-[#0a0a0a] p-5 rounded-2xl border border-[#1c1c1e] space-y-5">
+              {/* Scorecard Widget */}
+              <div className="p-4 bg-[#141415] rounded-xl border border-[#2c2c2e] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full border-4 border-[#30d158] flex items-center justify-center font-bold text-lg text-[#30d158]">
+                    96
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-white flex items-center gap-1.5">
+                      Deliverability Score <ShieldCheck size={16} className="text-[#30d158]" />
+                    </div>
+                    <div className="text-xs text-[#86868b]">Zero spam triggers detected. Safe for inbox placement.</div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <span className="px-3 py-1 bg-[#1c1c1e] text-[#d1d1d6] text-xs font-medium rounded-full flex items-center gap-1">
+                    <ExternalLink size={12} /> Gmail Ready
+                  </span>
+                </div>
+              </div>
+
+              {/* Subject Variations */}
+              <div className="p-3 bg-[#141415] rounded-xl border border-[#1c1c1e]">
+                <div className="text-xs font-semibold text-[#bf5af2] mb-2 flex items-center gap-1.5">
+                  <BarChart3 size={14} /> Top A/B Subject Line
+                </div>
+                <div className="text-sm text-white font-medium bg-[#0a0a0a] p-2.5 rounded-lg border border-[#1c1c1e]">
+                  {activeTab === "cold"
+                    ? "Quick question regarding ScaleUp Labs outbound rate"
+                    : activeTab === "linkedin"
+                    ? "Loved your post on B2B pipeline growth"
+                    : "Re: Budget constraints for Q3 outreach"}
+                </div>
+              </div>
+
+              {/* Content Output */}
+              <div>
+                <div className="text-xs font-bold text-[#86868b] uppercase tracking-wider mb-2">Message Body</div>
+                <div className="text-sm text-[#d1d1d6] leading-relaxed whitespace-pre-line bg-[#141415] p-4 rounded-xl border border-[#1c1c1e]">
+                  {activeTab === "cold" &&
+                    "Hi Alex,\n\nI noticed ScaleUp Labs is rapidly expanding its SDR team this quarter.\n\nWe helped a similar team cut outbound research time by 70% while improving inbox deliverability scores from 64% to 98%.\n\nWould you be open to a 10-minute call next Tuesday to see how?"}
+                  {activeTab === "linkedin" &&
+                    "Hi Sarah,\n\nYour recent breakdown on scaling enterprise pipelines was spot on. Loved the emphasis on personalization over volume.\n\nWould love to connect here and share a quick deliverability framework we just built."}
+                  {activeTab === "reply" &&
+                    "Hi Marcus,\n\nCompletely understand that budget is tight right now.\n\nWhat if we started with a zero-upfront pilot so you only pay once we hit a 20% increase in reply rates?\n\nWorth a brief 5-minute chat?"}
+                </div>
+              </div>
             </div>
-            <span className="font-semibold text-sm tracking-tight text-white">WriteYourEmail</span>
           </div>
-          
-          <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-sm font-medium text-[#86868b]">
-            <Link href="/studio" className="hover:text-white transition">Studio</Link>
-            <Link href="/pricing" className="hover:text-white transition">Pricing</Link>
-            <Link href="/terms" className="hover:text-white transition">Terms of Service</Link>
-            <Link href="/privacy" className="hover:text-white transition">Privacy Policy</Link>
+        </div>
+      </section>
+
+      {/* 4. Core Features Grid */}
+      <section id="features" className="py-24 px-6 max-w-7xl mx-auto border-t border-[#1c1c1e]">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h2 className="text-xs font-bold text-[#0a84ff] uppercase tracking-widest mb-3">Engineered for Conversion</h2>
+          <p className="text-3xl md:text-5xl font-bold text-white tracking-tight">
+            Everything You Need to Scale Cold Outreach.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#2c2c2e] hover:border-[#0a84ff50] transition-all group">
+            <div className="w-14 h-14 rounded-2xl bg-[#0a84ff15] text-[#0a84ff] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <ShieldCheck size={28} />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-3">AI Spam Trigger Detector</h3>
+            <p className="text-[#86868b] text-sm leading-relaxed">
+              Instantly scans your copy against spam lexicons, flags risky words, and generates a sanitized, spam-free version to keep your domain safe.
+            </p>
           </div>
 
-          <div className="text-xs text-[#52525b]">
-            © 2026 WriteYourEmail. All rights reserved.
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#2c2c2e] hover:border-[#bf5af250] transition-all group">
+            <div className="w-14 h-14 rounded-2xl bg-[#bf5af215] text-[#bf5af2] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <BarChart3 size={28} />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-3">Subject Line A/B Matrix</h3>
+            <p className="text-[#86868b] text-sm leading-relaxed">
+              Generates 5 distinct high-open subject lines for every prompt—ranging from curiosity hooks to personalized value propositions.
+            </p>
+          </div>
+
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#2c2c2e] hover:border-[#30d15850] transition-all group">
+            <div className="w-14 h-14 rounded-2xl bg-[#30d15815] text-[#30d158] flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <MousePointerClick size={28} />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-3">1-Click Gmail & Outlook</h3>
+            <p className="text-[#86868b] text-sm leading-relaxed">
+              Launch directly into your email client with pre-filled subject and body fields—no copy-paste friction required.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. 30 Omni-Channel Modes Showcase */}
+      <section id="modes" className="py-24 px-6 max-w-7xl mx-auto border-t border-[#1c1c1e] bg-[#050507]">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h2 className="text-xs font-bold text-[#bf5af2] uppercase tracking-widest mb-3">30 Specialized AI Copy Generators</h2>
+          <p className="text-3xl md:text-5xl font-bold text-white tracking-tight">
+            One Studio for Every Channel.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {[
+            { name: "Cold Email", mode: "create", tag: "Starter" },
+            { name: "Magic Polish", mode: "polish", tag: "Starter" },
+            { name: "Objection Reply", mode: "reply", tag: "Starter" },
+            { name: "Lead Win-Back", mode: "winback", tag: "Starter" },
+            { name: "Inbound Followup", mode: "inbound", tag: "Starter" },
+            { name: "LinkedIn DM", mode: "linkedin", tag: "Growth" },
+            { name: "WhatsApp Pitch", mode: "whatsapp", tag: "Growth" },
+            { name: "VSL Script", mode: "vsl_script", tag: "Growth" },
+            { name: "Proposal Pitch", mode: "proposal", tag: "Growth" },
+            { name: "Slack DM", mode: "slack_dm", tag: "Growth" },
+            { name: "Sequence Builder", mode: "sequence", tag: "Growth" },
+            { name: "Telegram Broadcast", mode: "telegram", tag: "Growth" },
+            { name: "Cold Call Script", mode: "cold_call", tag: "Enterprise" },
+            { name: "SMS Sequence", mode: "sms_sequence", tag: "Enterprise" },
+            { name: "Direct Mail", mode: "direct_mail", tag: "Enterprise" },
+          ].map((item, idx) => (
+            <Link
+              key={idx}
+              href="/studio"
+              className="p-4 rounded-2xl bg-[#141415] border border-[#1c1c1e] hover:border-[#0a84ff] transition-all flex flex-col justify-between group"
+            >
+              <div className="text-xs text-[#86868b] font-mono mb-2">{item.tag}</div>
+              <div className="text-sm font-semibold text-white group-hover:text-[#0a84ff] transition-colors">
+                {item.name}
+              </div>
+            </Link>
+          ))}
+        </div>
+        <div className="text-center mt-10">
+          <Link
+            href="/studio"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-[#0a84ff] hover:underline"
+          >
+            Explore all 30 Modes in Studio <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
+
+      {/* 6. Simple Prepaid Pricing Section */}
+      <section id="pricing" className="py-24 px-6 max-w-7xl mx-auto border-t border-[#1c1c1e]">
+        <div className="text-center max-w-3xl mx-auto mb-16">
+          <h2 className="text-xs font-bold text-[#30d158] uppercase tracking-widest mb-3">Transparent Prepaid Passes</h2>
+          <p className="text-3xl md:text-5xl font-bold text-white tracking-tight">
+            No Recurring Subscriptions. Pay As You Grow.
+          </p>
+          <p className="text-[#86868b] text-sm mt-3">
+            All paid plans are valid for 30 days via PayPal Standard Orders.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Free Tier */}
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] flex flex-col justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[#86868b] mb-2">Guest / Free</div>
+              <div className="text-4xl font-extrabold text-white mb-4">$0</div>
+              <p className="text-xs text-[#86868b] mb-6">Ideal for testing AI outreach quality.</p>
+              <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#30d158]" /> 5 Generations / day</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#30d158]" /> 5 Starter Modes</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#30d158]" /> Deliverability Scorecard</li>
+              </ul>
+            </div>
+            <Link
+              href="/studio"
+              className="w-full py-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white font-semibold text-xs rounded-full transition-all text-center block"
+            >
+              Start Free
+            </Link>
+          </div>
+
+          {/* Starter Tier */}
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] flex flex-col justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[#0a84ff] mb-2">Starter Pass</div>
+              <div className="text-4xl font-extrabold text-white mb-4">$19 <span className="text-xs text-[#86868b] font-normal">/ 30 days</span></div>
+              <p className="text-xs text-[#86868b] mb-6">Perfect for solo founders & freelancers.</p>
+              <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#0a84ff]" /> 50 Generations / month</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#0a84ff]" /> 5 Core Modes</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#0a84ff]" /> Subject A/B Matrix</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#0a84ff]" /> Spam Detector</li>
+              </ul>
+            </div>
+            <Link
+              href="/studio"
+              className="w-full py-3 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-xs rounded-full transition-all text-center block shadow-lg shadow-[#0a84ff20]"
+            >
+              Upgrade in Studio
+            </Link>
+          </div>
+
+          {/* Growth Tier */}
+          <div className="p-8 rounded-3xl bg-[#141415] border-2 border-[#bf5af2] flex flex-col justify-between relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#bf5af2] text-white text-[10px] font-bold uppercase rounded-full">
+              Most Popular
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-[#bf5af2] mb-2">Growth Pass</div>
+              <div className="text-4xl font-extrabold text-white mb-4">$39 <span className="text-xs text-[#86868b] font-normal">/ 30 days</span></div>
+              <p className="text-xs text-[#86868b] mb-6">For agencies and active SDRs.</p>
+              <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#bf5af2]" /> Unlimited Generations</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#bf5af2]" /> All 30 Omni-Channel Modes</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#bf5af2]" /> Multi-Touch Sequences</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#bf5af2]" /> Priority AI Engine</li>
+              </ul>
+            </div>
+            <Link
+              href="/studio"
+              className="w-full py-3 bg-[#bf5af2] hover:bg-[#a846da] text-white font-semibold text-xs rounded-full transition-all text-center block shadow-lg shadow-[#bf5af220]"
+            >
+              Get Growth Pass
+            </Link>
+          </div>
+
+          {/* Enterprise Tier */}
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] flex flex-col justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[#ffd60a] mb-2">Enterprise Pass</div>
+              <div className="text-4xl font-extrabold text-white mb-4">$79 <span className="text-xs text-[#86868b] font-normal">/ 365 days</span></div>
+              <p className="text-xs text-[#86868b] mb-6">Full annual access for high-volume outreach.</p>
+              <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> 1 Year Unlimited Access</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> VIP Support Chatbot</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Custom Mode Requests</li>
+              </ul>
+            </div>
+            <Link
+              href="/studio"
+              className="w-full py-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white font-semibold text-xs rounded-full transition-all text-center block"
+            >
+              Get Enterprise Pass
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* 7. FAQ Section */}
+      <section id="faq" className="py-24 px-6 max-w-4xl mx-auto border-t border-[#1c1c1e]">
+        <div className="text-center mb-16">
+          <h2 className="text-xs font-bold text-[#86868b] uppercase tracking-widest mb-3">Questions & Answers</h2>
+          <p className="text-3xl md:text-4xl font-bold text-white">Frequently Asked Questions</p>
+        </div>
+
+        <div className="space-y-4">
+          {[
+            {
+              q: "How does the Deliverability Scorecard work?",
+              a: "Our AI scans your email copy for blacklisted spam triggers, excessive capitalization, risky financial promises, and bad formatting. It outputs a score from 0-100 along with actionable tips to fix issues before sending.",
+            },
+            {
+              q: "What are prepaid 30-day passes?",
+              a: "Instead of forced recurring subscriptions, you buy a 30-day pass using PayPal. When your pass expires, you fall back to the Free tier until you choose to purchase another pass manually.",
+            },
+            {
+              q: "Can I use WriteYourEmail without creating an account?",
+              a: "Yes! Guests get 2 lifetime generations immediately. Creating a free account gives you 5 generations per day.",
+            },
+            {
+              q: "Which AI models power the outreach generator?",
+              a: "We utilize active Groq infrastructure powered by Llama-3.3-70B-Versatile and Llama-3.1-8B-Instant for real-time latency and copywriting mastery.",
+            },
+          ].map((item, idx) => (
+            <div key={idx} className="rounded-2xl bg-[#141415] border border-[#1c1c1e] overflow-hidden">
+              <button
+                onClick={() => toggleFaq(idx)}
+                className="w-full p-6 text-left flex items-center justify-between text-white font-semibold text-base"
+              >
+                <span>{item.q}</span>
+                {openFaq === idx ? <ChevronUp size={20} className="text-[#0a84ff]" /> : <ChevronDown size={20} className="text-[#86868b]" />}
+              </button>
+              {openFaq === idx && (
+                <div className="px-6 pb-6 text-sm text-[#86868b] leading-relaxed border-t border-[#1c1c1e] pt-4">
+                  {item.a}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 8. Final Call to Action */}
+      <section className="py-20 px-6 max-w-7xl mx-auto">
+        <div className="rounded-3xl bg-gradient-to-r from-[#0a84ff20] via-[#bf5af220] to-[#0a84ff10] border border-[#2c2c2e] p-10 md:p-16 text-center relative overflow-hidden">
+          <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-6">
+            Ready to Multiply Your Outreach Reply Rates?
+          </h2>
+          <p className="text-[#d1d1d6] max-w-xl mx-auto mb-8 text-base">
+            Join thousands of sales reps, founders, and marketers generating high-deliverability copy in seconds.
+          </p>
+          <Link
+            href="/studio"
+            className="inline-flex items-center gap-3 px-8 py-4 bg-[#0a84ff] hover:bg-[#007aff] text-white font-bold text-base rounded-full transition-all shadow-xl shadow-[#0a84ff30]"
+          >
+            Launch WriteYourEmail Studio
+            <ArrowRight size={18} />
+          </Link>
+        </div>
+      </section>
+
+      {/* 9. Footer */}
+      <footer className="py-12 px-6 border-t border-[#1c1c1e] text-xs text-[#86868b]">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3">
+            <Logo size={24} showText={true} />
+            <span>© {new Date().getFullYear()} WriteYourEmail.com. All rights reserved.</span>
+          </div>
+
+          <div className="flex gap-6">
+            <Link href="/studio" className="hover:text-white transition-colors">
+              App Studio
+            </Link>
+            <a href="#features" className="hover:text-white transition-colors">
+              Features
+            </a>
+            <a href="#pricing" className="hover:text-white transition-colors">
+              Pricing Passes
+            </a>
+            <a href="#faq" className="hover:text-white transition-colors">
+              FAQ
+            </a>
           </div>
         </div>
       </footer>
