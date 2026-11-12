@@ -12,7 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileText,
-} from "lucide-[#1c1c1e]" ? "lucide-react" : "lucide-react";
+} from "lucide-react";
 
 interface OutputPanelProps {
   content?: any;
@@ -30,10 +30,10 @@ function normalizeContent(content: any) {
   if (typeof content === "object" && (content.body || content.subject)) {
     return {
       subject: content.subject || "",
-      subjectVariations: content.subjectVariations || [],
+      subjectVariations: Array.isArray(content.subjectVariations) ? content.subjectVariations : [],
       body: content.body || "",
       spamScore: typeof content.spamScore === "number" ? content.spamScore : null,
-      spamTriggers: content.spamTriggers || [],
+      spamTriggers: Array.isArray(content.spamTriggers) ? content.spamTriggers : [],
       sanitizedBody: content.sanitizedBody || "",
       deliverabilityAdvice: content.deliverabilityAdvice || "",
       plainText: content.plainText || content.body || "",
@@ -72,7 +72,7 @@ export default function OutputPanel({
   const [showAB, setShowAB] = useState(true);
   const [showSanitized, setShowSanitized] = useState(false);
 
-  // Fallback prop aliasing for backwards compatibility with page.tsx
+  // Fallback prop aliasing for compatibility with page.tsx
   const activeContent = result !== undefined ? result : content;
   const isLoading = Boolean(isGenerating || loading);
   const activeError = error || genError;
