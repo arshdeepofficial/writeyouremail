@@ -9,11 +9,9 @@ import {
   ShieldCheck,
   BarChart3,
   Sparkles,
-  Mail,
   ChevronDown,
   ChevronUp,
   ExternalLink,
-  ShieldAlert,
   MousePointerClick,
 } from "lucide-react";
 
@@ -530,7 +528,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
             <Logo size={24} showText={true} />
-            <span>© {new Date().getFullYear()} WriteYourEmail.com. All rights reserved.</span>
+            <span>© 2025 WriteYourEmail.com. All rights reserved.</span>
           </div>
 
           <div className="flex gap-6">
