@@ -442,10 +442,10 @@ export default function LandingPage() {
           <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] flex flex-col justify-between">
             <div>
               <div className="text-sm font-semibold text-[#ffd60a] mb-2">Enterprise Pass</div>
-              <div className="text-4xl font-extrabold text-white mb-4">$79 <span className="text-xs text-[#86868b] font-normal">/ 365 days</span></div>
-              <p className="text-xs text-[#86868b] mb-6">Full annual access for high-volume outreach.</p>
+              <div className="text-4xl font-extrabold text-white mb-4">$79 <span className="text-xs text-[#86868b] font-normal">/ 30 days</span></div>
+              <p className="text-xs text-[#86868b] mb-6">Full 30-day pass for agencies & sales teams.</p>
               <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
-                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> 1 Year Unlimited Access</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Unlimited Generations & 30 Modes</li>
                 <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> VIP Support Chatbot</li>
                 <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Custom Mode Requests</li>
               </ul>

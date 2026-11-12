@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Zap, ShieldCheck, BarChart3, Mail, ArrowRight, Star } from "lucide-react";
+import { ArrowLeft, Check, Zap, Mail } from "lucide-react";
 
 export default function PricingPage() {
   return (
@@ -112,10 +112,10 @@ export default function PricingPage() {
           <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] flex flex-col justify-between">
             <div>
               <div className="text-sm font-semibold text-[#ffd60a] mb-2">Enterprise Pass</div>
-              <div className="text-4xl font-extrabold text-white mb-2">$79 <span className="text-xs text-[#86868b] font-normal">/ 365 days</span></div>
-              <p className="text-xs text-[#86868b] mb-6">Full annual access for high volume.</p>
+              <div className="text-4xl font-extrabold text-white mb-2">$79 <span className="text-xs text-[#86868b] font-normal">/ 30 days</span></div>
+              <p className="text-xs text-[#86868b] mb-6">Full 30-day pass for agencies & sales teams.</p>
               <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
-                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> 1 Year Unlimited Access</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Unlimited Generations & 30 Modes</li>
                 <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> VIP Support Chatbot</li>
                 <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Priority Custom Modes</li>
               </ul>
@@ -124,7 +124,7 @@ export default function PricingPage() {
               href="/studio"
               className="w-full py-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white font-semibold text-xs rounded-full transition-all text-center block"
             >
-              Get Annual Pass
+              Get Enterprise Pass
             </Link>
           </div>
         </div>
