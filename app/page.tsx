@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import Logo from "./studio/components/Logo";
 import {
   ArrowRight,
   Check,
@@ -11,18 +10,47 @@ import {
   BarChart3,
   Sparkles,
   Mail,
-  MessageSquare,
-  Star,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
   ExternalLink,
   ShieldAlert,
-  Send,
-  Layers,
   MousePointerClick,
-  Users,
 } from "lucide-react";
+
+function Logo({ size = 32, showText = true }: { size?: number; showText?: boolean }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div
+        className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-[#0a84ff] to-[#bf5af2] p-0.5 shadow-lg shadow-[#0a84ff25]"
+        style={{ width: size, height: size }}
+      >
+        <div className="w-full h-full bg-[#0a0a0a] rounded-[10px] flex items-center justify-center">
+          <svg
+            width={size * 0.55}
+            height={size * 0.55}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-white"
+          >
+            <path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9" />
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            <path d="M18 15v6" />
+            <path d="M15 18h6" />
+          </svg>
+        </div>
+      </div>
+      {showText && (
+        <span className="font-bold tracking-tight text-white text-lg">
+          WriteYourEmail<span className="text-[#0a84ff]">.com</span>
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState<"cold" | "linkedin" | "reply">("cold");
@@ -74,7 +102,7 @@ export default function LandingPage() {
 
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#141415] border border-[#2c2c2e] text-xs font-semibold text-[#0a84ff] mb-8">
           <Sparkles size={14} />
-          <span>New: Phase 1 Deliverability & Spam Sanitizer Engine Live</span>
+          <span>New: Deliverability & Spam Sanitizer Engine Live</span>
         </div>
 
         <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight max-w-5xl mx-auto leading-[1.1] mb-6 bg-gradient-to-b from-white via-[#e1e1e6] to-[#86868b] bg-clip-text text-transparent">
@@ -134,6 +162,7 @@ export default function LandingPage() {
             </div>
             <div className="flex gap-2">
               <button
+                type="button"
                 onClick={() => setActiveTab("cold")}
                 className={`px-3 py-1 text-xs rounded-full font-medium transition-all ${
                   activeTab === "cold" ? "bg-[#0a84ff] text-white" : "bg-[#1c1c1e] text-[#86868b]"
@@ -142,6 +171,7 @@ export default function LandingPage() {
                 Cold Email
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("linkedin")}
                 className={`px-3 py-1 text-xs rounded-full font-medium transition-all ${
                   activeTab === "linkedin" ? "bg-[#0a84ff] text-white" : "bg-[#1c1c1e] text-[#86868b]"
@@ -150,6 +180,7 @@ export default function LandingPage() {
                 LinkedIn DM
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab("reply")}
                 className={`px-3 py-1 text-xs rounded-full font-medium transition-all ${
                   activeTab === "reply" ? "bg-[#0a84ff] text-white" : "bg-[#1c1c1e] text-[#86868b]"
@@ -292,21 +323,21 @@ export default function LandingPage() {
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[
-            { name: "Cold Email", mode: "create", tag: "Starter" },
-            { name: "Magic Polish", mode: "polish", tag: "Starter" },
-            { name: "Objection Reply", mode: "reply", tag: "Starter" },
-            { name: "Lead Win-Back", mode: "winback", tag: "Starter" },
-            { name: "Inbound Followup", mode: "inbound", tag: "Starter" },
-            { name: "LinkedIn DM", mode: "linkedin", tag: "Growth" },
-            { name: "WhatsApp Pitch", mode: "whatsapp", tag: "Growth" },
-            { name: "VSL Script", mode: "vsl_script", tag: "Growth" },
-            { name: "Proposal Pitch", mode: "proposal", tag: "Growth" },
-            { name: "Slack DM", mode: "slack_dm", tag: "Growth" },
-            { name: "Sequence Builder", mode: "sequence", tag: "Growth" },
-            { name: "Telegram Broadcast", mode: "telegram", tag: "Growth" },
-            { name: "Cold Call Script", mode: "cold_call", tag: "Enterprise" },
-            { name: "SMS Sequence", mode: "sms_sequence", tag: "Enterprise" },
-            { name: "Direct Mail", mode: "direct_mail", tag: "Enterprise" },
+            { name: "Cold Email", tag: "Starter" },
+            { name: "Magic Polish", tag: "Starter" },
+            { name: "Objection Reply", tag: "Starter" },
+            { name: "Lead Win-Back", tag: "Starter" },
+            { name: "Inbound Followup", tag: "Starter" },
+            { name: "LinkedIn DM", tag: "Growth" },
+            { name: "WhatsApp Pitch", tag: "Growth" },
+            { name: "VSL Script", tag: "Growth" },
+            { name: "Proposal Pitch", tag: "Growth" },
+            { name: "Slack DM", tag: "Growth" },
+            { name: "Sequence Builder", tag: "Growth" },
+            { name: "Telegram Broadcast", tag: "Growth" },
+            { name: "Cold Call Script", tag: "Enterprise" },
+            { name: "SMS Sequence", tag: "Enterprise" },
+            { name: "Direct Mail", tag: "Enterprise" },
           ].map((item, idx) => (
             <Link
               key={idx}
@@ -453,11 +484,12 @@ export default function LandingPage() {
             },
             {
               q: "Which AI models power the outreach generator?",
-              a: "We utilize active Groq infrastructure powered by Llama-3.3-70B-Versatile and Llama-3.1-8B-Instant for real-time latency and copywriting mastery.",
+              a: "We utilize active Groq infrastructure powered by Llama-3.3-70B-Versatile and Llama-3.1-8b-Instant for real-time latency and copywriting mastery.",
             },
           ].map((item, idx) => (
             <div key={idx} className="rounded-2xl bg-[#141415] border border-[#1c1c1e] overflow-hidden">
               <button
+                type="button"
                 onClick={() => toggleFaq(idx)}
                 className="w-full p-6 text-left flex items-center justify-between text-white font-semibold text-base"
               >
