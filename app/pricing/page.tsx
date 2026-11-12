@@ -1,346 +1,163 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import React from "react";
 import Link from "next/link";
-import Script from "next/script";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-const PAYPAL_CLIENT_ID = "BAAODdDSTxLd8ul-bpGX8tIqVSkyEezEjQtleLHKXIXvHjTNHXcOkzCcvrfGB_uL-Sxm8y9Hr3GxIw8ZAc";
+import { ArrowLeft, Check, Zap, ShieldCheck, BarChart3, Mail, ArrowRight, Star } from "lucide-react";
 
 export default function PricingPage() {
-  const [user, setUser] = useState<any>(null);
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">("monthly");
-  const [sdkReady, setSdkReady] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => authListener.subscription.unsubscribe();
-  }, []);
-
-  const tiers = [
-    {
-      name: "Starter",
-      id: "starter",
-      priceMonthlyNum: 19,
-      priceYearlyNum: 190,
-      priceMonthly: "$19",
-      priceYearly: "$190",
-      periodLabelMonthly: "/mo",
-      periodLabelYearly: "/yr",
-      description: "Ideal for solo sales reps sending cold pitches.",
-      features: [
-        "50 AI Email Generations / month",
-        "Standard ICP Persona Engine",
-        "1-Click Gmail & Mail App Launch",
-        "Export History to TXT",
-        "Spam Trigger Word Risk Audit"
-      ],
-      highlight: false,
-      badge: "ESSENTIAL"
-    },
-    {
-      name: "Growth",
-      id: "growth",
-      priceMonthlyNum: 39,
-      priceYearlyNum: 390,
-      priceMonthly: "$39",
-      priceYearly: "$390",
-      periodLabelMonthly: "/mo",
-      periodLabelYearly: "/yr",
-      description: "For fast-growing teams scaling multi-touch outbound campaigns.",
-      features: [
-        "Unlimited Daily AI Generations",
-        "3-Step Follow-Up Sequence Generator",
-        "A/B Split Test Variations Engine",
-        "Custom Brand Voice DNA Injection",
-        "LinkedIn & Twitter/X Cold DM Generator",
-        "Priority Fallback Model Routing"
-      ],
-      highlight: true,
-      badge: "MOST POPULAR"
-    },
-    {
-      name: "Enterprise",
-      id: "enterprise",
-      priceMonthlyNum: 79,
-      priceYearlyNum: 790,
-      priceMonthly: "$79",
-      priceYearly: "$790",
-      periodLabelMonthly: "/mo",
-      periodLabelYearly: "/yr",
-      description: "Dedicated infrastructure and bulk automation for agencies.",
-      features: [
-        "Bulk CSV Lead List Personalization",
-        "AI Reply Intent Classifier & Analyzer",
-        "Cold Call Script Generator",
-        "1-Click History Export (CSV & TXT)",
-        "DocuSign & Proposal E-Signature Links",
-        "Zapier & CRM Webhook Export (Coming Soon)"
-      ],
-      highlight: false,
-      badge: "SCALE"
-    }
-  ];
-
   return (
-    <div
-      className="min-h-screen bg-[#000000] text-[#f5f5f7] font-sans selection:bg-[#0a84ff] selection:text-white relative overflow-x-hidden"
-      style={{
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-      }}
-    >
-      <Script
-        src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`}
-        strategy="afterInteractive"
-        onLoad={() => setSdkReady(true)}
-      />
-
-      <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-full max-w-[1000px] h-[500px] bg-gradient-to-b from-[#0a84ff]/15 via-[#0a84ff]/5 to-transparent blur-[120px] pointer-events-none rounded-full" />
-
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-[#000000]/70 backdrop-blur-2xl saturate-150 h-16 flex items-center justify-between px-6 max-w-7xl mx-auto">
-        <Link href="/" className="flex items-center space-x-2 font-semibold text-lg tracking-tight">
-          <span className="w-6 h-6 bg-gradient-to-br from-[#f5f5f7] to-[#a1a1a6] text-black flex items-center justify-center font-bold text-sm rounded-md shadow-sm">
-            ✉️
-          </span>
-          <span>WriteYourEmail</span>
-        </Link>
-        <div className="flex items-center space-x-6">
-          <Link href="/studio" className="text-sm font-medium text-[#86868b] hover:text-[#f5f5f7] transition">
-            Studio Engine
+    <div className="min-h-screen bg-black text-white font-sans selection:bg-[#0a84ff30] selection:text-[#0a84ff]">
+      {/* Navigation */}
+      <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-black/70 border-b border-[#1c1c1e]">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-[#86868b] hover:text-white transition-colors">
+            <ArrowLeft size={16} /> Back to Home
+          </Link>
+          <div className="text-lg font-bold text-white">
+            WriteYourEmail<span className="text-[#0a84ff]">.com</span>
+          </div>
+          <Link
+            href="/studio"
+            className="px-5 py-2.5 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-xs rounded-full transition-all shadow-lg shadow-[#0a84ff20]"
+          >
+            Launch Studio
           </Link>
         </div>
       </header>
 
-      <main className="py-20 px-6 max-w-7xl mx-auto text-center relative z-10">
-        <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-[#0a84ff]/10 text-[#0a84ff] border border-[#0a84ff]/20 inline-block mb-4 tracking-wider uppercase">
-          Flexible B2B Pricing
-        </span>
-        <h1 className="text-5xl sm:text-7xl font-bold tracking-tighter mb-6 bg-gradient-to-b from-[#f5f5f7] via-[#f5f5f7] to-[#86868b] bg-clip-text text-transparent leading-tight">
-          Tools designed to close deals.
+      {/* Hero Header */}
+      <section className="pt-36 pb-16 px-6 max-w-5xl mx-auto text-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#141415] border border-[#2c2c2e] text-xs font-semibold text-[#30d158] mb-6">
+          <Zap size={14} />
+          <span>Prepaid 30-Day Passes • Zero Automatic Recurring Fees</span>
+        </div>
+        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6 bg-gradient-to-b from-white via-[#e1e1e6] to-[#86868b] bg-clip-text text-transparent">
+          Simple, High-Value Outreach Pricing.
         </h1>
-        <p className="text-xl text-[#86868b] max-w-2xl mx-auto mb-10 font-medium">
-          Choose the tier that fits your outreach velocity. Instant activation powered by PayPal.
+        <p className="text-lg text-[#86868b] max-w-2xl mx-auto leading-relaxed">
+          Unlock 30 omni-channel AI modes, real-time deliverability scoring, and 5 A/B subject line variations. Pay once, use for 30 days.
         </p>
+      </section>
 
-        <div className="flex items-center justify-center gap-4 mb-16">
-          <span
-            className={`text-sm font-semibold transition ${
-              billingCycle === "monthly" ? "text-white" : "text-[#86868b]"
-            }`}
-          >
-            Monthly Billing
-          </span>
-          <button
-            type="button"
-            onClick={() => setBillingCycle(billingCycle === "monthly" ? "annually" : "monthly")}
-            className="w-14 h-7 bg-[#2c2c2e] border border-white/10 rounded-full relative transition-all p-1 cursor-pointer"
-          >
-            <div
-              className={`w-5 h-5 bg-white rounded-full transition-all shadow-md ${
-                billingCycle === "monthly" ? "translate-x-0" : "translate-x-7 bg-[#0a84ff]"
-              }`}
-            />
-          </button>
-          <span
-            className={`text-sm font-semibold transition flex items-center gap-1.5 ${
-              billingCycle === "annually" ? "text-white" : "text-[#86868b]"
-            }`}
-          >
-            Annual Billing
-            <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-              Save ~20%
-            </span>
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-          {tiers.map((tier) => {
-            const activePriceNum = billingCycle === "monthly" ? tier.priceMonthlyNum : tier.priceYearlyNum;
-            const activePrice = billingCycle === "monthly" ? tier.priceMonthly : tier.priceYearly;
-            const activePeriod = billingCycle === "monthly" ? tier.periodLabelMonthly : tier.periodLabelYearly;
-
-            return (
-              <div
-                key={tier.id}
-                className={`p-8 rounded-[2.5rem] bg-[#141415] border flex flex-col justify-between transition-all duration-300 relative ${
-                  tier.highlight
-                    ? "border-[#0a84ff] ring-2 ring-[#0a84ff]/30 shadow-[0_0_50px_rgba(10,132,255,0.15)]"
-                    : "border-white/10 hover:border-white/20"
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs font-bold text-[#86868b] tracking-widest uppercase">
-                      {tier.badge}
-                    </span>
-                    {tier.highlight && (
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#0a84ff] text-white">
-                        RECOMMENDED
-                      </span>
-                    )}
-                  </div>
-
-                  <h3 className="text-2xl font-bold mb-2 text-white">{tier.name}</h3>
-                  <p className="text-[#86868b] text-sm mb-6 leading-relaxed min-h-[40px]">
-                    {tier.description}
-                  </p>
-
-                  <div className="flex items-baseline gap-1 mb-8">
-                    <span className="text-5xl font-extrabold tracking-tight text-white">{activePrice}</span>
-                    <span className="text-[#86868b] text-sm font-medium">{activePeriod}</span>
-                  </div>
-
-                  <div className="mb-8 min-h-[50px]">
-                    {user ? (
-                      <PayPalButtonWrapper
-                        amount={activePriceNum}
-                        tierName={tier.name}
-                        userId={user.id}
-                        sdkReady={sdkReady}
-                      />
-                    ) : (
-                      <Link
-                        href="/studio"
-                        className="w-full py-4 bg-[#f5f5f7] text-black font-semibold rounded-2xl block text-center hover:bg-white transition shadow-md"
-                      >
-                        Log in to Subscribe
-                      </Link>
-                    )}
-                  </div>
-
-                  <div className="space-y-3 pt-6 border-t border-white/5">
-                    <p className="text-xs font-semibold text-[#86868b] uppercase tracking-wider mb-4">
-                      What&apos;s Included:
-                    </p>
-                    {tier.features.map((feat) => (
-                      <div key={feat} className="flex items-start gap-3 text-sm">
-                        <span className="text-[#0a84ff] font-bold mt-0.5">✓</span>
-                        <span className="text-[#f5f5f7]/90 font-medium">{feat}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </main>
-
-      <footer className="border-t border-white/10 py-12 text-center text-sm font-medium text-[#86868b]">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 WriteYourEmail. All rights reserved.</p>
-          <div className="flex space-x-6">
-            <Link href="/terms" className="hover:text-[#f5f5f7] transition">
-              Terms
+      {/* Pricing Grid */}
+      <section className="pb-24 px-6 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Free Tier */}
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] flex flex-col justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[#86868b] mb-2">Guest / Free</div>
+              <div className="text-4xl font-extrabold text-white mb-2">$0</div>
+              <p className="text-xs text-[#86868b] mb-6">Test outreach copy quality anytime.</p>
+              <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#30d158]" /> 5 Generations / day</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#30d158]" /> 5 Starter Modes</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#30d158]" /> Deliverability Scorecard</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#30d158]" /> 1-Click Gmail Link</li>
+              </ul>
+            </div>
+            <Link
+              href="/studio"
+              className="w-full py-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white font-semibold text-xs rounded-full transition-all text-center block"
+            >
+              Start Free
             </Link>
-            <Link href="/privacy" className="hover:text-[#f5f5f7] transition">
-              Privacy
+          </div>
+
+          {/* Starter Tier */}
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] flex flex-col justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[#0a84ff] mb-2">Starter Pass</div>
+              <div className="text-4xl font-extrabold text-white mb-2">$19 <span className="text-xs text-[#86868b] font-normal">/ 30 days</span></div>
+              <p className="text-xs text-[#86868b] mb-6">For freelancers and solo outreach.</p>
+              <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#0a84ff]" /> 50 Generations / month</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#0a84ff]" /> 5 Core Modes</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#0a84ff]" /> Subject Line A/B Matrix</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#0a84ff]" /> Spam Trigger Sanitizer</li>
+              </ul>
+            </div>
+            <Link
+              href="/studio"
+              className="w-full py-3 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-xs rounded-full transition-all text-center block shadow-lg shadow-[#0a84ff20]"
+            >
+              Get Starter Pass
             </Link>
+          </div>
+
+          {/* Growth Tier */}
+          <div className="p-8 rounded-3xl bg-[#141415] border-2 border-[#bf5af2] flex flex-col justify-between relative shadow-xl shadow-[#bf5af215]">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#bf5af2] text-white text-[10px] font-bold uppercase rounded-full">
+              Most Popular
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-[#bf5af2] mb-2">Growth Pass</div>
+              <div className="text-4xl font-extrabold text-white mb-2">$39 <span className="text-xs text-[#86868b] font-normal">/ 30 days</span></div>
+              <p className="text-xs text-[#86868b] mb-6">For agencies and active sales reps.</p>
+              <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#bf5af2]" /> Unlimited Generations</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#bf5af2]" /> All 30 Omni-Channel Modes</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#bf5af2]" /> Multi-Touch Sequences</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#bf5af2]" /> Priority AI Engine</li>
+              </ul>
+            </div>
+            <Link
+              href="/studio"
+              className="w-full py-3 bg-[#bf5af2] hover:bg-[#a846da] text-white font-semibold text-xs rounded-full transition-all text-center block shadow-lg shadow-[#bf5af220]"
+            >
+              Get Growth Pass
+            </Link>
+          </div>
+
+          {/* Enterprise Tier */}
+          <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] flex flex-col justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[#ffd60a] mb-2">Enterprise Pass</div>
+              <div className="text-4xl font-extrabold text-white mb-2">$79 <span className="text-xs text-[#86868b] font-normal">/ 365 days</span></div>
+              <p className="text-xs text-[#86868b] mb-6">Full annual access for high volume.</p>
+              <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> 1 Year Unlimited Access</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> VIP Support Chatbot</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Priority Custom Modes</li>
+              </ul>
+            </div>
+            <Link
+              href="/studio"
+              className="w-full py-3 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white font-semibold text-xs rounded-full transition-all text-center block"
+            >
+              Get Annual Pass
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Support Box */}
+      <section className="pb-24 px-6 max-w-3xl mx-auto text-center">
+        <div className="p-8 rounded-3xl bg-[#141415] border border-[#1c1c1e] space-y-4">
+          <h3 className="text-lg font-bold text-white">Need a custom plan or team license?</h3>
+          <p className="text-sm text-[#86868b]">
+            Reach out directly to our support team and we will assist with custom invoicing.
+          </p>
+          <a
+            href="mailto:help@writeyouremail.com"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-[#0a84ff] font-mono text-sm rounded-full transition-all border border-[#2c2c2e]"
+          >
+            <Mail size={16} /> help@writeyouremail.com
+          </a>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 px-6 border-t border-[#1c1c1e] text-xs text-[#86868b]">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+          <div>© 2025 WriteYourEmail.com. All rights reserved.</div>
+          <div className="flex gap-6">
+            <Link href="/" className="hover:text-white transition-colors">Home</Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+            <a href="mailto:help@writeyouremail.com" className="hover:text-white transition-colors">Support</a>
           </div>
         </div>
       </footer>
     </div>
   );
-}
-
-function PayPalButtonWrapper({
-  amount,
-  tierName,
-  userId,
-  sdkReady,
-}: {
-  amount: number;
-  tierName: string;
-  userId: string;
-  sdkReady: boolean;
-}) {
-  const containerId = `paypal-container-${tierName.toLowerCase()}-${amount}`;
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const renderPayPal = () => {
-      const container = document.getElementById(containerId);
-      if (!container) return;
-      container.innerHTML = "";
-
-      // @ts-ignore
-      if (window.paypal && window.paypal.Buttons) {
-        try {
-          // @ts-ignore
-          window.paypal
-            .Buttons({
-              style: {
-                shape: "pill",
-                color: "blue",
-                layout: "vertical",
-                label: "pay",
-              },
-              createOrder: async () => {
-                const res = await fetch("/api/paypal/create-order", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    amount,
-                    userId,
-                    planName: tierName,
-                  }),
-                });
-                const data = await res.json();
-                if (!res.ok || !data.orderId) {
-                  alert(data.error || "Failed to initiate PayPal Order.");
-                  throw new Error(data.error || "Order creation failed");
-                }
-                return data.orderId;
-              },
-              onApprove: async (data: any) => {
-                const res = await fetch("/api/paypal/capture-order", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    orderId: data.orderID,
-                    userId,
-                    tierName, // Pass tierName to backend
-                  }),
-                });
-                const captureData = await res.json();
-
-                if (res.ok && captureData.success) {
-                  alert(`Payment successful! Your account is upgraded to ${tierName.toUpperCase()}.`);
-                  window.location.href = "/studio?success=true";
-                } else {
-                  alert("Payment capture failed. Please contact support.");
-                }
-              },
-              onError: (err: any) => {
-                console.error("PayPal Order Error:", err);
-              },
-            })
-            .render(`#${containerId}`);
-        } catch (err) {
-          console.error("Error rendering PayPal buttons:", err);
-        }
-      }
-    };
-
-    const timer = setTimeout(renderPayPal, 150);
-    return () => {
-      isMounted = false;
-      clearTimeout(timer);
-    };
-  }, [amount, tierName, userId, sdkReady, containerId]);
-
-  return <div id={containerId} className="w-full min-h-[45px]" />;
 }

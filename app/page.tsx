@@ -13,6 +13,7 @@ import {
   ChevronUp,
   ExternalLink,
   MousePointerClick,
+  Mail,
 } from "lucide-react";
 
 function Logo({ size = 32, showText = true }: { size?: number; showText?: boolean }) {
@@ -74,9 +75,9 @@ export default function LandingPage() {
             <a href="#modes" className="hover:text-white transition-colors">
               30 Outreach Modes
             </a>
-            <a href="#pricing" className="hover:text-white transition-colors">
-              Pricing
-            </a>
+            <Link href="/pricing" className="hover:text-white transition-colors">
+              Pricing Passes
+            </Link>
             <a href="#faq" className="hover:text-white transition-colors">
               FAQ
             </a>
@@ -531,18 +532,24 @@ export default function LandingPage() {
             <span>© 2025 WriteYourEmail.com. All rights reserved.</span>
           </div>
 
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-6 items-center">
             <Link href="/studio" className="hover:text-white transition-colors">
               App Studio
             </Link>
-            <a href="#features" className="hover:text-white transition-colors">
-              Features
-            </a>
-            <a href="#pricing" className="hover:text-white transition-colors">
+            <Link href="/pricing" className="hover:text-white transition-colors">
               Pricing Passes
-            </a>
-            <a href="#faq" className="hover:text-white transition-colors">
-              FAQ
+            </Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-white transition-colors">
+              Terms of Service
+            </Link>
+            <a
+              href="mailto:help@writeyouremail.com"
+              className="text-[#0a84ff] hover:underline flex items-center gap-1 font-mono"
+            >
+              <Mail size={12} /> help@writeyouremail.com
             </a>
           </div>
         </div>
