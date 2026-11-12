@@ -7,7 +7,9 @@ import { MODES, PlanTier } from "../../studio/lib/modeSchemas";
 export const maxDuration = 30;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: { persistSession: false },
 });
@@ -21,6 +23,121 @@ const USAGE_LIMITS: Record<PlanTier, number> = {
   growth: 999999,
   enterprise: 999999,
 };
+
+// Local spam lexicon for offline scoring / emergency fallback
+const SPAM_LEXICON = [
+  "free",
+  "act now",
+  "limited time",
+  "click here",
+  "buy now",
+  "congratulations",
+  "winner",
+  "cash",
+  "prize",
+  "risk-free",
+  "guarantee",
+  "no obligation",
+  "urgent",
+  "$$$",
+  "100%",
+  "double your",
+  "make money",
+  "work from home",
+  "congratulations!",
+  "exclusive deal",
+  "once in a lifetime",
+];
+
+function scoreDeliverability(text: string) {
+  const lower = (text || "").toLowerCase();
+  const triggers = SPAM_LEXICON.filter((w) => lower.includes(w));
+  let score = 100;
+  score -= triggers.length * 8;
+  const caps = (text.match(/\b[A-Z]{4,}\b/g) || []).length;
+  score -= caps * 3;
+  const bangs = (text.match(/!/g) || []).length;
+  score -= Math.max(0, bangs - 1) * 4;
+  if ((text || "").length > 1200) score -= 5;
+  if ((text || "").length < 40) score -= 10;
+  return {
+    spamScore: Math.max(0, Math.min(100, score)),
+    spamTriggers: triggers,
+  };
+}
+
+function buildFallbackPayload(formData: Record<string, any>, modeName: string) {
+  const values = Object.values(formData || {}).filter(Boolean);
+  const target =
+    formData.company ||
+    formData.prospect_name ||
+    formData.target_audience ||
+    "Team";
+  const valueProp =
+    formData.value_prop ||
+    formData.solution ||
+    formData.offer ||
+    values[1] ||
+    "our solutions";
+  const callToAction =
+    formData.call_to_action ||
+    formData.ask ||
+    "Would you be open to a 10-minute call next week?";
+  const name = formData.prospect_name || "there";
+
+  const subject = `Quick question regarding ${target}`;
+  const body = `Hi ${name},
+
+I noticed your work with ${target} and wanted to reach out directly.
+
+We help teams tackle ${formData.pain_point || "key bottlenecks"} by leveraging ${valueProp}.
+
+${callToAction}
+
+Best regards,
+[Your Name]`;
+
+  const { spamScore, spamTriggers } = scoreDeliverability(`${subject}\n${body}`);
+
+  return {
+    subject,
+    subjectVariations: [
+      subject,
+      `Idea for ${target}`,
+      `Noticed something at ${target}`,
+      `Worth 10 minutes?`,
+      `Quick thought on ${formData.pain_point || "growth"}`,
+    ],
+    body,
+    spamScore,
+    spamTriggers,
+    sanitizedBody: body
+      .replace(/\bfree\b/gi, "complimentary")
+      .replace(/\bact now\b/gi, "when you have a moment")
+      .replace(/\bclick here\b/gi, "see details")
+      .replace(/\bbuy now\b/gi, "get started")
+      .replace(/\burgent\b/gi, "timely"),
+    deliverabilityAdvice:
+      spamScore >= 80
+        ? "Clean copy — strong inbox potential."
+        : "Tone down hype words and excessive punctuation for better placement.",
+    plainText: body,
+  };
+}
+
+function safeParseAiJson(raw: string) {
+  try {
+    // Strip markdown fences if model wraps JSON
+    const cleaned = raw
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -61,7 +178,9 @@ export async function POST(req: Request) {
 
         if (currentCount >= limit) {
           return NextResponse.json(
-            { error: `You have reached your limit of ${limit} generations. Please upgrade to continue.` },
+            {
+              error: `You have reached your limit of ${limit} generations. Please upgrade to continue.`,
+            },
             { status: 403 }
           );
         }
@@ -84,38 +203,57 @@ export async function POST(req: Request) {
       promptData += `- ${label}: ${value}\n`;
     }
 
-    const systemPrompt = `You are an elite, world-class copywriter and sales strategist. 
-Your task is to generate a highly converting message for the following category: ${modeConfig.name}.
+    const systemPrompt = `You are an elite copywriter AND email deliverability expert.
+Generate outreach for: ${modeConfig.name}
 Goal: ${modeConfig.description}
 
-Here are the specific inputs provided by the user:
+User inputs:
 ${promptData}
 
-INSTRUCTIONS:
-1. Write ONLY the final output. Do not include conversational filler like "Here is your email:".
-2. Optimize for maximum conversion, psychological impact, and clarity.
-3. Keep it professional, highly personalized, and tailored to the platform format.`;
+Return ONLY valid JSON (no markdown, no commentary) with this exact shape:
+{
+  "subject": "best primary subject line",
+  "subjectVariations": ["var1", "var2", "var3", "var4", "var5"],
+  "body": "full message body only, no subject prefix",
+  "spamScore": 0-100,
+  "spamTriggers": ["words/phrases that hurt inbox placement"],
+  "sanitizedBody": "same message with spammy words replaced by natural synonyms",
+  "deliverabilityAdvice": "one short actionable sentence",
+  "plainText": "plain-text version of body without markdown"
+}
+
+Rules:
+- spamScore 100 = safest inbox placement; deduct for ALL CAPS, $$$, hype, urgency spam, misleading claims.
+- subjectVariations must be 5 distinct, short, curiosity/value-led lines.
+- body must be ready to send for the target channel.
+- No filler like "Here is your email".`;
 
     const models = [
       "llama-3.3-70b-versatile",
       "llama-3.1-8b-instant",
-      "gemma2-9b-it"
+      "gemma2-9b-it",
     ];
 
-    let aiResult = "";
+    let aiPayload: any = null;
+    let rawText = "";
 
     if (groq) {
       for (const model of models) {
         try {
           const completion = await groq.chat.completions.create({
             messages: [{ role: "system", content: systemPrompt }],
-            model: model,
+            model,
             temperature: 0.7,
-            max_tokens: 1024,
+            max_tokens: 1400,
           });
 
-          if (completion.choices?.[0]?.message?.content) {
-            aiResult = completion.choices[0].message.content.trim();
+          const content = completion.choices?.[0]?.message?.content?.trim();
+          if (!content) continue;
+
+          rawText = content;
+          const parsed = safeParseAiJson(content);
+          if (parsed && (parsed.body || parsed.subject)) {
+            aiPayload = parsed;
             break;
           }
         } catch (err) {
@@ -124,37 +262,91 @@ INSTRUCTIONS:
       }
     }
 
-    if (!aiResult) {
-      const values = Object.values(formData).filter(Boolean);
-      const target = formData.company || formData.prospect_name || formData.target_audience || "Team";
-      const valueProp = formData.value_prop || formData.solution || formData.offer || values[1] || "our solutions";
-      const callToAction = formData.call_to_action || formData.ask || "Would you be open to a 10-minute call next week?";
-
-      aiResult = `Subject: Quick question regarding ${target}\n\nHi ${formData.prospect_name || "there"},\n\nI noticed your work with ${target} and wanted to reach out directly.\n\nWe help teams tackle ${formData.pain_point || "key bottlenecks"} by leveraging ${valueProp}.\n\n${callToAction}\n\nBest regards,\n[Your Name]`;
+    // If model returned prose instead of JSON, wrap it
+    if (!aiPayload && rawText) {
+      const { spamScore, spamTriggers } = scoreDeliverability(rawText);
+      const firstLine = rawText.split("\n").find((l) => l.trim()) || "Quick question";
+      aiPayload = {
+        subject: firstLine.replace(/^subject:\s*/i, "").slice(0, 90),
+        subjectVariations: [
+          firstLine.replace(/^subject:\s*/i, "").slice(0, 90),
+          "Quick question",
+          "Noticed something",
+          "Worth a quick look?",
+          "Idea for you",
+        ],
+        body: rawText.replace(/^subject:.*\n+/i, "").trim(),
+        spamScore,
+        spamTriggers,
+        sanitizedBody: rawText,
+        deliverabilityAdvice: "Review caps and hype words before sending.",
+        plainText: rawText.replace(/^subject:.*\n+/i, "").trim(),
+      };
     }
+
+    // Emergency local fallback (Groq down / empty)
+    if (!aiPayload) {
+      aiPayload = buildFallbackPayload(formData, modeConfig.name);
+    }
+
+    // Normalize + re-score locally so UI never gets missing fields
+    const bodyText = String(aiPayload.body || "");
+    const subjectText = String(aiPayload.subject || "Quick question");
+    const local = scoreDeliverability(`${subjectText}\n${bodyText}`);
+
+    const normalized = {
+      subject: subjectText,
+      subjectVariations: Array.isArray(aiPayload.subjectVariations)
+        ? aiPayload.subjectVariations.slice(0, 5)
+        : [subjectText],
+      body: bodyText,
+      spamScore:
+        typeof aiPayload.spamScore === "number"
+          ? Math.max(0, Math.min(100, aiPayload.spamScore))
+          : local.spamScore,
+      spamTriggers: Array.isArray(aiPayload.spamTriggers)
+        ? aiPayload.spamTriggers
+        : local.spamTriggers,
+      sanitizedBody: String(aiPayload.sanitizedBody || bodyText),
+      deliverabilityAdvice: String(
+        aiPayload.deliverabilityAdvice ||
+          "Keep it short, specific, and free of hype for better inbox rate."
+      ),
+      plainText: String(aiPayload.plainText || bodyText),
+    };
+
+    // Store a readable string in DB + full JSON in result for the UI
+    const contentForDb = `Subject: ${normalized.subject}\n\n${normalized.body}`;
 
     let createdHistoryRecord = {
       id: Date.now().toString(),
       mode: modeId,
-      content: aiResult,
-      created_at: new Date().toISOString()
+      content: contentForDb,
+      created_at: new Date().toISOString(),
     };
 
     if (userId) {
       try {
-        await supabase.from("usage_tracking").upsert({
-          user_id: userId,
-          count: newUsageCount,
-          plan_tier: planTier,
-          last_reset: new Date().toISOString(),
-        }, { onConflict: "user_id" });
+        await supabase.from("usage_tracking").upsert(
+          {
+            user_id: userId,
+            count: newUsageCount,
+            plan_tier: planTier,
+            last_reset: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
 
-        const { data: historyData } = await supabase.from("emails").insert({
-          user_id: userId,
-          mode: modeId,
-          content: aiResult,
-          created_at: new Date().toISOString(),
-        }).select().single();
+        const { data: historyData } = await supabase
+          .from("emails")
+          .insert({
+            user_id: userId,
+            mode: modeId,
+            content: contentForDb,
+            created_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
 
         if (historyData) {
           createdHistoryRecord = historyData;
@@ -165,11 +357,17 @@ INSTRUCTIONS:
     }
 
     return NextResponse.json({
-      result: aiResult,
-      newUsageCount: newUsageCount,
-      historyItem: createdHistoryRecord
+      // `result` is now the rich object (OutputPanel reads this)
+      result: normalized,
+      // keep string mirror for anything still expecting text
+      resultText: contentForDb,
+      newUsageCount,
+      historyItem: {
+        ...createdHistoryRecord,
+        // attach rich payload so History can re-open scorecard later if needed
+        rich: normalized,
+      },
     });
-
   } catch (error: any) {
     console.error("API Error:", error);
     return NextResponse.json(

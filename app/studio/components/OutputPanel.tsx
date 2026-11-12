@@ -1,161 +1,322 @@
 "use client";
 
-// app/studio/components/OutputPanel.tsx
-import React, { useState } from 'react';
-import { Copy, Check, AlertCircle, Bot } from 'lucide-react';
+import React, { useMemo, useState } from "react";
+import {
+  Copy,
+  Check,
+  Mail,
+  ShieldAlert,
+  ShieldCheck,
+  ExternalLink,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+} from "lucide-react";
 
 interface OutputPanelProps {
-  result: string | null;
-  isGenerating: boolean;
-  error: string | null;
+  content: any;
+  loading?: boolean;
+  genError?: string | null;
 }
 
-export default function OutputPanel({ result, isGenerating, error }: OutputPanelProps) {
-  const [copied, setCopied] = useState(false);
+function normalizeContent(content: any) {
+  if (!content) return null;
 
-  const handleCopy = async () => {
-    if (result) {
-      try {
-        await navigator.clipboard.writeText(result);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        console.error('Failed to copy text', err);
-      }
+  // New rich object from API
+  if (typeof content === "object" && (content.body || content.subject)) {
+    return {
+      subject: content.subject || "",
+      subjectVariations: content.subjectVariations || [],
+      body: content.body || "",
+      spamScore: typeof content.spamScore === "number" ? content.spamScore : null,
+      spamTriggers: content.spamTriggers || [],
+      sanitizedBody: content.sanitizedBody || "",
+      deliverabilityAdvice: content.deliverabilityAdvice || "",
+      plainText: content.plainText || content.body || "",
+    };
+  }
+
+  // Legacy string (history items / old gens)
+  if (typeof content === "string") {
+    const subjectMatch = content.match(/^Subject:\s*(.*)$/im);
+    const subject = subjectMatch ? subjectMatch[1].trim() : "";
+    const body = content.replace(/^Subject:.*\n+/im, "").trim();
+    return {
+      subject,
+      subjectVariations: subject ? [subject] : [],
+      body: body || content,
+      spamScore: null,
+      spamTriggers: [],
+      sanitizedBody: "",
+      deliverabilityAdvice: "",
+      plainText: body || content,
+    };
+  }
+
+  return null;
+}
+
+export default function OutputPanel({
+  content,
+  loading = false,
+  genError = null,
+}: OutputPanelProps) {
+  const [copied, setCopied] = useState<"all" | "sanitized" | "plain" | null>(null);
+  const [showAB, setShowAB] = useState(true);
+  const [showSanitized, setShowSanitized] = useState(false);
+
+  const data = useMemo(() => normalizeContent(content), [content]);
+  const score = data?.spamScore;
+
+  const copyText = async (text: string, key: "all" | "sanitized" | "plain") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // silent — no alert() popups per product rules
     }
   };
 
+  const openInGmail = () => {
+    if (!data) return;
+    const url = `https://mail.google.com/mail/?view=cm&fs=1&su=${encodeURIComponent(
+      data.subject || ""
+    )}&body=${encodeURIComponent(data.body || "")}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const openInOutlook = () => {
+    if (!data) return;
+    const url = `https://outlook.office.com/mail/deeplink/compose?subject=${encodeURIComponent(
+      data.subject || ""
+    )}&body=${encodeURIComponent(data.body || "")}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  if (loading) {
+    return (
+      <div className="flex-1 bg-[#0a0a0a] flex items-center justify-center border-l border-[#1c1c1e]">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[#0a84ff] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-[#86868b] font-medium">
+            Crafting high-deliverability copy…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (genError) {
+    return (
+      <div className="flex-1 bg-[#0a0a0a] flex items-center justify-center border-l border-[#1c1c1e] p-6">
+        <div className="max-w-md w-full p-5 rounded-2xl border border-[#ff453a40] bg-[#ff453a10]">
+          <div className="flex items-center gap-2 text-[#ff453a] font-semibold mb-2">
+            <ShieldAlert size={18} />
+            Generation failed
+          </div>
+          <p className="text-[#d1d1d6] text-sm leading-relaxed">{genError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex-1 bg-[#0a0a0a] flex items-center justify-center border-l border-[#1c1c1e] text-[#424245]">
+        <div className="text-center">
+          <Mail size={48} className="mx-auto mb-4 opacity-20" />
+          <p>Your AI-generated outreach will appear here.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const fullCopy = data.subject
+    ? `Subject: ${data.subject}\n\n${data.body}`
+    : data.body;
+
+  const scoreColor =
+    score == null
+      ? "border-[#424245] text-[#86868b]"
+      : score > 80
+      ? "border-[#30d158] text-[#30d158]"
+      : score > 50
+      ? "border-[#ffd60a] text-[#ffd60a]"
+      : "border-[#ff453a] text-[#ff453a]";
+
   return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      backgroundColor: '#000000',
-      padding: '24px',
-      overflowY: 'auto'
-    }}>
-      <h2 style={{ 
-        margin: '0 0 20px 0', 
-        fontSize: '18px', 
-        fontWeight: 600,
-        color: '#ffffff',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px'
-      }}>
-        <Bot size={20} color="#0a84ff" />
-        AI Output
-      </h2>
-
-      <div style={{
-        flex: 1,
-        backgroundColor: '#141415',
-        border: '1px solid #2a2a2c',
-        borderRadius: '16px',
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* Error State */}
-        {error && (
-          <div style={{
-            margin: '16px',
-            padding: '16px',
-            backgroundColor: 'rgba(255, 69, 58, 0.1)',
-            border: '1px solid rgba(255, 69, 58, 0.3)',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '12px'
-          }}>
-            <AlertCircle color="#ff453a" size={20} style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <h4 style={{ margin: '0 0 4px 0', color: '#ff453a', fontSize: '14px' }}>Generation Failed</h4>
-              <p style={{ margin: 0, color: '#ff9f9c', fontSize: '13px', lineHeight: 1.4 }}>
-                {error}
-              </p>
-            </div>
+    <div className="flex-1 bg-[#0a0a0a] overflow-y-auto border-l border-[#1c1c1e] p-6 lg:p-10 custom-scrollbar">
+      {/* Deliverability Scorecard */}
+      <div className="mb-8 p-5 bg-[#141415] rounded-2xl border border-[#2c2c2e] flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div
+            className={`w-16 h-16 rounded-full border-4 flex items-center justify-center font-bold text-xl ${scoreColor}`}
+          >
+            {score == null ? "—" : score}
           </div>
-        )}
-
-        {/* Loading State */}
-        {isGenerating && (
-          <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ height: '16px', width: '80%', borderRadius: '8px', backgroundColor: '#2a2a2c', opacity: 0.6 }} />
-            <div style={{ height: '16px', width: '95%', borderRadius: '8px', backgroundColor: '#2a2a2c', opacity: 0.6 }} />
-            <div style={{ height: '16px', width: '60%', borderRadius: '8px', backgroundColor: '#2a2a2c', opacity: 0.6 }} />
+          <div>
+            <h3 className="text-white font-semibold flex items-center gap-2">
+              Deliverability Score
+              {score != null && score > 80 ? (
+                <ShieldCheck size={16} className="text-[#30d158]" />
+              ) : score != null ? (
+                <ShieldAlert size={16} className="text-[#ff453a]" />
+              ) : null}
+            </h3>
+            <p className="text-[#86868b] text-sm">
+              {data.deliverabilityAdvice || "Optimized for inbox placement."}
+            </p>
           </div>
-        )}
+        </div>
 
-        {/* Empty State */}
-        {!result && !isGenerating && !error && (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#6e6e73',
-            fontSize: '14px',
-            padding: '32px',
-            textAlign: 'center'
-          }}>
-            Fill out the form on the left and click "Generate Magic" to see your result here.
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={openInGmail}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white rounded-full text-sm font-medium transition-all"
+          >
+            <ExternalLink size={14} /> Gmail
+          </button>
+          <button
+            onClick={openInOutlook}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1c1c1e] hover:bg-[#2c2c2e] text-white rounded-full text-sm font-medium transition-all"
+          >
+            <ExternalLink size={14} /> Outlook
+          </button>
+          <button
+            onClick={() => copyText(fullCopy, "all")}
+            className="flex items-center gap-2 px-4 py-2 bg-[#0a84ff] hover:bg-[#007aff] text-white rounded-full text-sm font-medium transition-all"
+          >
+            {copied === "all" ? <Check size={14} /> : <Copy size={14} />}
+            {copied === "all" ? "Copied" : "Copy All"}
+          </button>
+        </div>
+      </div>
 
-        {/* Result State */}
-        {result && !isGenerating && (
-          <>
-            <div style={{
-              position: 'absolute',
-              top: '16px',
-              right: '16px',
-              zIndex: 10
-            }}>
-              <button
-                onClick={handleCopy}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  backgroundColor: copied ? '#30d158' : '#1c1c1e',
-                  border: '1px solid #2a2a2c',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '12px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                }}
-                aria-label="Copy to clipboard"
+      {/* Spam triggers */}
+      {data.spamTriggers?.length > 0 && (
+        <div className="mb-8 p-4 bg-[#ff453a10] border border-[#ff453a30] rounded-xl">
+          <h4 className="text-[#ff453a] text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-2">
+            <ShieldAlert size={14} /> Spam triggers detected
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {data.spamTriggers.map((word: string, i: number) => (
+              <span
+                key={`${word}-${i}`}
+                className="px-2 py-1 bg-[#ff453a20] text-[#ff453a] text-xs rounded border border-[#ff453a30]"
               >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
+                {word}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* A/B subjects */}
+      {data.subjectVariations?.length > 0 && (
+        <div className="mb-8 border border-[#1c1c1e] rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowAB((v) => !v)}
+            className="w-full flex items-center justify-between p-4 bg-[#141415] text-white text-sm font-semibold"
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 size={16} className="text-[#bf5af2]" />
+              Subject line A/B variations ({data.subjectVariations.length})
             </div>
-            
-            <div 
-              className="hide-scrollbar"
-              style={{
-                padding: '24px',
-                paddingTop: '60px',
-                color: '#e5e5ea',
-                fontSize: '15px',
-                lineHeight: '1.6',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                overflowY: 'auto',
-                flex: 1
-              }}
+            {showAB ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+          {showAB && (
+            <div className="p-4 bg-[#0a0a0a] space-y-3">
+              {data.subjectVariations.map((sub: string, i: number) => (
+                <div
+                  key={`${sub}-${i}`}
+                  className="flex items-center justify-between gap-3 p-3 bg-[#141415] rounded-lg border border-[#1c1c1e] group"
+                >
+                  <span className="text-white text-sm">{sub}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyText(sub, "all")}
+                    className="shrink-0 text-[#0a84ff] text-xs opacity-70 group-hover:opacity-100 transition-opacity"
+                  >
+                    Copy
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Primary output */}
+      <div className="space-y-6">
+        {data.subject ? (
+          <div>
+            <label className="text-[#86868b] text-xs font-bold uppercase tracking-widest mb-2 block">
+              Primary subject
+            </label>
+            <div className="text-xl font-semibold text-white tracking-tight">
+              {data.subject}
+            </div>
+          </div>
+        ) : null}
+
+        <div>
+          <label className="text-[#86868b] text-xs font-bold uppercase tracking-widest mb-2 block">
+            Message body
+          </label>
+          <div className="text-[#d1d1d6] leading-relaxed whitespace-pre-wrap text-[17px] font-normal">
+            {data.body}
+          </div>
+        </div>
+
+        {/* Plain text one-click */}
+        <div className="flex flex-wrap gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => copyText(data.plainText || data.body, "plain")}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#1c1c1e] text-[#d1d1d6] hover:bg-[#2c2c2e] transition-all"
+          >
+            <FileText size={12} />
+            {copied === "plain" ? "Plain copied" : "Copy plain text"}
+          </button>
+        </div>
+
+        {/* Sanitized version */}
+        {data.sanitizedBody ? (
+          <div className="mt-6 pt-6 border-t border-[#1c1c1e]">
+            <button
+              type="button"
+              onClick={() => setShowSanitized((v) => !v)}
+              className="w-full flex items-center justify-between text-left"
             >
-              {result}
-            </div>
-          </>
-        )}
+              <label className="text-[#30d158] text-xs font-bold uppercase tracking-widest flex items-center gap-2 cursor-pointer">
+                <ShieldCheck size={14} /> Sanitized version (spam-light)
+              </label>
+              {showSanitized ? (
+                <ChevronUp size={16} className="text-[#86868b]" />
+              ) : (
+                <ChevronDown size={16} className="text-[#86868b]" />
+              )}
+            </button>
+            {showSanitized && (
+              <div className="mt-3">
+                <div className="text-[#86868b] leading-relaxed whitespace-pre-wrap text-[15px]">
+                  {data.sanitizedBody}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyText(data.sanitizedBody, "sanitized")}
+                  className="mt-3 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#1c1c1e] text-[#30d158] hover:bg-[#2c2c2e] transition-all"
+                >
+                  {copied === "sanitized" ? <Check size={12} /> : <Copy size={12} />}
+                  {copied === "sanitized" ? "Copied" : "Copy sanitized"}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

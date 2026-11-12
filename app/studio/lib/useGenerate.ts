@@ -2,7 +2,7 @@
 import { useState } from 'react';
 
 interface GenerateOptions {
-  onSuccess?: (result: string, newUsageCount: number, historyItem?: any) => void;
+  onSuccess?: (result: any, newUsageCount: number, historyItem?: any) => void;
   onError?: (error: string) => void;
 }
 
