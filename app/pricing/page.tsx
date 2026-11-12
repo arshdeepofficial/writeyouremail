@@ -2,26 +2,80 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Zap, Mail } from "lucide-react";
+import { ArrowLeft, Check, Zap, Mail, ArrowRight } from "lucide-react";
+
+function Logo({ size = 32, showText = true }: { size?: number; showText?: boolean }) {
+  return (
+    <Link href="/" className="flex items-center gap-2.5 group">
+      <div
+        className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-[#0a84ff] to-[#bf5af2] p-0.5 shadow-lg shadow-[#0a84ff25] group-hover:scale-105 transition-transform"
+        style={{ width: size, height: size }}
+      >
+        <div className="w-full h-full bg-[#0a0a0a] rounded-[10px] flex items-center justify-center">
+          <svg
+            width={size * 0.55}
+            height={size * 0.55}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-white"
+          >
+            <path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9" />
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            <path d="M18 15v6" />
+            <path d="M15 18h6" />
+          </svg>
+        </div>
+      </div>
+      {showText && (
+        <span className="font-bold tracking-tight text-white text-lg">
+          WriteYourEmail<span className="text-[#0a84ff]">.com</span>
+        </span>
+      )}
+    </Link>
+  );
+}
 
 export default function PricingPage() {
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#0a84ff30] selection:text-[#0a84ff]">
-      {/* Navigation */}
+      {/* Header Navigation */}
       <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-black/70 border-b border-[#1c1c1e]">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-sm font-semibold text-[#86868b] hover:text-white transition-colors">
-            <ArrowLeft size={16} /> Back to Home
-          </Link>
-          <div className="text-lg font-bold text-white">
-            WriteYourEmail<span className="text-[#0a84ff]">.com</span>
+          <Logo size={36} showText={true} />
+
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#86868b]">
+            <Link href="/studio" className="hover:text-white transition-colors">
+              Studio
+            </Link>
+            <Link href="/#modes" className="hover:text-white transition-colors">
+              30 Modes
+            </Link>
+            <Link href="/#features" className="hover:text-white transition-colors">
+              Features
+            </Link>
+            <Link href="/pricing" className="text-white font-semibold">
+              Pricing Passes
+            </Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-white transition-colors">
+              Terms
+            </Link>
+          </nav>
+
+          <div className="flex items-center gap-4">
+            <Link
+              href="/studio"
+              className="px-5 py-2.5 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-xs rounded-full transition-all shadow-lg shadow-[#0a84ff20]"
+            >
+              Launch Studio
+            </Link>
           </div>
-          <Link
-            href="/studio"
-            className="px-5 py-2.5 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-xs rounded-full transition-all shadow-lg shadow-[#0a84ff20]"
-          >
-            Launch Studio
-          </Link>
         </div>
       </header>
 
@@ -150,11 +204,14 @@ export default function PricingPage() {
       <footer className="py-8 px-6 border-t border-[#1c1c1e] text-xs text-[#86868b]">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div>© 2025 WriteYourEmail.com. All rights reserved.</div>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap gap-6 items-center">
             <Link href="/" className="hover:text-white transition-colors">Home</Link>
+            <Link href="/studio" className="hover:text-white transition-colors">Studio</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
-            <a href="mailto:help@writeyouremail.com" className="hover:text-white transition-colors">Support</a>
+            <a href="mailto:help@writeyouremail.com" className="text-[#0a84ff] hover:underline flex items-center gap-1 font-mono">
+              <Mail size={12} /> help@writeyouremail.com
+            </a>
           </div>
         </div>
       </footer>

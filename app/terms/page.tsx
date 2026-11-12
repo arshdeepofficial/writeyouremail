@@ -2,34 +2,85 @@
 
 import React from "react";
 import Link from "next/link";
-import { ArrowLeft, FileText, Mail, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { FileText, Mail, ShieldAlert, CheckCircle2 } from "lucide-react";
+
+function Logo({ size = 32, showText = true }: { size?: number; showText?: boolean }) {
+  return (
+    <Link href="/" className="flex items-center gap-2.5 group">
+      <div
+        className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-[#0a84ff] to-[#bf5af2] p-0.5 shadow-lg shadow-[#0a84ff25] group-hover:scale-105 transition-transform"
+        style={{ width: size, height: size }}
+      >
+        <div className="w-full h-full bg-[#0a0a0a] rounded-[10px] flex items-center justify-center">
+          <svg
+            width={size * 0.55}
+            height={size * 0.55}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-white"
+          >
+            <path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9" />
+            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+            <path d="M18 15v6" />
+            <path d="M15 18h6" />
+          </svg>
+        </div>
+      </div>
+      {showText && (
+        <span className="font-bold tracking-tight text-white text-lg">
+          WriteYourEmail<span className="text-[#0a84ff]">.com</span>
+        </span>
+      )}
+    </Link>
+  );
+}
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#0a84ff30] selection:text-[#0a84ff]">
-      {/* Navigation */}
+      {/* Header Navigation */}
       <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-black/70 border-b border-[#1c1c1e]">
-        <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm font-semibold text-[#86868b] hover:text-white transition-colors"
-          >
-            <ArrowLeft size={16} /> Back to Home
-          </Link>
-          <div className="text-sm font-bold text-white">
-            WriteYourEmail<span className="text-[#0a84ff]">.com</span>
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <Logo size={36} showText={true} />
+
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#86868b]">
+            <Link href="/studio" className="hover:text-white transition-colors">
+              Studio
+            </Link>
+            <Link href="/#modes" className="hover:text-white transition-colors">
+              30 Modes
+            </Link>
+            <Link href="/#features" className="hover:text-white transition-colors">
+              Features
+            </Link>
+            <Link href="/pricing" className="hover:text-white transition-colors">
+              Pricing Passes
+            </Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="text-white font-semibold">
+              Terms
+            </Link>
+          </nav>
+
+          <div className="flex items-center gap-4">
+            <Link
+              href="/studio"
+              className="px-4 py-2 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-xs rounded-full transition-all"
+            >
+              Open Studio
+            </Link>
           </div>
-          <Link
-            href="/studio"
-            className="px-4 py-2 bg-[#0a84ff] hover:bg-[#007aff] text-white font-semibold text-xs rounded-full transition-all"
-          >
-            Open Studio
-          </Link>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="pt-32 pb-20 px-6 max-w-4xl mx-auto">
+      <main className="pt-36 pb-20 px-6 max-w-4xl mx-auto">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#141415] border border-[#2c2c2e] text-xs font-semibold text-[#30d158] mb-6">
           <FileText size={14} />
           <span>Last Updated: January 2025</span>
@@ -43,72 +94,41 @@ export default function TermsPage() {
         </p>
 
         <div className="space-y-10 text-[#d1d1d6] text-sm leading-relaxed">
-          {/* Agreement */}
+          {/* Terms */}
           <section className="space-y-3">
             <h2 className="text-xl font-bold text-white">1. Agreement to Terms</h2>
             <p>
-              By accessing or using WriteYourEmail.com ("Service"), you agree to be bound by these Terms of Service. If you do not agree with any part of these terms, you may not access the Service.
+              By accessing or using WriteYourEmail.com ("Service"), you agree to be bound by these Terms of Service.
             </p>
           </section>
 
-          {/* Service Description */}
           <section className="p-6 rounded-2xl bg-[#141415] border border-[#1c1c1e] space-y-3">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-[#0a84ff]" /> 2. Description of Service
+              <CheckCircle2 size={18} className="text-[#0a84ff]" /> 2. Service Description
             </h2>
             <p>
-              WriteYourEmail.com provides AI-powered omni-channel sales outreach generation, deliverability scoring, spam trigger detection, and subject line variation tools. Content generation is governed by daily and monthly quotas according to your active access tier.
+              WriteYourEmail.com provides AI-powered omni-channel sales outreach generation, deliverability scoring, spam trigger detection, and subject line variation tools.
             </p>
           </section>
 
-          {/* Prepaid Passes & Payment */}
           <section className="space-y-3">
-            <h2 className="text-xl font-bold text-white">3. Prepaid 30-Day Passes & Monetization</h2>
+            <h2 className="text-xl font-bold text-white">3. Prepaid 30-Day Passes</h2>
             <p>
-              To maintain flexible, transparent pricing, WriteYourEmail.com operates on a <strong className="text-white">Prepaid Access Pass model</strong> processed via PayPal Standard Checkout Orders (v2).
-            </p>
-            <ul className="list-disc pl-5 space-y-2 text-[#86868b]">
-              <li><strong className="text-white">No Recurring Subscriptions:</strong> You purchase non-recurring 30-day (or 365-day) access passes. You will never be charged automatic recurring monthly fees.</li>
-              <li><strong className="text-white">Plan Expiry:</strong> Upon pass expiration, your account automatically reverts to the Free tier until a new pass is manually purchased.</li>
-              <li><strong className="text-white">Refunds:</strong> Refund requests submitted within 7 days of purchase to <a href="mailto:help@writeyouremail.com" className="text-[#0a84ff] hover:underline">help@writeyouremail.com</a> are evaluated on a case-by-case basis.</li>
-            </ul>
-          </section>
-
-          {/* Ownership */}
-          <section className="space-y-3">
-            <h2 className="text-xl font-bold text-white">4. Intellectual Property & Output Ownership</h2>
-            <p>
-              <strong className="text-white">You own all email copy and outreach content</strong> generated using WriteYourEmail.com. We claim no ownership or copyright over the outputs produced for your campaigns. You are free to edit, send, publish, and commercialize generated text without restriction.
+              WriteYourEmail.com operates on a <strong className="text-white">Prepaid Access Pass model</strong> via PayPal Standard Checkout Orders (v2). No automatic recurring charges apply.
             </p>
           </section>
 
-          {/* Acceptable Use */}
           <section className="p-6 rounded-2xl bg-[#141415] border border-[#1c1c1e] space-y-3">
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <ShieldAlert size={18} className="text-[#ff453a]" /> 5. Acceptable Use Policy
+              <ShieldAlert size={18} className="text-[#ff453a]" /> 4. Ownership & Content Rights
             </h2>
-            <p>You agree NOT to use WriteYourEmail.com to:</p>
-            <ul className="list-disc pl-5 space-y-1.5 text-[#86868b]">
-              <li>Generate illegal, harmful, harassing, or fraudulent communications.</li>
-              <li>Attempt to bypass API quota limits or reverse-engineer system endpoints.</li>
-              <li>Distribute malware, phishing links, or deception vectors.</li>
-            </ul>
-          </section>
-
-          {/* Limitation of Liability */}
-          <section className="space-y-3">
-            <h2 className="text-xl font-bold text-white">6. Limitation of Liability</h2>
             <p>
-              WriteYourEmail.com is provided "as is" without warranty of any kind. While our Deliverability Scorecard reduces spam risk, we do not guarantee specific open rates, response rates, or domain reputation outcomes for your sales campaigns.
+              <strong className="text-white">You own all generated content</strong>. You retain 100% rights to edit, commercialize, and send generated outputs.
             </p>
           </section>
 
-          {/* Support */}
           <section className="space-y-3">
-            <h2 className="text-xl font-bold text-white">7. Support & Inquiries</h2>
-            <p>
-              For technical assistance, billing queries, or legal notices, contact our support desk:
-            </p>
+            <h2 className="text-xl font-bold text-white">5. Support Enquiries</h2>
             <div className="p-4 rounded-xl bg-[#141415] border border-[#2c2c2e] inline-flex items-center gap-3 text-white font-mono text-sm">
               <Mail size={16} className="text-[#0a84ff]" />
               <a href="mailto:help@writeyouremail.com" className="hover:underline text-[#0a84ff]">
@@ -121,10 +141,11 @@ export default function TermsPage() {
 
       {/* Footer */}
       <footer className="py-8 px-6 border-t border-[#1c1c1e] text-xs text-[#86868b]">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div>© 2025 WriteYourEmail.com. All rights reserved.</div>
           <div className="flex gap-6">
             <Link href="/" className="hover:text-white transition-colors">Home</Link>
+            <Link href="/studio" className="hover:text-white transition-colors">Studio</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
             <Link href="/pricing" className="hover:text-white transition-colors">Pricing Passes</Link>
             <a href="mailto:help@writeyouremail.com" className="hover:text-white transition-colors">Support</a>

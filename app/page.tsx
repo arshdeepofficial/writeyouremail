@@ -14,13 +14,15 @@ import {
   ExternalLink,
   MousePointerClick,
   Mail,
+  Shield,
+  FileText,
 } from "lucide-react";
 
 function Logo({ size = 32, showText = true }: { size?: number; showText?: boolean }) {
   return (
-    <div className="flex items-center gap-2.5">
+    <Link href="/" className="flex items-center gap-2.5 group">
       <div
-        className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-[#0a84ff] to-[#bf5af2] p-0.5 shadow-lg shadow-[#0a84ff25]"
+        className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-[#0a84ff] to-[#bf5af2] p-0.5 shadow-lg shadow-[#0a84ff25] group-hover:scale-105 transition-transform"
         style={{ width: size, height: size }}
       >
         <div className="w-full h-full bg-[#0a0a0a] rounded-[10px] flex items-center justify-center">
@@ -47,7 +49,7 @@ function Logo({ size = 32, showText = true }: { size?: number; showText?: boolea
           WriteYourEmail<span className="text-[#0a84ff]">.com</span>
         </span>
       )}
-    </div>
+    </Link>
   );
 }
 
@@ -61,26 +63,30 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-[#0a84ff30] selection:text-[#0a84ff] overflow-x-hidden">
-      {/* 1. Header Navigation */}
+      {/* 1. Universal Header Navigation */}
       <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-xl bg-black/70 border-b border-[#1c1c1e]">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Logo size={36} showText={true} />
-          </div>
+          <Logo size={36} showText={true} />
 
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[#86868b]">
-            <a href="#features" className="hover:text-white transition-colors">
+            <Link href="/studio" className="hover:text-white transition-colors">
+              Studio
+            </Link>
+            <Link href="/#modes" className="hover:text-white transition-colors">
+              30 Modes
+            </Link>
+            <Link href="/#features" className="hover:text-white transition-colors">
               Features
-            </a>
-            <a href="#modes" className="hover:text-white transition-colors">
-              30 Outreach Modes
-            </a>
+            </Link>
             <Link href="/pricing" className="hover:text-white transition-colors">
               Pricing Passes
             </Link>
-            <a href="#faq" className="hover:text-white transition-colors">
-              FAQ
-            </a>
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-white transition-colors">
+              Terms
+            </Link>
           </nav>
 
           <div className="flex items-center gap-4">
@@ -120,12 +126,12 @@ export default function LandingPage() {
             Start Writing Free
             <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
           </Link>
-          <a
-            href="#demo"
+          <Link
+            href="/pricing"
             className="w-full sm:w-auto px-8 py-4 bg-[#141415] hover:bg-[#1c1c1e] text-white font-semibold text-base rounded-full border border-[#2c2c2e] transition-all flex items-center justify-center gap-2"
           >
-            Explore 30 Modes
-          </a>
+            View Pricing Passes
+          </Link>
         </div>
 
         {/* Social Proof Stats */}
@@ -447,7 +453,7 @@ export default function LandingPage() {
               <ul className="space-y-3 text-xs text-[#d1d1d6] mb-8">
                 <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Unlimited Generations & 30 Modes</li>
                 <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> VIP Support Chatbot</li>
-                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Custom Mode Requests</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-[#ffd60a]" /> Priority Custom Modes</li>
               </ul>
             </div>
             <Link
@@ -534,7 +540,7 @@ export default function LandingPage() {
 
           <div className="flex flex-wrap gap-6 items-center">
             <Link href="/studio" className="hover:text-white transition-colors">
-              App Studio
+              Studio
             </Link>
             <Link href="/pricing" className="hover:text-white transition-colors">
               Pricing Passes
