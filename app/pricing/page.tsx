@@ -3,7 +3,22 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
-import { Check, Sparkles, Tag, ShieldCheck, Zap, Lock, ArrowRight, Mail, UserCheck, AlertCircle, Loader2 } from "lucide-react";
+import { 
+  Check, 
+  Sparkles, 
+  Tag, 
+  ShieldCheck, 
+  Zap, 
+  Lock, 
+  ArrowRight, 
+  UserCheck, 
+  AlertCircle, 
+  Loader2,
+  Calendar,
+  Clock,
+  CheckCircle2,
+  PlusCircle
+} from "lucide-react";
 
 declare global {
   interface Window {
@@ -34,6 +49,13 @@ export default function PricingPage() {
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<any>(null);
   
+  // Active subscription status from Supabase
+  const [activeSub, setActiveSub] = useState<{
+    plan_tier: string;
+    subscription_ends_at: string;
+  } | null>(null);
+  const [subLoading, setSubLoading] = useState(true);
+
   // Promo code engine state
   const [promoCode, setPromoCode] = useState("");
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
@@ -47,7 +69,7 @@ export default function PricingPage() {
     name: string;
     basePrice: number;
   } | null>(null);
-  
+
   // In-modal authentication state
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -59,16 +81,26 @@ export default function PricingPage() {
 
   useEffect(() => {
     setMounted(true);
-    // Check initial user authentication state
-    supabase.auth.getUser().then(({ data }) => {
+
+    const loadUserAndSubscription = async () => {
+      setSubLoading(true);
+      const { data } = await supabase.auth.getUser();
       if (data?.user) {
         setUser(data.user);
+        await fetchUserSubscription(data.user.id);
       }
-    });
+      setSubLoading(false);
+    };
 
-    // Listen for auth state changes
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+    loadUserAndSubscription();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        await fetchUserSubscription(session.user.id);
+      } else {
+        setActiveSub(null);
+      }
     });
 
     return () => {
@@ -76,7 +108,36 @@ export default function PricingPage() {
     };
   }, []);
 
-  // Load PayPal SDK dynamically when user is authenticated & modal is open
+  const fetchUserSubscription = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("usage_tracking")
+        .select("plan_tier, subscription_ends_at")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching usage tracking:", error);
+        return;
+      }
+
+      if (data && data.subscription_ends_at) {
+        const isStillValid = new Date(data.subscription_ends_at) > new Date();
+        if (isStillValid) {
+          setActiveSub({
+            plan_tier: data.plan_tier || "starter",
+            subscription_ends_at: data.subscription_ends_at,
+          });
+        } else {
+          setActiveSub(null);
+        }
+      }
+    } catch (err) {
+      console.error("Subscription check error:", err);
+    }
+  };
+
+  // Load PayPal SDK dynamically when modal opens
   useEffect(() => {
     if (selectedPlan && user && mounted) {
       const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "sb";
@@ -142,6 +203,7 @@ export default function PricingPage() {
         if (error) throw error;
         if (data.user) {
           setUser(data.user);
+          await fetchUserSubscription(data.user.id);
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -152,6 +214,7 @@ export default function PricingPage() {
         if (error) throw error;
         if (data.user) {
           setUser(data.user);
+          await fetchUserSubscription(data.user.id);
         }
       }
     } catch (err: any) {
@@ -159,6 +222,15 @@ export default function PricingPage() {
     } finally {
       setAuthLoading(false);
     }
+  };
+
+  // Stackable expiration calculation
+  const getStackedExpiryDate = () => {
+    const baseDate = activeSub?.subscription_ends_at && new Date(activeSub.subscription_ends_at) > new Date()
+      ? new Date(activeSub.subscription_ends_at)
+      : new Date();
+    
+    return new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000);
   };
 
   const renderPayPalButtons = () => {
@@ -181,31 +253,35 @@ export default function PricingPage() {
           return actions.order.create({
             purchase_units: [
               {
-                description: `WriteYourEmail.com - ${selectedPlan.name} (30 Days) for ${user.email}`,
+                description: `WriteYourEmail.com - ${selectedPlan.name} (+30 Days) for ${user.email}`,
                 amount: {
                   currency_code: "USD",
                   value: finalPrice,
                 },
-                custom_id: user.id, // Links purchase directly to user Supabase ID
+                custom_id: user.id,
               },
             ],
           });
         },
         onApprove: async (_data: any, actions: any) => {
-          setCheckoutStatus("Processing payment & activating pass...");
+          setCheckoutStatus("Processing payment & extending active pass...");
           try {
             const details = await actions.order.capture();
-            
-            // Record usage tracking / subscription in Supabase DB
+            const newExpiryISO = getStackedExpiryDate().toISOString();
+
+            // Record updated stackable subscription in Supabase
             await supabase.from("usage_tracking").upsert({
               user_id: user.id,
               plan_tier: selectedPlan.id,
-              subscription_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              subscription_ends_at: newExpiryISO,
             });
 
-            setCheckoutStatus(`✅ Payment successful! 30-Day ${selectedPlan.name} activated for ${user.email}. Order ID: ${details.id}`);
+            // Refresh UI active subscription state
+            await fetchUserSubscription(user.id);
+
+            setCheckoutStatus(`✅ Success! ${selectedPlan.name} active until ${new Date(newExpiryISO).toLocaleDateString()}. Order ID: ${details.id}`);
           } catch (err) {
-            setCheckoutStatus("❌ Payment capture failed. Please contact help@writeyouremail.com with your PayPal receipt.");
+            setCheckoutStatus("❌ Payment capture failed. Please contact help@writeyouremail.com with your receipt.");
           }
         },
         onError: (err: any) => {
@@ -232,7 +308,6 @@ export default function PricingPage() {
         "Subject Line A/B Matrix (5 variations)",
         "1-Click Gmail & Outlook Launch",
       ],
-      cta: "Get Starter Pass",
     },
     {
       id: "growth",
@@ -251,7 +326,6 @@ export default function PricingPage() {
         "Multi-Step Follow-Up Generator",
         "1-Click Direct Email Launch",
       ],
-      cta: "Get Growth Pass",
     },
     {
       id: "enterprise",
@@ -269,9 +343,14 @@ export default function PricingPage() {
         "Direct Support: help@writeyouremail.com",
         "Commercial Usage Rights",
       ],
-      cta: "Get Enterprise Pass",
     },
   ];
+
+  const getDaysRemaining = (endsAt: string) => {
+    const diffTime = new Date(endsAt).getTime() - new Date().getTime();
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 0;
+  };
 
   return (
     <div className="min-h-screen bg-[#000000] text-gray-100 font-sans selection:bg-[#0a84ff] selection:text-white">
@@ -315,11 +394,11 @@ export default function PricingPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            {user ? (
+            {user && (
               <span className="text-xs text-gray-400 font-mono hidden sm:inline">
-                Logged in as: <strong className="text-white">{user.email}</strong>
+                Logged in: <strong className="text-white">{user.email}</strong>
               </span>
-            ) : null}
+            )}
             <Link
               href="/studio"
               className="rounded-xl bg-[#0a84ff] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0071e3] shadow-lg shadow-[#0a84ff]/25"
@@ -330,7 +409,42 @@ export default function PricingPage() {
         </div>
       </nav>
 
-      <main className="mx-auto max-w-7xl px-6 py-16">
+      <main className="mx-auto max-w-7xl px-6 py-12">
+        {/* Active Pass Banner (If Logged In with Active Plan) */}
+        {activeSub && (
+          <div className="mx-auto max-w-4xl mb-12 rounded-3xl border border-[#30d158]/30 bg-[#30d158]/10 p-6 md:p-8 backdrop-blur-xl shadow-2xl">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#30d158]/20 text-[#30d158] shrink-0">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-[#30d158]/20 px-3 py-0.5 text-xs font-bold text-[#30d158] uppercase tracking-wider mb-1">
+                    Active Pass Verified
+                  </div>
+                  <h3 className="text-xl font-extrabold text-white">
+                    You are currently on the <span className="text-[#30d158] uppercase">{activeSub.plan_tier} PASS</span>
+                  </h3>
+                  <p className="mt-1 text-xs text-gray-300 flex items-center gap-2 font-mono">
+                    <Calendar className="h-3.5 w-3.5 text-[#30d158]" /> Valid until:{" "}
+                    <strong className="text-white">{new Date(activeSub.subscription_ends_at).toLocaleDateString()}</strong>
+                    <span className="text-gray-400">({getDaysRemaining(activeSub.subscription_ends_at)} days remaining)</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/studio"
+                  className="rounded-xl bg-[#30d158] px-5 py-2.5 text-sm font-bold text-black hover:bg-[#28b84c] transition shadow-lg shrink-0"
+                >
+                  Use Studio Now
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#0a84ff]/30 bg-[#0a84ff]/10 px-4 py-1.5 text-xs font-semibold text-[#0a84ff] mb-4">
@@ -341,7 +455,7 @@ export default function PricingPage() {
           </h1>
           <p className="mt-4 text-lg text-gray-400">
             Pay once for 30 days of high-deliverability AI email generation. 
-            No recurring billing, cancel anytime because it never auto-renews.
+            No recurring billing. Purchasing a pass while active adds +30 days to your current balance!
           </p>
         </div>
 
@@ -381,21 +495,28 @@ export default function PricingPage() {
           {plans.map((plan) => {
             const hasDiscount = discountPercent > 0;
             const finalPrice = calculatePrice(plan.basePrice);
+            const isCurrentActive = activeSub?.plan_tier?.toLowerCase() === plan.id;
 
             return (
               <div
                 key={plan.id}
                 className={`relative flex flex-col rounded-3xl border p-8 transition-all ${
-                  plan.popular
+                  isCurrentActive
+                    ? "border-[#30d158] bg-[#141415] ring-2 ring-[#30d158] shadow-2xl shadow-[#30d158]/10"
+                    : plan.popular
                     ? "border-[#0a84ff] bg-[#141415] shadow-2xl shadow-[#0a84ff]/10 ring-1 ring-[#0a84ff]"
                     : "border-[#1c1c1e] bg-[#0a0a0a] hover:border-[#222224]"
                 }`}
               >
-                {plan.popular && (
+                {isCurrentActive ? (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-[#30d158] px-4 py-1 text-xs font-extrabold tracking-wider text-black uppercase shadow-md flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Current Active Pass
+                  </div>
+                ) : plan.popular ? (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#0a84ff] to-[#bf5af2] px-4 py-1 text-xs font-bold tracking-wider text-white uppercase shadow-md">
                     Most Popular
                   </div>
-                )}
+                ) : null}
 
                 <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                 <p className="mt-2 text-xs text-gray-400 min-h-[32px]">{plan.description}</p>
@@ -439,12 +560,20 @@ export default function PricingPage() {
                     setCheckoutStatus(null);
                   }}
                   className={`w-full rounded-xl py-3 px-4 text-sm font-semibold transition flex items-center justify-center gap-2 ${
-                    plan.popular
+                    isCurrentActive
+                      ? "bg-[#30d158] text-black hover:bg-[#28b84c] shadow-lg shadow-[#30d158]/20"
+                      : plan.popular
                       ? "bg-[#0a84ff] text-white hover:bg-[#0071e3] shadow-lg shadow-[#0a84ff]/20"
                       : "bg-[#1c1c1e] text-white hover:bg-[#222224] border border-[#222224]"
                   }`}
                 >
-                  <span>{plan.cta}</span>
+                  <span>
+                    {isCurrentActive
+                      ? "Extend Pass (+30 Days)"
+                      : activeSub
+                      ? `Switch to ${plan.name} (+30 Days)`
+                      : `Get ${plan.name}`}
+                  </span>
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
@@ -501,7 +630,7 @@ export default function PricingPage() {
               </div>
             </div>
 
-            {/* STEP 1: If User Is NOT Logged In -> Show In-Modal Account Creation */}
+            {/* If User Is NOT Logged In -> Show Account Creation */}
             {!user ? (
               <div className="my-4 space-y-4">
                 <div className="rounded-2xl border border-[#0a84ff]/30 bg-[#0a84ff]/10 p-4">
@@ -576,11 +705,19 @@ export default function PricingPage() {
                 </form>
               </div>
             ) : (
-              /* STEP 2: User IS Logged In -> Show PayPal Buttons linked to User Email */
+              /* User IS Logged In -> Show PayPal Buttons & Extension Date Preview */
               <div className="space-y-4">
-                <div className="flex items-center justify-between rounded-xl border border-[#222224] bg-[#1c1c1e] px-4 py-2.5 text-xs text-gray-300">
-                  <span>Purchasing pass for:</span>
-                  <strong className="text-white font-mono">{user.email}</strong>
+                <div className="rounded-xl border border-[#222224] bg-[#1c1c1e] p-3 text-xs text-gray-300 space-y-1">
+                  <div className="flex justify-between">
+                    <span>Purchasing pass for:</span>
+                    <strong className="text-white font-mono">{user.email}</strong>
+                  </div>
+                  {activeSub && (
+                    <div className="flex justify-between text-[#30d158] font-medium pt-1 border-t border-[#222224]">
+                      <span>New Expiration Date:</span>
+                      <strong>{getStackedExpiryDate().toLocaleDateString()} (+30 days)</strong>
+                    </div>
+                  )}
                 </div>
 
                 {checkoutStatus ? (
