@@ -42,9 +42,10 @@ import {
   Menu,
   X,
   Lock,
-  Zap,
-  ChevronRight,
+  ChevronDown,
   User,
+  LogOut,
+  LogIn,
   ShieldCheck,
   Building
 } from 'lucide-react';
@@ -108,6 +109,15 @@ export default function StudioPage() {
   const [usageCount, setUsageCount] = useState<number>(0);
   const [usageLimit, setUsageLimit] = useState<number>(5);
 
+  // Profile Menu & Auth Modal State
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authEmail, setAuthEmail] = useState<string>('');
+  const [authPassword, setAuthPassword] = useState<string>('');
+  const [authLoading, setAuthLoading] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   // Strategy Sidebar & Search State
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedMode, setSelectedMode] = useState<ModeConfig>(MODES[0]);
@@ -117,7 +127,7 @@ export default function StudioPage() {
   // Dynamic Form Field State Map
   const [formData, setFormData] = useState<Record<string, string>>({});
 
-  // Generation & Deliverability Output State
+  // Generation & Output State
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [genResult, setGenResult] = useState<AiGeneratedResult | null>(null);
   const [activeSubjectTab, setActiveSubjectTab] = useState<number>(0);
@@ -129,17 +139,24 @@ export default function StudioPage() {
   const [copiedSubject, setCopiedSubject] = useState<boolean>(false);
   const [copiedBody, setCopiedBody] = useState<boolean>(false);
 
-  // Load User Data & Usage Limits from Supabase
+  // Load User Data & Setup Realtime Auth Listener
   useEffect(() => {
-    async function loadUserData() {
-      if (!supabase) return;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
+    async function loadUserData(currentUser: any) {
+      if (!supabase || !currentUser) {
+        setUser(null);
+        setPlanTier('free');
+        setUsageCount(0);
+        setUsageLimit(5);
+        return;
+      }
+
+      setUser(currentUser);
+
+      try {
         const { data } = await supabase
           .from('usage_tracking')
           .select('plan_tier, count, subscription_ends_at')
-          .eq('user_id', session.user.id)
+          .eq('user_id', currentUser.id)
           .maybeSingle();
 
         if (data) {
@@ -150,12 +167,25 @@ export default function StudioPage() {
             tier === 'starter' ? 50 : tier === 'growth' || tier === 'enterprise' ? 999999 : 5
           );
         }
+      } catch (err) {
+        console.warn('Error fetching usage tracking:', err);
       }
     }
-    loadUserData();
+
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        loadUserData(session?.user || null);
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        loadUserData(session?.user || null);
+      });
+
+      return () => subscription.unsubscribe();
+    }
   }, []);
 
-  // Initialize form default values whenever selected mode changes
+  // Reset/Initialize form fields when selected mode changes
   useEffect(() => {
     const initialForm: Record<string, string> = {};
     selectedMode.fields.forEach((field) => {
@@ -173,9 +203,60 @@ export default function StudioPage() {
     setFormData((prev) => ({ ...prev, [fieldId]: value }));
   };
 
+  // Auth Operations
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+
+    if (!supabase) {
+      setAuthError('Authentication service unavailable.');
+      return;
+    }
+
+    if (!authEmail || !authPassword) {
+      setAuthError('Please fill in all email and password fields.');
+      return;
+    }
+
+    setAuthLoading(true);
+
+    try {
+      if (authMode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword
+        });
+        if (error) throw error;
+      }
+
+      setIsAuthModalOpen(false);
+      setAuthEmail('');
+      setAuthPassword('');
+    } catch (err: any) {
+      setAuthError(err.message || 'Authentication failed. Check your credentials.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setUser(null);
+    setPlanTier('free');
+    setUsageCount(0);
+    setUsageLimit(5);
+    setIsProfileMenuOpen(false);
+  };
+
   const categories = ['All', 'starter', 'growth', 'enterprise'];
 
-  // Filter modes based on category and search query
   const filteredModes = MODES.filter((m) => {
     const matchesCategory = selectedCategory === 'All' || m.tier === selectedCategory.toLowerCase();
     const matchesSearch =
@@ -227,7 +308,6 @@ export default function StudioPage() {
         setActiveSubjectTab(0);
         setShowSanitized(false);
 
-        // Append to local history list
         setHistory((prev) => [
           {
             id: Date.now().toString(),
@@ -244,7 +324,7 @@ export default function StudioPage() {
         setUsageCount(data.newUsageCount);
       }
     } catch (err: any) {
-      setGenError(err.message || 'An unexpected error occurred while processing your request.');
+      setGenError(err.message || 'An unexpected error occurred while generating email.');
     } finally {
       setIsGenerating(false);
     }
@@ -274,8 +354,8 @@ export default function StudioPage() {
   const ModeIcon = ICON_MAP[selectedMode.iconName] || Mail;
 
   return (
-    <div className="min-h-screen bg-[#000000] text-gray-100 flex flex-col font-sans selection:bg-[#0a84ff] selection:text-white">
-      {/* Dynamic Header */}
+    <div className="min-h-screen bg-[#000000] text-gray-100 flex flex-col font-sans selection:bg-[#0a84ff] selection:text-white relative">
+      {/* Studio Header */}
       <header className="sticky top-0 z-40 border-b border-[#222224] bg-[#000000]/80 backdrop-blur-md px-4 lg:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <Link href="/" className="flex items-center space-x-2 group">
@@ -292,7 +372,7 @@ export default function StudioPage() {
         </div>
 
         <div className="flex items-center space-x-3">
-          {/* Usage Badge */}
+          {/* Usage Counter Pill */}
           <div className="hidden md:flex items-center space-x-2 px-3 py-1.5 rounded-full bg-[#141415] border border-[#222224] text-xs">
             <span className="text-gray-400">Generations:</span>
             <span className="font-bold text-white">
@@ -319,6 +399,66 @@ export default function StudioPage() {
             <span>Upgrade Pass</span>
           </Link>
 
+          {/* User Auth & Profile Control */}
+          <div className="relative">
+            {user ? (
+              <button
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                className="flex items-center space-x-2 p-1.5 pl-2.5 pr-2 rounded-xl bg-[#141415] border border-[#222224] hover:border-[#0a84ff] transition-all text-xs text-white"
+              >
+                <div className="w-5 h-5 rounded-full bg-[#0a84ff] flex items-center justify-center text-[10px] font-bold text-white uppercase">
+                  {user.email ? user.email.charAt(0) : 'U'}
+                </div>
+                <span className="hidden sm:inline font-medium max-w-[110px] truncate">
+                  {user.email ? user.email.split('@')[0] : 'Account'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-[#141415] border border-[#222224] hover:border-[#0a84ff] transition-colors text-xs font-medium text-white"
+              >
+                <LogIn className="w-3.5 h-3.5 text-[#0a84ff]" />
+                <span>Log In</span>
+              </button>
+            )}
+
+            {/* Logged-In User Profile Dropdown Menu */}
+            {isProfileMenuOpen && user && (
+              <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#141415] border border-[#222224] shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-2.5 border-b border-[#222224] mb-1">
+                  <div className="text-xs font-semibold text-white truncate">{user.email}</div>
+                  <div className="flex items-center space-x-1.5 mt-1">
+                    <span className="text-[10px] px-1.5 py-0.2 rounded font-bold uppercase bg-[#0a84ff]/20 text-[#0a84ff]">
+                      {planTier} Plan
+                    </span>
+                    <span className="text-[10px] text-gray-400 font-mono">{usageCount} used</span>
+                  </div>
+                </div>
+
+                <Link
+                  href="/pricing"
+                  onClick={() => setIsProfileMenuOpen(false)}
+                  className="w-full text-left px-3 py-2 rounded-xl text-xs text-gray-300 hover:text-white hover:bg-[#1c1c1e] flex items-center justify-between transition-colors mb-1"
+                >
+                  <div className="flex items-center space-x-2">
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Manage Subscription</span>
+                  </div>
+                </Link>
+
+                <button
+                  onClick={handleSignOut}
+                  className="w-full text-left px-3 py-2 rounded-xl text-xs text-red-400 hover:bg-red-500/10 flex items-center space-x-2 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Mobile Drawer Button (< lg screens) */}
           <button
             onClick={() => setMobileDrawerOpen(true)}
@@ -330,7 +470,7 @@ export default function StudioPage() {
         </div>
       </header>
 
-      {/* Main 3-Column Responsive Studio Layout */}
+      {/* Main 3-Column Studio Layout */}
       <main className="flex-1 max-w-[1700px] w-full mx-auto p-3 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* COLUMN 1: Categorized Modes Sidebar (Desktop View) */}
@@ -355,7 +495,7 @@ export default function StudioPage() {
             />
           </div>
 
-          {/* Category / Tier Filters */}
+          {/* Category Filters */}
           <div className="flex space-x-1 overflow-x-auto pb-2 mb-2 border-b border-[#222224] [::-webkit-scrollbar]:hidden">
             {categories.map((cat) => (
               <button
@@ -372,7 +512,7 @@ export default function StudioPage() {
             ))}
           </div>
 
-          {/* Scrollable Modes List */}
+          {/* Scrollable Mode List */}
           <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 text-xs">
             {filteredModes.map((mode) => {
               const IconComp = ICON_MAP[mode.iconName] || Mail;
@@ -522,7 +662,7 @@ export default function StudioPage() {
           </div>
         </section>
 
-        {/* COLUMN 3: Deliverability Scorecard & Generated Output Panel */}
+        {/* COLUMN 3: Deliverability Scorecard & Output Panel */}
         <section className="lg:col-span-4 space-y-4">
           <div className="bg-[#141415] border border-[#222224] rounded-2xl p-5 flex flex-col justify-between min-h-[380px]">
             <div>
@@ -627,7 +767,7 @@ export default function StudioPage() {
                     </div>
                   </div>
 
-                  {/* Direct Launch Buttons */}
+                  {/* Direct Mail Launchers */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <a
                       href={`https://mail.google.com/mail/?view=cm&fs=1&tf=1&su=${encodeURIComponent(currentSubject)}&body=${encodeURIComponent(currentBody)}`}
@@ -770,6 +910,109 @@ export default function StudioPage() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AUTH MODAL DIALOG (LOGIN / SIGN UP) */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-[#141415] border border-[#222224] rounded-2xl w-full max-w-md p-6 relative shadow-2xl">
+            <button
+              onClick={() => setIsAuthModalOpen(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#0a84ff] to-[#bf5af2] mx-auto flex items-center justify-center font-bold text-white mb-3 shadow-lg shadow-[#0a84ff]/20">
+                W
+              </div>
+              <h3 className="font-semibold text-lg text-white">
+                {authMode === 'login' ? 'Log in to WriteYourEmail' : 'Create your account'}
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                {authMode === 'login'
+                  ? 'Access your generated emails and pass status'
+                  : 'Start writing deliverability-optimized emails in seconds'}
+              </p>
+            </div>
+
+            {authError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Email Address</label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
+                  <input
+                    type="email"
+                    placeholder="name@company.com"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    className="w-full bg-[#1c1c1e] border border-[#222224] rounded-xl pl-9 pr-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#0a84ff]"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Password</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3 top-3 text-gray-500" />
+                  <input
+                    type="password"
+                    placeholder="••••••••"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    className="w-full bg-[#1c1c1e] border border-[#222224] rounded-xl pl-9 pr-3 py-2.5 text-xs text-white focus:outline-none focus:border-[#0a84ff]"
+                    required
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full py-3 rounded-xl bg-[#0a84ff] hover:bg-[#0a84ff]/90 text-white font-semibold text-xs tracking-wide transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
+              >
+                {authLoading ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <span>{authMode === 'login' ? 'Sign In' : 'Create Account'}</span>
+                )}
+              </button>
+            </form>
+
+            <div className="mt-5 pt-4 border-t border-[#222224] text-center text-xs text-gray-400">
+              {authMode === 'login' ? (
+                <p>
+                  Don't have an account?{' '}
+                  <button
+                    onClick={() => { setAuthMode('signup'); setAuthError(null); }}
+                    className="text-[#0a84ff] font-semibold hover:underline"
+                  >
+                    Sign up
+                  </button>
+                </p>
+              ) : (
+                <p>
+                  Already have an account?{' '}
+                  <button
+                    onClick={() => { setAuthMode('login'); setAuthError(null); }}
+                    className="text-[#0a84ff] font-semibold hover:underline"
+                  >
+                    Log in
+                  </button>
+                </p>
+              )}
             </div>
           </div>
         </div>
