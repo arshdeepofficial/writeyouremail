@@ -47,15 +47,16 @@ import {
   LogOut,
   LogIn,
   ShieldCheck,
-  Building
+  Building,
+  Trash2
 } from 'lucide-react';
 
-// Initialize Supabase Client dynamically
+// Initialize Supabase Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = (supabaseUrl && supabaseAnonKey) ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
-// Safe Lucide Icon mapping for modeSchemas iconName strings
+// Icon mapping helper
 const ICON_MAP: Record<string, React.ElementType> = {
   Mail,
   Sparkles,
@@ -102,6 +103,15 @@ interface AiGeneratedResult {
   plainText?: string;
 }
 
+interface HistoryItem {
+  id: string;
+  subject: string;
+  body: string;
+  mode: string;
+  modeId?: string;
+  date: string;
+}
+
 export default function StudioPage() {
   // User Authentication & Plan State
   const [user, setUser] = useState<any>(null);
@@ -134,19 +144,80 @@ export default function StudioPage() {
   const [showSanitized, setShowSanitized] = useState<boolean>(false);
   const [genError, setGenError] = useState<string | null>(null);
 
-  // Recent History & Feedback State
-  const [history, setHistory] = useState<Array<{ id: string; subject: string; body: string; mode: string; date: string }>>([]);
+  // Persistent History State
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [copiedSubject, setCopiedSubject] = useState<boolean>(false);
   const [copiedBody, setCopiedBody] = useState<boolean>(false);
 
-  // Load User Data & Setup Realtime Auth Listener
+  // Helper to fetch user history from Supabase or LocalStorage
+  const fetchUserHistory = async (userId?: string) => {
+    // 1. Try fetching from Supabase if logged in
+    if (userId && supabase) {
+      try {
+        const { data: dbEmails } = await supabase
+          .from('emails')
+          .select('id, mode, content, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(15);
+
+        if (dbEmails && dbEmails.length > 0) {
+          const loaded: HistoryItem[] = dbEmails.map((item: any) => {
+            let subject = 'Generated Email';
+            let body = item.content || '';
+
+            if (item.content && item.content.includes('Subject:')) {
+              const parts = item.content.split('\n\n');
+              subject = parts[0].replace(/^Subject:\s*/i, '').trim();
+              body = parts.slice(1).join('\n\n').trim();
+            }
+
+            const modeObj = MODES.find((m) => m.id === item.mode);
+            const modeName = modeObj ? modeObj.name : item.mode || 'Outreach';
+
+            const dateStr = item.created_at
+              ? new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : 'Recent';
+
+            return {
+              id: item.id || Date.now().toString(),
+              subject,
+              body,
+              mode: modeName,
+              modeId: item.mode,
+              date: dateStr
+            };
+          });
+
+          setHistory(loaded);
+          try {
+            localStorage.setItem('wye_recent_history', JSON.stringify(loaded));
+          } catch (e) {}
+          return;
+        }
+      } catch (err) {
+        console.warn('Error loading history from DB:', err);
+      }
+    }
+
+    // 2. Fallback to LocalStorage for guest / empty DB
+    try {
+      const cached = localStorage.getItem('wye_recent_history');
+      if (cached) {
+        setHistory(JSON.parse(cached));
+      }
+    } catch (e) {}
+  };
+
+  // Load User Session & Initial History
   useEffect(() => {
-    async function loadUserData(currentUser: any) {
+    async function initUser(currentUser: any) {
       if (!supabase || !currentUser) {
         setUser(null);
         setPlanTier('free');
         setUsageCount(0);
         setUsageLimit(5);
+        fetchUserHistory();
         return;
       }
 
@@ -170,22 +241,26 @@ export default function StudioPage() {
       } catch (err) {
         console.warn('Error fetching usage tracking:', err);
       }
+
+      fetchUserHistory(currentUser.id);
     }
 
     if (supabase) {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        loadUserData(session?.user || null);
+        initUser(session?.user || null);
       });
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        loadUserData(session?.user || null);
+        initUser(session?.user || null);
       });
 
       return () => subscription.unsubscribe();
+    } else {
+      fetchUserHistory();
     }
   }, []);
 
-  // Reset/Initialize form fields when selected mode changes
+  // Initialize form default values whenever selected mode changes
   useEffect(() => {
     const initialForm: Record<string, string> = {};
     selectedMode.fields.forEach((field) => {
@@ -253,6 +328,7 @@ export default function StudioPage() {
     setUsageCount(0);
     setUsageLimit(5);
     setIsProfileMenuOpen(false);
+    fetchUserHistory();
   };
 
   const categories = ['All', 'starter', 'growth', 'enterprise'];
@@ -308,16 +384,23 @@ export default function StudioPage() {
         setActiveSubjectTab(0);
         setShowSanitized(false);
 
-        setHistory((prev) => [
-          {
-            id: Date.now().toString(),
-            subject: data.result.subject,
-            body: data.result.body,
-            mode: selectedMode.name,
-            date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          },
-          ...prev.slice(0, 9)
-        ]);
+        // Build persistent history item
+        const newHistItem: HistoryItem = {
+          id: data.historyItem?.id || Date.now().toString(),
+          subject: data.result.subject,
+          body: data.result.body,
+          mode: selectedMode.name,
+          modeId: selectedMode.id,
+          date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+
+        setHistory((prev) => {
+          const updated = [newHistItem, ...prev.filter(i => i.id !== newHistItem.id)].slice(0, 15);
+          try {
+            localStorage.setItem('wye_recent_history', JSON.stringify(updated));
+          } catch (e) {}
+          return updated;
+        });
       }
 
       if (typeof data.newUsageCount === 'number') {
@@ -328,6 +411,33 @@ export default function StudioPage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  // Restore history item when clicked
+  const handleSelectHistoryItem = (item: HistoryItem) => {
+    setGenResult({
+      subject: item.subject,
+      body: item.body,
+      spamScore: 95,
+      spamTriggers: [],
+      deliverabilityAdvice: 'Restored from generation history.'
+    });
+    setActiveSubjectTab(0);
+    setShowSanitized(false);
+
+    if (item.modeId) {
+      const targetMode = MODES.find((m) => m.id === item.modeId);
+      if (targetMode) {
+        setSelectedMode(targetMode);
+      }
+    }
+  };
+
+  const handleClearHistory = () => {
+    setHistory([]);
+    try {
+      localStorage.removeItem('wye_recent_history');
+    } catch (e) {}
   };
 
   const currentSubject =
@@ -424,7 +534,7 @@ export default function StudioPage() {
               </button>
             )}
 
-            {/* Logged-In User Profile Dropdown Menu */}
+            {/* Profile Dropdown */}
             {isProfileMenuOpen && user && (
               <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-[#141415] border border-[#222224] shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="p-2.5 border-b border-[#222224] mb-1">
@@ -459,7 +569,7 @@ export default function StudioPage() {
             )}
           </div>
 
-          {/* Mobile Drawer Button (< lg screens) */}
+          {/* Mobile Drawer Trigger (< lg screens) */}
           <button
             onClick={() => setMobileDrawerOpen(true)}
             className="lg:hidden p-2 rounded-lg bg-[#141415] border border-[#222224] text-gray-300 hover:text-white"
@@ -473,9 +583,9 @@ export default function StudioPage() {
       {/* Main 3-Column Studio Layout */}
       <main className="flex-1 max-w-[1700px] w-full mx-auto p-3 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* COLUMN 1: Categorized Modes Sidebar (Desktop View) */}
-        <aside className="hidden lg:block lg:col-span-3 bg-[#141415] border border-[#222224] rounded-2xl p-4 flex flex-col h-[calc(100vh-110px)] sticky top-[80px]">
-          <div className="flex items-center justify-between pb-3 border-b border-[#222224] mb-3">
+        {/* COLUMN 1: Categorized Strategies Sidebar (Desktop View) */}
+        <aside className="hidden lg:flex lg:col-span-3 bg-[#141415] border border-[#222224] rounded-2xl p-4 flex-col h-[calc(100vh-110px)] sticky top-[80px] overflow-hidden">
+          <div className="flex items-center justify-between pb-3 border-b border-[#222224] mb-3 flex-shrink-0">
             <div className="flex items-center space-x-2">
               <Layers className="w-4 h-4 text-[#0a84ff]" />
               <h2 className="font-semibold text-sm text-white">Outreach Strategies</h2>
@@ -484,7 +594,7 @@ export default function StudioPage() {
           </div>
 
           {/* Search Bar */}
-          <div className="relative mb-3">
+          <div className="relative mb-3 flex-shrink-0">
             <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-gray-500" />
             <input
               type="text"
@@ -496,7 +606,7 @@ export default function StudioPage() {
           </div>
 
           {/* Category Filters */}
-          <div className="flex space-x-1 overflow-x-auto pb-2 mb-2 border-b border-[#222224] [::-webkit-scrollbar]:hidden">
+          <div className="flex space-x-1 overflow-x-auto pb-2 mb-2 border-b border-[#222224] flex-shrink-0 [::-webkit-scrollbar]:hidden">
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -512,8 +622,8 @@ export default function StudioPage() {
             ))}
           </div>
 
-          {/* Scrollable Mode List */}
-          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 text-xs">
+          {/* Scrollable Mode List Container with min-h-0 fix */}
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-1.5 pr-1 text-xs">
             {filteredModes.map((mode) => {
               const IconComp = ICON_MAP[mode.iconName] || Mail;
               const isSelected = selectedMode.id === mode.id;
@@ -767,7 +877,7 @@ export default function StudioPage() {
                     </div>
                   </div>
 
-                  {/* Direct Mail Launchers */}
+                  {/* Direct Launchers */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <a
                       href={`https://mail.google.com/mail/?view=cm&fs=1&tf=1&su=${encodeURIComponent(currentSubject)}&body=${encodeURIComponent(currentBody)}`}
@@ -810,32 +920,36 @@ export default function StudioPage() {
             )}
           </div>
 
-          {/* Recent History Panel */}
+          {/* Persistent Recent History Panel */}
           <div className="bg-[#141415] border border-[#222224] rounded-2xl p-4">
             <div className="flex items-center justify-between pb-2 border-b border-[#222224] mb-3">
               <div className="flex items-center space-x-2">
                 <History className="w-4 h-4 text-purple-400" />
                 <h3 className="font-semibold text-xs text-white">Recent Generations</h3>
               </div>
-              <span className="text-[10px] text-gray-500">{history.length} Saved</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-[10px] text-gray-500">{history.length} Saved</span>
+                {history.length > 0 && (
+                  <button
+                    onClick={handleClearHistory}
+                    title="Clear history"
+                    className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {history.length === 0 ? (
-              <p className="text-gray-500 text-[11px] text-center py-4">No recent history in this session.</p>
+              <p className="text-gray-500 text-[11px] text-center py-4">No recent history saved.</p>
             ) : (
-              <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
                 {history.map((item) => (
                   <div
                     key={item.id}
-                    onClick={() => {
-                      setGenResult({
-                        subject: item.subject,
-                        body: item.body,
-                        spamScore: 95,
-                        spamTriggers: []
-                      });
-                    }}
-                    className="p-2 rounded-lg bg-[#1c1c1e] hover:bg-[#222224] border border-[#222224] cursor-pointer transition-colors"
+                    onClick={() => handleSelectHistoryItem(item)}
+                    className="p-2.5 rounded-xl bg-[#1c1c1e] hover:bg-[#222224] border border-[#222224] hover:border-[#0a84ff]/40 cursor-pointer transition-all"
                   >
                     <div className="flex justify-between text-[10px] text-gray-400 mb-0.5">
                       <span className="text-[#0a84ff] font-medium">{item.mode}</span>
