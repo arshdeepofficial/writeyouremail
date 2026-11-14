@@ -150,6 +150,9 @@ export default function StudioPage() {
   const [copiedBody, setCopiedBody] = useState<boolean>(false);
 
   // Helper to fetch user history from Supabase or LocalStorage
+
+  
+
   const fetchUserHistory = async (userId?: string) => {
     // 1. Try fetching from Supabase if logged in
     if (userId && supabase) {
@@ -321,15 +324,22 @@ export default function StudioPage() {
   };
 
   const handleSignOut = async () => {
-    if (!supabase) return;
-    await supabase.auth.signOut();
-    setUser(null);
-    setPlanTier('free');
-    setUsageCount(0);
-    setUsageLimit(5);
-    setIsProfileMenuOpen(false);
-    fetchUserHistory();
-  };
+  if (!supabase) return;
+  await supabase.auth.signOut();
+  
+  setUser(null);
+  setPlanTier('free');
+  setUsageCount(0);
+  setUsageLimit(5);
+  setIsProfileMenuOpen(false);
+
+  // Clear history from React state and local storage
+  setHistory([]);
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('writeyour_email_history');
+    localStorage.removeItem('write-your-email-history');
+  }
+};
 
   const categories = ['All', 'starter', 'growth', 'enterprise'];
 
