@@ -2,13 +2,19 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { Check, Sparkles, Tag, ShieldCheck, Zap, Lock, ArrowRight } from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+import { Check, Sparkles, Tag, ShieldCheck, Zap, Lock, ArrowRight, Mail, UserCheck, AlertCircle, Loader2 } from "lucide-react";
 
 declare global {
   interface Window {
     paypal?: any;
   }
 }
+
+// Initialize Supabase Client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key";
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Fixed inline Logo for reliable SSR prerendering
 function Logo() {
@@ -26,6 +32,9 @@ function Logo() {
 
 export default function PricingPage() {
   const [mounted, setMounted] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  
+  // Promo code engine state
   const [promoCode, setPromoCode] = useState("");
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
@@ -39,16 +48,38 @@ export default function PricingPage() {
     basePrice: number;
   } | null>(null);
   
+  // In-modal authentication state
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const [checkoutStatus, setCheckoutStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
+    // Check initial user authentication state
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) {
+        setUser(data.user);
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  // Load PayPal SDK dynamically when modal opens
+  // Load PayPal SDK dynamically when user is authenticated & modal is open
   useEffect(() => {
-    if (selectedPlan && mounted) {
-      const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "sb"; // Defaults to sandbox if env not set
+    if (selectedPlan && user && mounted) {
+      const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "sb";
       const scriptId = "paypal-sdk-script";
 
       if (!document.getElementById(scriptId)) {
@@ -62,7 +93,7 @@ export default function PricingPage() {
         renderPayPalButtons();
       }
     }
-  }, [selectedPlan, mounted, discountPercent]);
+  }, [selectedPlan, user, mounted, discountPercent]);
 
   const applyPromoCode = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -90,9 +121,49 @@ export default function PricingPage() {
     return basePrice.toFixed(2);
   };
 
+  const handleInModalAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setAuthLoading(true);
+
+    if (!authEmail || !authPassword) {
+      setAuthError("Please provide both email and password.");
+      setAuthLoading(false);
+      return;
+    }
+
+    try {
+      if (isSignUp) {
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+        });
+
+        if (error) throw error;
+        if (data.user) {
+          setUser(data.user);
+        }
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword,
+        });
+
+        if (error) throw error;
+        if (data.user) {
+          setUser(data.user);
+        }
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "Authentication failed. Please try again.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const renderPayPalButtons = () => {
     const container = document.getElementById("paypal-button-container");
-    if (!container || !window.paypal || !selectedPlan) return;
+    if (!container || !window.paypal || !selectedPlan || !user) return;
 
     container.innerHTML = ""; // Clear existing buttons
 
@@ -110,22 +181,31 @@ export default function PricingPage() {
           return actions.order.create({
             purchase_units: [
               {
-                description: `WriteYourEmail.com - ${selectedPlan.name} (30 Days)`,
+                description: `WriteYourEmail.com - ${selectedPlan.name} (30 Days) for ${user.email}`,
                 amount: {
                   currency_code: "USD",
                   value: finalPrice,
                 },
+                custom_id: user.id, // Links purchase directly to user Supabase ID
               },
             ],
           });
         },
         onApprove: async (_data: any, actions: any) => {
-          setCheckoutStatus("Processing payment...");
+          setCheckoutStatus("Processing payment & activating pass...");
           try {
             const details = await actions.order.capture();
-            setCheckoutStatus(`✅ Payment successful! Welcome to ${selectedPlan.name}. Order ID: ${details.id}`);
+            
+            // Record usage tracking / subscription in Supabase DB
+            await supabase.from("usage_tracking").upsert({
+              user_id: user.id,
+              plan_tier: selectedPlan.id,
+              subscription_ends_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            });
+
+            setCheckoutStatus(`✅ Payment successful! 30-Day ${selectedPlan.name} activated for ${user.email}. Order ID: ${details.id}`);
           } catch (err) {
-            setCheckoutStatus("❌ Payment capture failed. Please contact help@writeyouremail.com.");
+            setCheckoutStatus("❌ Payment capture failed. Please contact help@writeyouremail.com with your PayPal receipt.");
           }
         },
         onError: (err: any) => {
@@ -226,12 +306,20 @@ export default function PricingPage() {
             <Link href="/studio" className="text-sm text-gray-400 transition hover:text-white">
               Studio
             </Link>
+            <Link href="/docs" className="text-sm text-gray-400 transition hover:text-white">
+              Docs & Guides
+            </Link>
             <Link href="/pricing" className="text-sm text-[#0a84ff] font-medium">
               Pricing
             </Link>
           </div>
 
           <div className="flex items-center gap-4">
+            {user ? (
+              <span className="text-xs text-gray-400 font-mono hidden sm:inline">
+                Logged in as: <strong className="text-white">{user.email}</strong>
+              </span>
+            ) : null}
             <Link
               href="/studio"
               className="rounded-xl bg-[#0a84ff] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0071e3] shadow-lg shadow-[#0a84ff]/25"
@@ -382,7 +470,7 @@ export default function PricingPage() {
         </div>
       </main>
 
-      {/* PayPal Checkout Modal */}
+      {/* Checkout Modal */}
       {selectedPlan && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="w-full max-w-md rounded-3xl border border-[#222224] bg-[#141415] p-6 shadow-2xl relative">
@@ -413,13 +501,97 @@ export default function PricingPage() {
               </div>
             </div>
 
-            {checkoutStatus ? (
-              <div className="my-6 rounded-2xl border border-[#222224] bg-[#1c1c1e] p-4 text-center text-sm font-medium text-white">
-                {checkoutStatus}
+            {/* STEP 1: If User Is NOT Logged In -> Show In-Modal Account Creation */}
+            {!user ? (
+              <div className="my-4 space-y-4">
+                <div className="rounded-2xl border border-[#0a84ff]/30 bg-[#0a84ff]/10 p-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#0a84ff] uppercase tracking-wider">
+                    <UserCheck className="h-4 w-4" /> Step 1: Create Account
+                  </div>
+                  <p className="mt-1 text-xs text-gray-300">
+                    Create your account to attach your 30-day pass to your email before completing PayPal payment.
+                  </p>
+                </div>
+
+                <form onSubmit={handleInModalAuth} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-400 mb-1">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="you@company.com"
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      className="w-full rounded-xl border border-[#222224] bg-[#1c1c1e] px-4 py-2.5 text-sm text-white focus:border-[#0a84ff] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-400 mb-1">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Minimum 6 characters"
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      className="w-full rounded-xl border border-[#222224] bg-[#1c1c1e] px-4 py-2.5 text-sm text-white focus:border-[#0a84ff] focus:outline-none"
+                    />
+                  </div>
+
+                  {authError && (
+                    <div className="flex items-center gap-2 rounded-xl border border-[#ff453a]/30 bg-[#ff453a]/10 p-3 text-xs text-[#ff453a]">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{authError}</span>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full rounded-xl bg-[#0a84ff] py-3 text-sm font-semibold text-white transition hover:bg-[#0071e3] flex items-center justify-center gap-2"
+                  >
+                    {authLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Creating Account...</span>
+                      </>
+                    ) : (
+                      <span>{isSignUp ? "Create Free Account & Continue" : "Log In & Continue"}</span>
+                    )}
+                  </button>
+
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSignUp(!isSignUp)}
+                      className="text-xs text-gray-400 hover:text-white underline"
+                    >
+                      {isSignUp ? "Already have an account? Log in" : "Need an account? Sign up"}
+                    </button>
+                  </div>
+                </form>
               </div>
             ) : (
-              <div className="my-4 min-h-[150px]">
-                <div id="paypal-button-container"></div>
+              /* STEP 2: User IS Logged In -> Show PayPal Buttons linked to User Email */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between rounded-xl border border-[#222224] bg-[#1c1c1e] px-4 py-2.5 text-xs text-gray-300">
+                  <span>Purchasing pass for:</span>
+                  <strong className="text-white font-mono">{user.email}</strong>
+                </div>
+
+                {checkoutStatus ? (
+                  <div className="my-4 rounded-2xl border border-[#222224] bg-[#1c1c1e] p-4 text-center text-sm font-medium text-white">
+                    {checkoutStatus}
+                  </div>
+                ) : (
+                  <div className="my-4 min-h-[150px]">
+                    <div id="paypal-button-container"></div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -441,6 +613,7 @@ export default function PricingPage() {
           <div className="flex items-center gap-6 text-sm text-gray-400">
             <Link href="/" className="hover:text-white transition">Home</Link>
             <Link href="/studio" className="hover:text-white transition">Studio</Link>
+            <Link href="/docs" className="hover:text-white transition">Docs</Link>
             <Link href="/pricing" className="hover:text-white transition">Pricing</Link>
             <Link href="/privacy" className="hover:text-white transition">Privacy</Link>
             <Link href="/terms" className="hover:text-white transition">Terms</Link>
