@@ -51,6 +51,25 @@ import {
   Trash2
 } from 'lucide-react';
 
+// 1. Add this definition at the top of the file
+const InstagramIcon = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+  </svg>
+);
+
 // Initialize Supabase Client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -1143,15 +1162,59 @@ export default function StudioPage() {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-[#222224] bg-[#000000] py-4 px-6 text-center text-[11px] text-gray-500 flex flex-col sm:flex-row items-center justify-between">
-        <div>© 2025 WriteYourEmail.com. All rights reserved.</div>
-        <div className="flex space-x-4 mt-2 sm:mt-0">
-          <Link href="/pricing" className="hover:text-gray-300">Pricing</Link>
-          <Link href="/docs" className="hover:text-gray-300">Documentation</Link>
-          <Link href="/privacy" className="hover:text-gray-300">Privacy Policy</Link>
-          <Link href="/terms" className="hover:text-gray-300">Terms of Service</Link>
-        </div>
-      </footer>
+      
+// ... inside your component return ...
+
+<footer className="w-full border-t border-white/5 bg-[#000000] py-16 px-6 mt-20">
+  <div className="max-w-7xl mx-auto flex flex-col items-center gap-12">
+    
+    {/* Parent Company Branding */}
+    <div className="flex flex-col items-center text-center space-y-3">
+      <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mb-2">
+        <span className="text-white font-bold text-lg">W</span>
+      </div>
+      <p className="text-[10px] tracking-[0.5em] uppercase text-gray-500 font-semibold">
+        A Product of <span className="text-gray-200">Glent Global Enterprises</span>
+      </p>
+    </div>
+
+    {/* Social & Support Icons */}
+    <div className="flex items-center gap-10">
+      <a
+        href="https://instagram.com/glentglobal"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group flex flex-col items-center gap-2 text-gray-500 hover:text-white transition-all duration-300"
+      >
+        <InstagramIcon size={22} className="group-hover:scale-110 transition-transform" />
+        <span className="text-[9px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Instagram</span>
+      </a>
+      <a
+        href="mailto:help@writeyouremail.com"
+        className="group flex flex-col items-center gap-2 text-gray-500 hover:text-white transition-all duration-300"
+      >
+        <Mail size={22} className="group-hover:scale-110 transition-transform" />
+        <span className="text-[9px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Support</span>
+      </a>
+    </div>
+
+    {/* Navigation & Copyright */}
+    <div className="flex flex-col items-center gap-6">
+      <nav className="flex flex-wrap justify-center gap-x-10 gap-y-4 text-[11px] font-medium uppercase tracking-[0.2em] text-gray-500">
+        <a href="/docs" className="hover:text-blue-400 transition-colors">Documentation</a>
+        <a href="/privacy" className="hover:text-blue-400 transition-colors">Privacy</a>
+        <a href="/pricing" className="hover:text-blue-400 transition-colors">Passes</a>
+      </nav>
+      
+      <div className="h-[1px] w-12 bg-white/10"></div>
+      
+      <p className="text-[10px] text-gray-700 tracking-widest uppercase">
+        © 2025 WriteYourEmail.com — Global Operations
+      </p>
+    </div>
+    
+  </div>
+</footer>
     </div>
   );
 }
