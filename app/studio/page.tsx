@@ -1163,7 +1163,7 @@ export default function StudioPage() {
 
       {/* Footer */}
       
-// ... inside your component return ...
+
 
 <footer className="w-full border-t border-white/5 bg-[#000000] py-16 px-6 mt-20">
   <div className="max-w-7xl mx-auto flex flex-col items-center gap-12">
