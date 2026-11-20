@@ -1,15 +1,9 @@
-import React from 'react';
-import Link from 'next/link';
-import type { Metadata } from 'next';
+'use client';
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Glent Global Enterprises | Autonomous Systems & Venture Lab',
-    template: '%s | Glent Global Enterprises',
-  },
-  description:
-    'Glent Global Enterprises is a high-performance software laboratory engineering generative intelligence systems, deliverability engines, and autonomous business infrastructure.',
-};
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { supabase } from './lib/supabase';
+import { User, LogOut, ArrowUpRight } from 'lucide-react';
 
 const InstagramIcon = ({ size = 16, className = '' }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -20,6 +14,24 @@ const InstagramIcon = ({ size = 16, className = '' }: { size?: number; className
 );
 
 export default function GlentLayout({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-black text-white antialiased selection:bg-[#0a84ff]/30 selection:text-white flex flex-col font-sans">
       {/* Global Ambient Glow */}
@@ -51,40 +63,57 @@ export default function GlentLayout({ children }: { children: React.ReactNode })
             <Link href="/glent/contact" className="hover:text-white transition-colors">Inquiries</Link>
           </nav>
 
-          {/* Right Action */}
+          {/* Right Action / Auth Status */}
           <div className="flex items-center gap-4">
-            <a
-              href="https://instagram.com/glentglobal"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-neutral-400 hover:text-white transition-colors flex items-center gap-1.5 text-xs font-mono"
-            >
-              <InstagramIcon size={14} />
-              <span className="hidden sm:inline">@glentglobal</span>
-            </a>
-            <Link
-              href="/studio"
-              className="px-3.5 py-1.5 rounded-lg bg-white text-black text-xs font-semibold hover:bg-neutral-200 transition-colors hidden sm:inline-block"
-            >
-              Studio App
-            </Link>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/glent/passport"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.04] text-xs font-mono text-neutral-300 hover:text-white transition-colors"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="max-w-[120px] truncate">{user.email}</span>
+                </Link>
+                <Link
+                  href="/studio"
+                  className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-neutral-200 transition-colors hidden sm:inline-flex items-center gap-1"
+                >
+                  Studio <ArrowUpRight size={12} />
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/glent/passport"
+                  className="text-xs font-mono uppercase tracking-wider text-neutral-400 hover:text-white transition-colors"
+                >
+                  Glent Passport ID
+                </Link>
+                <Link
+                  href="/glent/passport"
+                  className="px-3.5 py-1.5 rounded-lg bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-neutral-200 transition-colors"
+                >
+                  Authenticate
+                </Link>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Mobile Submenu Bar */}
+        {/* Mobile Navigation Sub-bar */}
         <div className="md:hidden border-t border-white/5 px-6 py-2 flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-neutral-400 overflow-x-auto gap-4">
           <Link href="/glent" className="hover:text-white">Overview</Link>
           <Link href="/glent/ecosystem" className="hover:text-white">Ecosystem</Link>
           <Link href="/glent/philosophy" className="hover:text-white">Philosophy</Link>
-          <Link href="/glent/governance" className="hover:text-white">Governance</Link>
+          <Link href="/glent/passport" className="text-blue-400">Passport ID</Link>
           <Link href="/glent/contact" className="hover:text-white">Contact</Link>
         </div>
       </header>
 
-      {/* Main Page Slot */}
+      {/* Main Content */}
       <main className="flex-1">{children}</main>
 
-      {/* Institutional Corporate Footer */}
+      {/* Footer */}
       <footer className="border-t border-white/5 bg-black py-16 px-6 mt-24">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
           <div className="space-y-2">
@@ -100,18 +129,18 @@ export default function GlentLayout({ children }: { children: React.ReactNode })
           </div>
 
           <div className="flex flex-wrap gap-x-8 gap-y-3 text-xs font-mono text-neutral-500 uppercase tracking-wider">
+            <Link href="/glent/passport" className="text-neutral-300 hover:text-white transition-colors">Glent Passport</Link>
             <Link href="/glent/ecosystem" className="hover:text-white transition-colors">Portfolio</Link>
             <Link href="/glent/philosophy" className="hover:text-white transition-colors">Philosophy</Link>
             <Link href="/glent/governance" className="hover:text-white transition-colors">Governance</Link>
             <Link href="/glent/contact" className="hover:text-white transition-colors">Corporate Desk</Link>
             <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-            <Link href="/docs" className="hover:text-white transition-colors">API Docs</Link>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto mt-10 pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center text-[10px] font-mono text-neutral-600 gap-2">
           <span>© 2025 GLENT GLOBAL ENTERPRISES. ALL RIGHTS RESERVED.</span>
-          <span>HEADQUARTERED IN DIGITAL SOVEREIGN INFRASTRUCTURE</span>
+          <span>UNIFIED SINGLE SIGN-ON INFRASTRUCTURE</span>
         </div>
       </footer>
     </div>
