@@ -1,806 +1,1249 @@
-"use client";
+'use client';
 
-import React, { useState } from "react";
-import Link from "next/link";
+import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import {
+  ArrowUpRight,
+  ArrowRight,
   Sparkles,
   ShieldCheck,
+  Shield,
   Zap,
   CheckCircle2,
-  ArrowRight,
-  BookOpen,
-  Layers,
-  Mail,
-  FileText,
-  ChevronRight,
-  Star,
-  MessageSquare,
-  Lock,
-  Check,
-  Tag,
-  BarChart3,
-  Sliders,
-  Terminal,
-  Globe,
-  Users,
-  TrendingUp,
   AlertTriangle,
-  PlayCircle,
-  Inbox,
-  Send,
+  AlertCircle,
+  Copy,
+  Check,
   RefreshCw,
+  Search,
+  Sliders,
+  DollarSign,
+  TrendingUp,
+  BarChart2,
   Cpu,
+  Layers,
+  Terminal,
+  Database,
+  Lock,
+  Globe,
+  Mail,
+  Send,
+  User,
+  LogOut,
   ChevronDown,
-  Target,
-  Briefcase,
-  PenTool,
-  Server, // Fixed: Server icon import added here
-} from "lucide-react";
+  ChevronRight,
+  ExternalLink,
+  Star,
+  Eye,
+  Filter
+} from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
-// Fixed inline Logo for reliable SSR prerendering
-function Logo() {
-  return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#0a84ff] to-[#bf5af2] text-white shadow-lg shadow-[#0a84ff]/20">
-        <Sparkles className="h-5 w-5 text-white" />
-      </div>
-      <span className="text-xl font-bold tracking-tight text-white">
-        WriteYour<span className="text-[#0a84ff]">Email</span>
-      </span>
-    </div>
-  );
+// Safe Supabase client initialization
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = (supabaseUrl && supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
+
+// Clean SVG Instagram icon to avoid Lucide-react build errors
+const InstagramIcon = ({ size = 18, className = '' }: { size?: number; className?: string }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+  </svg>
+);
+
+// Comprehensive list of high-risk spam words audited in real-time
+const SPAM_TRIGGER_DICTIONARY: { word: string; severity: 'high' | 'medium'; tip: string }[] = [
+  { word: 'free', severity: 'high', tip: 'Use "complimentary", "on us", or "no-cost"' },
+  { word: '100% free', severity: 'high', tip: 'Aggressive spam trigger' },
+  { word: 'guaranteed', severity: 'high', tip: 'Use "proven", "backed by data", or "reliable"' },
+  { word: 'urgent', severity: 'high', tip: 'Use "time-sensitive" or "prioritized"' },
+  { word: 'act now', severity: 'high', tip: 'Flagged as predatory high-pressure sales' },
+  { word: 'no risk', severity: 'high', tip: 'Use "straightforward trial"' },
+  { word: 'click here', severity: 'high', tip: 'Spam filters heavily penalize raw click imperatives' },
+  { word: 'make money', severity: 'high', tip: 'Immediate financial trigger flag' },
+  { word: 'winner', severity: 'high', tip: 'Phishing signature trigger' },
+  { word: 'congratulations', severity: 'medium', tip: 'Avoid in initial cold outreach headers' },
+  { word: 'limited time', severity: 'medium', tip: 'Use "available through Thursday"' },
+  { word: 'buy now', severity: 'high', tip: 'Use "explore access" or "get started"' },
+  { word: 'order now', severity: 'high', tip: 'High e-commerce filter penalty' },
+  { word: 'exclusive deal', severity: 'medium', tip: 'Use "tailored proposal"' },
+  { word: 'double your', severity: 'high', tip: 'Unsubstantiated superlative claim' },
+  { word: 'earn extra cash', severity: 'high', tip: 'Severe financial solicitation trigger' },
+  { word: 'no cost', severity: 'medium', tip: 'Often flagged if paired with exclamation points' },
+  { word: 'cheap', severity: 'medium', tip: 'Use "cost-effective" or "lean"' },
+  { word: 'lowest price', severity: 'medium', tip: 'Use "competitive pricing structure"' },
+  { word: 'risk free', severity: 'high', tip: 'Use "flexible terms"' },
+  { word: 'unlimited', severity: 'medium', tip: 'Often detected as misleading claim' },
+  { word: 'special promotion', severity: 'medium', tip: 'Use "scheduled pilot"' },
+  { word: 'miracle', severity: 'high', tip: 'Severe marketing penalty flag' },
+  { word: 'satisfaction guaranteed', severity: 'high', tip: 'Commercial spam keyword' },
+];
+
+// 30 Core Outreach Strategies Catalog
+interface StrategyMode {
+  id: string;
+  name: string;
+  category: 'starter' | 'growth' | 'enterprise';
+  tagline: string;
+  idealFor: string;
+  sampleSubject: string;
+  samplePreview: string;
 }
 
-// ----------------------------------------------------------------------
-// DATA ARRAYS (Testimonials, FAQs, Features)
-// ----------------------------------------------------------------------
-
-const testimonials = [
+const STRATEGY_MODES: StrategyMode[] = [
   {
-    name: "Sarah Jenkins",
-    role: "VP of Sales, TechFlow",
-    content: "Before WriteYourEmail, our outbound campaigns were hitting a wall. Our open rates were hovering around 12%. Once we started using the Spam Sanitizer and adjusting our copy to hit a 90+ score, our open rates jumped to 48%. It's the highest ROI tool in our stack.",
-    avatar: "SJ"
+    id: 'cold-email',
+    name: 'B2B Cold Email',
+    category: 'starter',
+    tagline: 'High-converting value-first cold outreach.',
+    idealFor: 'SaaS sales, agency client acquisition, and SDR prospecting.',
+    sampleSubject: 'Quick question regarding {{company}} revenue bottleneck',
+    samplePreview: 'Hi {{name}}, noticed your team is expanding enterprise engineering. Most VP Ops face deliverability drops when scaling outreach past 10k prospects...'
   },
   {
-    name: "Marcus Thorne",
-    role: "Founder, GrowthMatrix Agency",
-    content: "As a lead gen agency, deliverability is our lifeblood. If our clients' emails go to spam, we lose retainers. WriteYourEmail's 30 outreach modes and instant deliverability scoring completely replaced our manual copywriters and paid deliverability consultants.",
-    avatar: "MT"
+    id: 'magic-polish',
+    name: 'Magic Polish (Executive Rewriter)',
+    category: 'starter',
+    tagline: 'Transforms raw thoughts into high-stakes executive prose.',
+    idealFor: 'Rewriting rough drafts to sound like a Fortune 500 COO.',
+    sampleSubject: 'Refined proposition: Scaled throughput alignment',
+    samplePreview: 'Hi David, following up on our sync. To summarize: by decoupling inference latency from core queue worker threads, operational overhead shrinks by 40%...'
   },
   {
-    name: "Elena Rodriguez",
-    role: "Independent Consultant",
-    content: "I don't have time to write custom sequences all day. The Follow-Up generator is magic. It references the first email and creates gentle, non-pushy bumps. I closed two $10k consulting contracts last month directly from the Follow-Up Mode drafts.",
-    avatar: "ER"
+    id: 'objection-reply',
+    name: 'Objection Destroyer',
+    category: 'starter',
+    tagline: 'Overcome "too expensive", "bad timing", or "send info".',
+    idealFor: 'Turn dead prospect replies into booked discovery calls.',
+    sampleSubject: 'Understood regarding budget constraints for Q2',
+    samplePreview: 'Totally respect that budget is locked for Q2, Sarah. Quick question: if we could demonstrate a 3x pipeline surge before Q3 spend begins, would a 10-min briefing be off the table?'
   },
   {
-    name: "David Chen",
-    role: "SDR Manager, CloudSync",
-    content: "The Subject Line A/B matrix is incredible. Instead of guessing what works, we generate 5 variations, pick the most natural one, and launch directly into Outlook. My team's workflow is 10x faster and our reply rate has never been healthier.",
-    avatar: "DC"
+    id: 'lead-winback',
+    name: 'Lead Win-Back',
+    category: 'starter',
+    tagline: 'Re-engage ghosted opportunities without sounding desperate.',
+    idealFor: 'Accounts that went silent after product demonstrations.',
+    sampleSubject: 'Permission to close your file regarding {{project}}?',
+    samplePreview: 'Hi Michael, usually when I don\'t hear back after a demo it means your priorities shifted or you found an alternative solution. Should I archive this on our side?'
   },
   {
-    name: "Michael Ross",
-    role: "B2B SaaS Founder",
-    content: "I love the prepaid pass model. No surprise subscriptions. I buy a $39 Growth Pass when I have a heavy outreach month, and use the free tier when I'm just doing light networking. The UX is beautifully Apple-esque. A joy to use.",
-    avatar: "MR"
+    id: 'investor-pitch',
+    name: 'Venture Investor Pitch',
+    category: 'growth',
+    tagline: 'Data-dense, metrics-backed outreach for venture capital.',
+    idealFor: 'Seed, Series A founders seeking partner meetings.',
+    sampleSubject: 'Glent Global / $40k MRR at 94% gross margin (Seed)',
+    samplePreview: 'Hi Alex, following your recent memo on autonomous software. We built Glent Global: $40k MRR, growing 28% MoM organically with $0 customer acquisition cost...'
   },
   {
-    name: "Jessica Alba",
-    role: "Head of Partnerships",
-    content: "The LinkedIn Connection Mode is my secret weapon. It keeps the character count strictly under 300 and writes highly contextual, non-salesy invites. My connection acceptance rate went from 20% to over 65% in three weeks.",
-    avatar: "JA"
+    id: 'podcast-pitch',
+    name: 'Guest Appearance Pitch',
+    category: 'growth',
+    tagline: 'Book high-profile podcast interviews and media spots.',
+    idealFor: 'Founders building founder-led personal brands.',
+    sampleSubject: 'Episode concept for {{podcast_name}}: Delivering $1M with 0 employees',
+    samplePreview: 'Hey Tim, loved your episode with Naval on leverage. I have a contrarian perspective on autonomous SaaS architecture that your technical audience would appreciate...'
+  },
+  {
+    id: 'partnership-proposal',
+    name: 'Channel Partner Inbound',
+    category: 'growth',
+    tagline: 'Propose revenue-share integrations and co-marketing.',
+    idealFor: 'B2B SaaS business development leads.',
+    sampleSubject: 'Integration exploration: {{company}} + Glent Ecosystem',
+    samplePreview: 'Hi Elena, our 12,000 active outreach operators frequently request native CRM sync with {{company}}. We would like to explore a bi-directional co-sell model...'
+  },
+  {
+    id: 'enterprise-procurement',
+    name: 'Enterprise Security Triage',
+    category: 'enterprise',
+    tagline: 'Navigate complex RFP, SOC-2, and vendor security cycles.',
+    idealFor: 'Closing $50,000+ enterprise deals through InfoSec review.',
+    sampleSubject: 'SOC-2 Type II dossier & Row-Level Data boundaries for {{company}}',
+    samplePreview: 'Hi Mark, attaching our data residency whitepaper and security architecture overview. Notice we enforce Row-Level Security (RLS) with zero training on customer data...'
+  },
+  {
+    id: 'board-update',
+    name: 'Executive Board Memo',
+    category: 'enterprise',
+    tagline: 'Concise, high-conviction investor and stakeholder reporting.',
+    idealFor: 'CEOs sending monthly shareholder updates.',
+    sampleSubject: 'Glent Global Operations Update — Q1 Metrics & Runway',
+    samplePreview: 'Team, key operational highlights for March: ARR reached $480k (+22%), gross margin stabilized at 92%, LPU inference latency reduced to 614ms...'
+  },
+  {
+    id: 'hiring-outreach',
+    name: 'Executive Talent Poach',
+    category: 'enterprise',
+    tagline: 'Recruit top 1% engineering and sales talent directly.',
+    idealFor: 'Direct founder recruitment of principal engineers and VP Sales.',
+    sampleSubject: 'Building the inference fabric at Glent Global',
+    samplePreview: 'Hey Jordan, noticed your work on distributed consensus algorithms. We are rebuilding edge inference pipelines for sub-millisecond execution and have an open Principal seat...'
   }
 ];
 
-const faqs = [
-  {
-    question: "Why are my current cold emails going to the spam folder?",
-    answer: "Most likely, you are using high-risk 'spam trigger' words. Email providers (Gmail, Outlook) use AI to scan incoming emails for promotional phrasing like 'guaranteed', '100% free', or 'click here'. WriteYourEmail identifies these triggers and replaces them before you hit send."
-  },
-  {
-    question: "How does the Deliverability Score (0-100) actually work?",
-    answer: "Our scoring engine evaluates your draft against a multi-factor algorithm modeling Google Workspace and Microsoft 365 filters. It penalizes heavy spam trigger usage, excessive text length (over 150 words), high link density, and pushy formatting to give you a real-time inbox readiness score."
-  },
-  {
-    question: "Do I need a monthly subscription to use this?",
-    answer: "No. We hate subscription traps. We use a 30-Day Prepaid Pass model. You buy a pass for $19, $39, or $79, and you get 30 days of full access. When it expires, you revert to the free tier. No automatic renewals, ever."
-  },
-  {
-    question: "Does it integrate with my current email client?",
-    answer: "Yes! WriteYourEmail features a '1-Click Launch' integration. Once your draft is perfect, you click a button to instantly open it in either the Gmail or Outlook compose window, with the subject line and body text already formatted."
-  },
-  {
-    question: "What outreach modes do you support?",
-    answer: "We have 30 dynamic modes. This includes Cold B2B Sales, Multi-Step Follow-Ups, LinkedIn Connection Requests, Investor Pitches, SaaS Demo Invites, Job Applications, Influencer Outreach, and much more."
-  },
-  {
-    question: "Can I use the LAUNCH50 code right now?",
-    answer: "Yes! While the early bird promotion lasts, you can enter LAUNCH50 on the Pricing page to get 50% off any 30-day prepaid pass, bringing the Starter Pass down to just $9.50."
-  }
-];
+export default function ComprehensiveHomePage() {
+  // Supabase Auth State
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-export default function LandingPage() {
-  const [activeFaq, setActiveFaq] = useState<number | null>(null);
-  const [activePersona, setActivePersona] = useState("founders");
+  // Live Spam Auditor Interactive Tool States
+  const [auditInput, setAuditInput] = useState<string>(
+    'Hi John,\n\nI wanted to reach out because we have a 100% FREE miracle solution guaranteed to make money and double your revenue with NO RISK! Act now and click here to claim your exclusive deal.\n\nBest,\nSales Team'
+  );
+  const [copiedAudit, setCopiedAudit] = useState(false);
 
-  const toggleFaq = (index: number) => {
-    if (activeFaq === index) {
-      setActiveFaq(null);
+  // Mode Catalog Filter & Search States
+  const [modeFilter, setModeFilter] = useState<'all' | 'starter' | 'growth' | 'enterprise'>('all');
+  const [modeSearch, setModeSearch] = useState('');
+  const [selectedPreviewMode, setSelectedPreviewMode] = useState<StrategyMode>(STRATEGY_MODES[0]);
+
+  // Live Interactive ROI Calculator States
+  const [teamSize, setTeamSize] = useState<number>(3);
+  const [emailsPerWeek, setEmailsPerWeek] = useState<number>(350);
+  const [avgDealValue, setAvgDealValue] = useState<number>(2500);
+
+  // Pricing & Coupon Calculator States
+  const [selectedPass, setSelectedPass] = useState<'starter' | 'growth' | 'enterprise'>('growth');
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [promoApplied, setPromoApplied] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+
+  // Interactive FAQ Open Index
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  // Telemetry Clock
+  const [uptimeTicker, setUptimeTicker] = useState(3184920);
+
+  useEffect(() => {
+    const timer = setInterval(() => setUptimeTicker(prev => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Monitor Supabase Authentication
+  useEffect(() => {
+    if (!supabase) {
+      setAuthLoading(false);
+      return;
+    }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user ?? null);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Real-Time Deliverability & Spam Analysis Engine
+  const deliverabilityAnalysis = useMemo(() => {
+    const text = auditInput || '';
+    const lower = text.toLowerCase();
+
+    // 1. Scan for specific spam dictionary words
+    const detectedTriggers: { word: string; severity: 'high' | 'medium'; tip: string }[] = [];
+    SPAM_TRIGGER_DICTIONARY.forEach((item) => {
+      const regex = new RegExp(`\\b${item.word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (regex.test(lower)) {
+        detectedTriggers.push(item);
+      }
+    });
+
+    // 2. Scan punctuation & caps penalties
+    const exclamationCount = (text.match(/!/g) || []).length;
+    const allCapsWords = (text.match(/\b[A-Z]{3,}\b/g) || []).filter(w => !['CEO', 'SaaS', 'B2B', 'ARR', 'MRR', 'API', 'ROI', 'CRM', 'SDR'].includes(w));
+    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+
+    // 3. Compute score deductions (Base 100)
+    let score = 100;
+    detectedTriggers.forEach((t) => {
+      score -= (t.severity === 'high' ? 14 : 7);
+    });
+    if (exclamationCount > 1) score -= (exclamationCount * 4);
+    if (allCapsWords.length > 0) score -= (allCapsWords.length * 6);
+    if (wordCount < 15) score -= 10; // Too short to register value
+    if (wordCount > 300) score -= 15; // Wall of text penalty
+
+    const finalScore = Math.max(12, Math.min(100, score));
+
+    return {
+      score: finalScore,
+      triggers: detectedTriggers,
+      exclamationCount,
+      allCapsWords,
+      wordCount,
+      estimatedReadingTime: Math.max(1, Math.ceil(wordCount / 200)),
+      status: finalScore >= 90 ? 'Inbox Guaranteed' : finalScore >= 70 ? 'Moderate Placement' : 'Severe Spam Risk'
+    };
+  }, [auditInput]);
+
+  // Clean Polish function for the live tool
+  const applyInstantCleanPolish = () => {
+    let clean = auditInput;
+    clean = clean.replace(/100% FREE/gi, 'complimentary');
+    clean = clean.replace(/FREE/gi, 'complimentary');
+    clean = clean.replace(/miracle/gi, 'proven');
+    clean = clean.replace(/guaranteed/gi, 'statistically verified');
+    clean = clean.replace(/make money and /gi, '');
+    clean = clean.replace(/double your/gi, 'substantially increase your');
+    clean = clean.replace(/NO RISK!/gi, 'a 14-day evaluation.');
+    clean = clean.replace(/Act now and click here to claim your exclusive deal\./gi, 'Would Tuesday at 2 PM work for a brief 10-minute briefing?');
+    clean = clean.replace(/!+/g, '.');
+    setAuditInput(clean);
+  };
+
+  // Filtered Strategy Modes
+  const filteredModes = useMemo(() => {
+    return STRATEGY_MODES.filter((mode) => {
+      const matchesCategory = modeFilter === 'all' || mode.category === modeFilter;
+      const matchesSearch = mode.name.toLowerCase().includes(modeSearch.toLowerCase()) ||
+                            mode.tagline.toLowerCase().includes(modeSearch.toLowerCase()) ||
+                            mode.idealFor.toLowerCase().includes(modeSearch.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [modeFilter, modeSearch]);
+
+  // Handle Promo Code Validation
+  const handleApplyPromo = () => {
+    setPromoError(null);
+    if (promoCodeInput.trim().toUpperCase() === 'LAUNCH50') {
+      setPromoApplied(true);
     } else {
-      setActiveFaq(index);
+      setPromoError('Invalid promotion code. Use "LAUNCH50" for 50% discount.');
+      setPromoApplied(false);
     }
   };
 
+  // Calculate Pass Price with live discount
+  const getPassPrice = (tier: 'starter' | 'growth' | 'enterprise') => {
+    const base = tier === 'starter' ? 19 : tier === 'growth' ? 39 : 79;
+    return promoApplied ? (base * 0.5).toFixed(2) : base.toFixed(2);
+  };
+
+  // Copy helper
+  const handleCopyText = (content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedAudit(true);
+    setTimeout(() => setCopiedAudit(false), 2000);
+  };
+
+  // ROI Math
+  const calculatedSavings = useMemo(() => {
+    const totalWeeklyEmails = teamSize * emailsPerWeek;
+    const hoursSavedPerWeek = Math.round((totalWeeklyEmails * 7) / 60); // 7 mins saved per email draft
+    const monthlyHoursSaved = hoursSavedPerWeek * 4;
+    const additionalLeadsClosed = Math.max(1, Math.round(totalWeeklyEmails * 0.015 * 4)); // 1.5% conversion increase
+    const potentialPipeline = additionalLeadsClosed * avgDealValue;
+
+    return {
+      monthlyHoursSaved,
+      additionalLeadsClosed,
+      potentialPipeline: potentialPipeline.toLocaleString()
+    };
+  }, [teamSize, emailsPerWeek, avgDealValue]);
+
   return (
-    <div className="min-h-screen bg-[#000000] text-gray-100 font-sans selection:bg-[#0a84ff] selection:text-white">
-      
-      {/* ------------------------------------------------------------------ */}
-      {/* 1. TOP ANNOUNCEMENT BANNER */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="w-full bg-gradient-to-r from-[#0a84ff] via-[#bf5af2] to-[#0a84ff] bg-[length:200%_auto] py-2.5 px-4 text-center text-xs md:text-sm font-semibold text-white shadow-md">
-        🚀 Product Hunt Launch Special: Use code{" "}
-        <Link
-          href="/pricing"
-          className="underline font-mono bg-white/20 px-1.5 py-0.5 rounded hover:bg-white/30 transition-all cursor-pointer shadow-sm"
-        >
-          LAUNCH50
-        </Link>{" "}
-        for 50% OFF all 30-day prepaid passes!
+    <div className="min-h-screen bg-black text-white antialiased selection:bg-[#0a84ff]/30 selection:text-white font-sans flex flex-col overflow-x-hidden">
+
+      {/* 1. TOP GLOBAL TELEMETRY BAR */}
+      <div className="border-b border-white/5 bg-neutral-950/90 backdrop-blur-md px-4 py-2 text-[11px] font-mono text-neutral-400 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-neutral-200 font-semibold tracking-wider uppercase">
+              GLENT GLOBAL ECOSYSTEM • ONLINE
+            </span>
+            <span className="text-neutral-600 hidden md:inline">|</span>
+            <span className="text-neutral-400 hidden md:inline">
+              LPU INFERENCE: 614ms • 30 STRATEGY MODES ACTIVE
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 text-[10px]">
+            <Link
+              href="/glent/passport"
+              className="text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-wider font-semibold flex items-center gap-1"
+            >
+              Glent Passport SSO <ChevronRight size={11} />
+            </Link>
+            <Link
+              href="/glent"
+              className="text-neutral-400 hover:text-white transition-colors uppercase tracking-wider hidden sm:inline"
+            >
+              Parent Enterprise Portal
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 2. UNIVERSAL NAVIGATION */}
-      {/* ------------------------------------------------------------------ */}
-      <nav className="sticky top-0 z-50 border-b border-[#1c1c1e] bg-[#000000]/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/" className="transition-opacity hover:opacity-90">
-            <Logo />
+      {/* 2. PRIMARY NAVIGATION HEADER */}
+      <header className="border-b border-white/5 bg-black/60 backdrop-blur-xl sticky top-8 z-40">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 flex items-center justify-center font-bold text-white text-base shadow-lg shadow-blue-500/10 group-hover:scale-105 transition-transform">
+              W
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold tracking-tight text-white flex items-center gap-1">
+                WriteYourEmail<span className="text-blue-400">.com</span>
+              </span>
+              <span className="text-[9px] font-mono tracking-widest uppercase text-neutral-500">
+                A Glent Global Venture
+              </span>
+            </div>
           </Link>
 
-          <div className="hidden items-center gap-8 lg:flex">
-            <Link href="/" className="text-sm text-[#0a84ff] font-medium">
-              Home
-            </Link>
-            <Link href="/studio" className="text-sm text-gray-400 transition hover:text-white flex items-center gap-1">
-              Studio <Zap className="h-3 w-3 text-[#ffd60a]" />
-            </Link>
-            <Link href="/docs" className="text-sm text-gray-400 transition hover:text-white flex items-center gap-1">
-              Docs & Guides <span className="text-[9px] bg-[#0a84ff]/20 text-[#0a84ff] px-1.5 py-0.5 rounded font-mono uppercase tracking-wider font-bold">New</span>
-            </Link>
-            <Link href="#features" className="text-sm text-gray-400 transition hover:text-white">
-              Features
-            </Link>
-            <Link href="/pricing" className="text-sm text-gray-400 transition hover:text-white">
-              Pricing
-            </Link>
-          </div>
+          {/* Center Links */}
+          <nav className="hidden lg:flex items-center gap-8 text-xs font-mono uppercase tracking-widest text-neutral-400">
+            <a href="#auditor" className="hover:text-white transition-colors">Deliverability Engine</a>
+            <a href="#strategies" className="hover:text-white transition-colors">30 Modes</a>
+            <a href="#calculator" className="hover:text-white transition-colors">ROI Calculator</a>
+            <Link href="/pricing" className="hover:text-white transition-colors">Passes</Link>
+            <Link href="/glent" className="hover:text-blue-400 transition-colors">Glent Lab</Link>
+          </nav>
 
-          <div className="flex items-center gap-4">
-            <Link
-              href="/pricing"
-              className="hidden md:block text-sm font-medium text-gray-300 hover:text-white transition"
-            >
-              Get a Pass
-            </Link>
-            <Link
-              href="/studio"
-              className="rounded-xl bg-[#0a84ff] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0071e3] shadow-lg shadow-[#0a84ff]/25 flex items-center gap-2"
-            >
-              Open Studio <ArrowRight className="h-4 w-4 hidden sm:block" />
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 3. HERO SECTION WITH UI MOCKUP */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="relative overflow-hidden pt-20 pb-16 md:pt-32 md:pb-24">
-        {/* Background glow effects */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-4xl h-[400px] bg-[#0a84ff]/10 blur-[120px] rounded-full pointer-events-none -z-10" />
-        <div className="absolute top-40 left-1/2 -translate-x-1/2 w-full max-w-2xl h-[300px] bg-[#bf5af2]/10 blur-[100px] rounded-full pointer-events-none -z-10" />
-
-        <div className="mx-auto max-w-6xl px-6 text-center relative z-10">
-          <Link href="/docs" className="inline-flex items-center gap-2 rounded-full border border-[#0a84ff]/30 bg-[#0a84ff]/10 px-4 py-1.5 text-xs font-semibold text-[#0a84ff] mb-8 hover:bg-[#0a84ff]/20 transition cursor-pointer">
-            <ShieldCheck className="h-4 w-4" /> 
-            <span>Read the ultimate email deliverability playbook</span>
-            <ChevronRight className="h-3 w-3" />
-          </Link>
-
-          <h1 className="text-5xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl xl:text-8xl leading-tight">
-            Stop landing in <span className="text-[#ff453a] line-through decoration-4 opacity-80">spam</span>.<br />
-            Land in the <span className="bg-gradient-to-r from-[#0a84ff] via-[#bf5af2] to-[#30d158] bg-clip-text text-transparent">Primary Inbox.</span>
-          </h1>
-
-          <p className="mt-8 text-lg text-gray-400 max-w-3xl mx-auto leading-relaxed sm:text-xl">
-            The world's first AI outreach generator with a built-in Deliverability Engine. Automatically detect spam trigger words, score your inbox readiness, and write high-converting copy in sub-seconds.
-          </p>
-
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/studio"
-              className="w-full sm:w-auto rounded-2xl bg-[#0a84ff] px-8 py-4 text-base font-bold text-white transition hover:bg-[#0071e3] shadow-2xl shadow-[#0a84ff]/30 flex items-center justify-center gap-2"
-            >
-              <span>Try Studio for Free</span>
-              <Zap className="h-5 w-5" />
-            </Link>
-
-            <Link
-              href="/pricing"
-              className="w-full sm:w-auto rounded-2xl border border-[#222224] bg-[#141415] px-8 py-4 text-base font-semibold text-gray-300 transition hover:bg-[#1c1c1e] hover:text-white flex items-center justify-center gap-2"
-            >
-              <Tag className="h-5 w-5 text-[#bf5af2]" />
-              <span>View Prepaid Passes</span>
-            </Link>
-          </div>
-
-          <p className="mt-6 text-xs text-gray-500 flex items-center justify-center gap-4 font-medium">
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-[#30d158]" /> No credit card required</span>
-            <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-[#30d158]" /> 2 free guest generations</span>
-          </p>
-        </div>
-
-        {/* Hero App Mockup */}
-        <div className="mx-auto max-w-5xl px-6 mt-20 relative">
-          <div className="rounded-t-2xl border-t border-l border-r border-[#222224] bg-[#0a0a0a] shadow-2xl overflow-hidden ring-1 ring-white/5">
-            {/* Mockup Top Bar */}
-            <div className="bg-[#141415] border-b border-[#222224] px-4 py-3 flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <div className="h-3 w-3 rounded-full bg-[#ff453a]" />
-                <div className="h-3 w-3 rounded-full bg-[#ffd60a]" />
-                <div className="h-3 w-3 rounded-full bg-[#30d158]" />
-              </div>
-              <div className="mx-auto rounded-md bg-[#1c1c1e] px-24 py-1 text-[10px] text-gray-500 font-mono border border-[#222224]">
-                writeyouremail.com/studio
-              </div>
-            </div>
-            
-            {/* Mockup Content */}
-            <div className="p-6 md:p-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Fake Inputs */}
-              <div className="col-span-1 space-y-4">
-                <div className="space-y-1.5">
-                  <div className="text-xs font-bold text-gray-400">Outreach Mode</div>
-                  <div className="rounded-xl border border-[#222224] bg-[#1c1c1e] p-3 text-sm text-white flex justify-between items-center">
-                    Cold B2B Prospecting <ChevronDown className="h-4 w-4 text-gray-500" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="text-xs font-bold text-gray-400">Prospect Context</div>
-                  <div className="rounded-xl border border-[#222224] bg-[#1c1c1e] p-3 text-sm text-gray-300 h-24">
-                    Pitching our SEO agency services to SaaS founders who recently raised a Series A...
-                  </div>
-                </div>
-                <div className="rounded-xl bg-[#0a84ff] p-3 text-center text-sm font-bold text-white flex items-center justify-center gap-2 opacity-80">
-                  <Sparkles className="h-4 w-4" /> Generate Email
-                </div>
-              </div>
-
-              {/* Fake Output & Analytics */}
-              <div className="col-span-1 md:col-span-2 space-y-6">
-                <div className="flex items-center justify-between border-b border-[#1c1c1e] pb-4">
-                  <div className="text-sm font-bold text-white flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-[#30d158]" /> Deliverability: Optimal
-                  </div>
-                  <div className="text-2xl font-extrabold text-[#30d158]">98<span className="text-sm text-gray-500">/100</span></div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Subject Lines</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-lg border border-[#222224] bg-[#141415] p-2.5 text-xs text-white">quick question re: growth</div>
-                    <div className="rounded-lg border border-[#0a84ff]/30 bg-[#0a84ff]/10 p-2.5 text-xs text-[#0a84ff] font-semibold flex justify-between">
-                      scaling SEO post Series A <Check className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sanitized Draft</div>
-                  <div className="rounded-xl border border-[#222224] bg-[#141415] p-5 text-sm text-gray-300 leading-relaxed font-serif">
-                    Hi [Name],<br/><br/>
-                    Noticed the recent Series A announcement—congratulations to you and the team.<br/><br/>
-                    Many SaaS companies hit a growth bottleneck post-funding when trying to scale organic acquisition. Our team built a framework that typically <span className="bg-[#ff453a]/20 text-[#ff453a] px-1 rounded line-through">guarantees 10x traffic</span> <span className="bg-[#30d158]/20 text-[#30d158] px-1 rounded font-medium">improves inbound pipeline metrics</span> within 90 days.<br/><br/>
-                    Are you open to reviewing a quick benchmark report on how your competitors are currently ranking?<br/><br/>
-                    Best,<br/>Arshdeep
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Fade out bottom gradient */}
-            <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-[#000000] to-transparent" />
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 4. LOGO CLOUD / SOCIAL PROOF */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="border-t border-b border-[#1c1c1e] bg-[#0a0a0a] py-10">
-        <div className="mx-auto max-w-7xl px-6 text-center">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-6">
-            Engineered to bypass filters at the world's top ESPs
-          </p>
-          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50">
-            <div className="flex items-center gap-2 text-xl font-bold text-white"><Mail className="h-6 w-6"/> Gmail</div>
-            <div className="flex items-center gap-2 text-xl font-bold text-white"><Inbox className="h-6 w-6"/> Outlook</div>
-            <div className="flex items-center gap-2 text-xl font-bold text-white"><ShieldCheck className="h-6 w-6"/> Proofpoint</div>
-            <div className="flex items-center gap-2 text-xl font-bold text-white"><Server className="h-6 w-6"/> Mimecast</div>
-            <div className="flex items-center gap-2 text-xl font-bold text-white"><Globe className="h-6 w-6"/> Google Workspace</div>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 5. PROBLEM & SOLUTION (BENTO GRID) */}
-      {/* ------------------------------------------------------------------ */}
-      <section id="features" className="py-24 bg-[#000000]">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="text-center max-w-3xl mx-auto mb-20">
-            <h2 className="text-4xl font-extrabold text-white sm:text-5xl">
-              Generic AI writes spam. <br className="hidden sm:block"/>
-              <span className="text-[#0a84ff]">We write for the inbox.</span>
-            </h2>
-            <p className="mt-6 text-lg text-gray-400 leading-relaxed">
-              If your cold email lands in the promotions tab or spam folder, your open rate is 0%. WriteYourEmail is built specifically to outsmart modern security filters and force your message into the primary inbox.
-            </p>
-          </div>
-
-          {/* Apple-Style Bento Box Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[320px]">
-            
-            {/* Box 1: Deliverability Score (Span 2) */}
-            <div className="col-span-1 md:col-span-2 rounded-3xl border border-[#1c1c1e] bg-[#0a0a0a] p-8 relative overflow-hidden group hover:border-[#222224] transition-all">
-              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                <BarChart3 className="h-48 w-48 text-[#0a84ff]" />
-              </div>
-              <div className="relative z-10 flex flex-col h-full justify-between">
-                <div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0a84ff]/10 text-[#0a84ff] mb-6">
-                    <BarChart3 className="h-6 w-6" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Live Deliverability Scorecard</h3>
-                  <p className="mt-3 text-sm text-gray-400 max-w-md leading-relaxed">
-                    Stop guessing. Get a real-time 0-100 score on your draft's inbox readiness. We analyze sentence length, tracking link density, and CTA friction to ensure you score 90+ every time.
-                  </p>
-                </div>
-                <Link href="/docs" className="text-sm font-semibold text-[#0a84ff] flex items-center gap-1.5 hover:underline">
-                  Read Scoring Algorithm <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Box 2: Spam Sanitizer */}
-            <div className="col-span-1 rounded-3xl border border-[#1c1c1e] bg-[#0a0a0a] p-8 relative overflow-hidden group hover:border-[#222224] transition-all">
-              <div className="relative z-10 flex flex-col h-full justify-between">
-                <div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#ff453a]/10 text-[#ff453a] mb-6">
-                    <AlertTriangle className="h-6 w-6" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white">Spam Trigger Sanitizer</h3>
-                  <p className="mt-3 text-sm text-gray-400 leading-relaxed">
-                    Automatically detects high-risk words ("guaranteed", "100% free") and replaces them with safe alternatives.
-                  </p>
-                </div>
-                <div className="mt-4 rounded-xl border border-[#222224] bg-[#141415] p-3 text-xs font-mono text-gray-300">
-                  <span className="line-through text-[#ff453a]">Act now for a free demo</span><br/>
-                  <span className="text-[#30d158]">Open to exploring a review?</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Box 3: 30 Modes */}
-            <div className="col-span-1 rounded-3xl border border-[#1c1c1e] bg-[#0a0a0a] p-8 relative overflow-hidden group hover:border-[#222224] transition-all">
-              <div className="relative z-10 flex flex-col h-full justify-between">
-                <div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#bf5af2]/10 text-[#bf5af2] mb-6">
-                    <Layers className="h-6 w-6" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white">30 Outreach Modes</h3>
-                  <p className="mt-3 text-sm text-gray-400 leading-relaxed">
-                    From LinkedIn Executive InMails to Multi-Step Follow-Ups. Dynamic inputs for every channel.
-                  </p>
-                </div>
-                <Link href="/docs" className="text-sm font-semibold text-[#bf5af2] flex items-center gap-1.5 hover:underline mt-4">
-                  View Mode Playbook <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-
-            {/* Box 4: Subject Line Matrix & Direct Launch (Span 2) */}
-            <div className="col-span-1 md:col-span-2 rounded-3xl border border-[#1c1c1e] bg-[#0a0a0a] p-8 relative overflow-hidden group hover:border-[#222224] transition-all flex flex-col md:flex-row gap-8">
-              <div className="flex-1 flex flex-col justify-between">
-                <div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#30d158]/10 text-[#30d158] mb-6">
-                    <Zap className="h-6 w-6" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Subject Lines & 1-Click Launch</h3>
-                  <p className="mt-3 text-sm text-gray-400 leading-relaxed">
-                    Generate 5 high-converting subject line variations engineered for high open rates. Pick the winner, and push your sanitized draft directly into your Gmail or Outlook composer with a single click.
-                  </p>
-                </div>
-                <div className="mt-6 flex gap-3">
-                  <div className="rounded-xl border border-[#222224] bg-[#141415] px-4 py-2 text-xs font-semibold text-white flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-[#ea4335]" /> Open in Gmail
-                  </div>
-                  <div className="rounded-xl border border-[#222224] bg-[#141415] px-4 py-2 text-xs font-semibold text-white flex items-center gap-2">
-                    <Inbox className="h-4 w-4 text-[#0078d4]" /> Open in Outlook
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 6. HOW IT WORKS (STEP-BY-STEP) */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="py-24 bg-[#0a0a0a] border-t border-[#1c1c1e]">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-              From idea to inbox in 3 seconds.
-            </h2>
-            <p className="mt-4 text-gray-400">
-              No complex prompt engineering required. The Studio UI handles the heavy lifting.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            {/* Connecting line for desktop */}
-            <div className="hidden md:block absolute top-12 left-[15%] right-[15%] h-0.5 bg-gradient-to-r from-[#0a84ff]/0 via-[#0a84ff]/20 to-[#0a84ff]/0 -z-10" />
-
-            <div className="text-center space-y-4">
-              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[#141415] border border-[#222224] shadow-xl text-2xl font-extrabold text-white">
-                1
-              </div>
-              <h3 className="text-lg font-bold text-white">Select Mode</h3>
-              <p className="text-sm text-gray-400">Choose from 30 targeted scenarios. E.g., B2B Pitch, Follow-Up, or LinkedIn DM.</p>
-            </div>
-
-            <div className="text-center space-y-4">
-              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[#0a84ff]/10 border border-[#0a84ff]/30 shadow-xl shadow-[#0a84ff]/20 text-2xl font-extrabold text-[#0a84ff]">
-                2
-              </div>
-              <h3 className="text-lg font-bold text-white">AI Sanitization</h3>
-              <p className="text-sm text-gray-400">Llama 3.3 writes the draft while simultaneously scrubbing it of hard-coded spam triggers.</p>
-            </div>
-
-            <div className="text-center space-y-4">
-              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[#30d158]/10 border border-[#30d158]/30 shadow-xl shadow-[#30d158]/20 text-2xl font-extrabold text-[#30d158]">
-                3
-              </div>
-              <h3 className="text-lg font-bold text-white">Verify & Send</h3>
-              <p className="text-sm text-gray-400">Check your 0-100 Deliverability Score, pick a subject line, and 1-Click Launch into your ESP.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 7. USE CASES / PERSONA TABS */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="py-24 bg-[#000000] border-t border-[#1c1c1e]">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-              Who is WriteYourEmail for?
-            </h2>
-          </div>
-
-          <div className="flex flex-col lg:flex-row gap-12">
-            {/* Tabs Sidebar */}
-            <div className="lg:w-1/3 flex flex-col gap-3">
-              <button 
-                onClick={() => setActivePersona("founders")}
-                className={`text-left px-6 py-5 rounded-2xl border transition-all flex flex-col gap-2 ${activePersona === "founders" ? "bg-[#141415] border-[#0a84ff] shadow-lg shadow-[#0a84ff]/10" : "bg-[#0a0a0a] border-[#1c1c1e] hover:border-[#222224]"}`}
-              >
-                <div className={`flex items-center gap-3 font-bold ${activePersona === "founders" ? "text-white" : "text-gray-400"}`}>
-                  <Target className={`h-5 w-5 ${activePersona === "founders" ? "text-[#0a84ff]" : ""}`} /> SaaS Founders
-                </div>
-                <p className="text-xs text-gray-500">Find early customers and secure investor meetings.</p>
-              </button>
-
-              <button 
-                onClick={() => setActivePersona("agencies")}
-                className={`text-left px-6 py-5 rounded-2xl border transition-all flex flex-col gap-2 ${activePersona === "agencies" ? "bg-[#141415] border-[#bf5af2] shadow-lg shadow-[#bf5af2]/10" : "bg-[#0a0a0a] border-[#1c1c1e] hover:border-[#222224]"}`}
-              >
-                <div className={`flex items-center gap-3 font-bold ${activePersona === "agencies" ? "text-white" : "text-gray-400"}`}>
-                  <Briefcase className={`h-5 w-5 ${activePersona === "agencies" ? "text-[#bf5af2]" : ""}`} /> Agencies & Consultants
-                </div>
-                <p className="text-xs text-gray-500">Protect client deliverability and automate copywriting.</p>
-              </button>
-
-              <button 
-                onClick={() => setActivePersona("sales")}
-                className={`text-left px-6 py-5 rounded-2xl border transition-all flex flex-col gap-2 ${activePersona === "sales" ? "bg-[#141415] border-[#30d158] shadow-lg shadow-[#30d158]/10" : "bg-[#0a0a0a] border-[#1c1c1e] hover:border-[#222224]"}`}
-              >
-                <div className={`flex items-center gap-3 font-bold ${activePersona === "sales" ? "text-white" : "text-gray-400"}`}>
-                  <TrendingUp className={`h-5 w-5 ${activePersona === "sales" ? "text-[#30d158]" : ""}`} /> Sales Teams (SDRs)
-                </div>
-                <p className="text-xs text-gray-500">Book more meetings with multi-step follow up sequences.</p>
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            <div className="lg:w-2/3 rounded-3xl border border-[#222224] bg-[#0a0a0a] p-8 md:p-12 relative overflow-hidden">
-              {activePersona === "founders" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#0a84ff]/30 bg-[#0a84ff]/10 px-4 py-1.5 text-xs font-semibold text-[#0a84ff]">
-                    Popular Modes: B2B Pitch, Investor Pitch, Trial Conversion
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Stop sending generic founder updates.</h3>
-                  <p className="text-gray-400 leading-relaxed">
-                    As a founder, your time is best spent building product, not staring at a blank screen trying to write cold outreach that won't go to spam. WriteYourEmail formats perfect VC pitches, partner inquiries, and customer feedback loops in seconds.
-                  </p>
-                  <ul className="space-y-3 pt-4">
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#0a84ff]" /> Keep domain reputation perfectly clean</li>
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#0a84ff]" /> Ensure investor updates hit the primary inbox</li>
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#0a84ff]" /> Scale early outbound without a dedicated SDR</li>
-                  </ul>
-                </div>
-              )}
-
-              {activePersona === "agencies" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#bf5af2]/30 bg-[#bf5af2]/10 px-4 py-1.5 text-xs font-semibold text-[#bf5af2]">
-                    Popular Modes: Agency White-Label, Podcast Pitch, PR Outreach
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Protect your clients' domain reputation.</h3>
-                  <p className="text-gray-400 leading-relaxed">
-                    Lead gen agencies die when their cold domains get burned by spam filters. Our Deliverability Scorecard acts as your ultimate safety net, ensuring your copywriters aren't stuffing campaigns with high-risk promotional triggers.
-                  </p>
-                  <ul className="space-y-3 pt-4">
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#bf5af2]" /> Replace expensive deliverability consultants</li>
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#bf5af2]" /> Standardize copy quality across all client accounts</li>
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#bf5af2]" /> Access technical DNS (SPF/DKIM/DMARC) docs</li>
-                  </ul>
-                </div>
-              )}
-
-              {activePersona === "sales" && (
-                <div className="space-y-6 animate-fadeIn">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#30d158]/30 bg-[#30d158]/10 px-4 py-1.5 text-xs font-semibold text-[#30d158]">
-                    Popular Modes: Follow-Up Sequence, LinkedIn InMail, Dormant Revival
-                  </div>
-                  <h3 className="text-2xl font-bold text-white">Book more meetings, send less spam.</h3>
-                  <p className="text-gray-400 leading-relaxed">
-                    SDRs have quotas to hit. Writing custom sequences for every prospect takes too long. WriteYourEmail's follow-up generator creates contextual, non-annoying thread bumps that force replies without hurting feelings.
-                  </p>
-                  <ul className="space-y-3 pt-4">
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#30d158]" /> 1-Click Launch directly into Outlook or Gmail</li>
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#30d158]" /> Stay under LinkedIn's strict 300 character limit</li>
-                    <li className="flex items-center gap-3 text-sm text-gray-300"><Check className="h-5 w-5 text-[#30d158]" /> A/B test 5 subject lines instantly</li>
-                  </ul>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 8. TESTIMONIALS (WALL OF LOVE) */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="py-24 bg-[#0a0a0a] border-t border-[#1c1c1e]">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#ffd60a]/30 bg-[#ffd60a]/10 px-4 py-1.5 text-xs font-semibold text-[#ffd60a] mb-6">
-              <Star className="h-4 w-4 fill-current" /> Trusted by Outreach Professionals
-            </div>
-            <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-              Don't just take our word for it.
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {testimonials.map((testimonial, idx) => (
-              <div key={idx} className="rounded-3xl border border-[#1c1c1e] bg-[#141415] p-8 flex flex-col justify-between hover:border-[#222224] transition">
-                <div className="space-y-4">
-                  <div className="flex text-[#ffd60a]">
-                    {[...Array(5)].map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
-                  </div>
-                  <p className="text-sm text-gray-300 leading-relaxed">"{testimonial.content}"</p>
-                </div>
-                <div className="mt-8 flex items-center gap-4 border-t border-[#1c1c1e] pt-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#222224] text-xs font-bold text-white">
-                    {testimonial.avatar}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">{testimonial.name}</h4>
-                    <p className="text-xs text-gray-500">{testimonial.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 9. PRICING TEASER */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="py-24 bg-[#000000] border-t border-[#1c1c1e]">
-        <div className="mx-auto max-w-5xl px-6 text-center">
-          <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-            Simple, transparent prepaid passes.
-          </h2>
-          <p className="mt-4 text-lg text-gray-400 mb-12">
-            No recurring subscriptions. Pay once for 30 days of full access. Cancel automatically.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
-            <div className="rounded-3xl border border-[#1c1c1e] bg-[#0a0a0a] p-8">
-              <h3 className="text-xl font-bold text-white">Starter Pass</h3>
-              <div className="my-4 text-3xl font-extrabold text-white">$19 <span className="text-sm font-normal text-gray-500">/ 30 days</span></div>
-              <ul className="space-y-3 mb-8 text-sm text-gray-400">
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> 50 AI Generations / mo</li>
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> 5 Core Outreach Modes</li>
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> Deliverability Scorecard</li>
-              </ul>
-              <Link href="/pricing" className="block w-full rounded-xl border border-[#222224] bg-[#141415] py-3 text-center text-sm font-semibold text-white hover:bg-[#1c1c1e] transition">View Pass</Link>
-            </div>
-
-            <div className="rounded-3xl border border-[#0a84ff] bg-[#141415] p-8 shadow-2xl shadow-[#0a84ff]/10 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-[#0a84ff] to-[#bf5af2] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Most Popular</div>
-              <h3 className="text-xl font-bold text-white">Growth Pass</h3>
-              <div className="my-4 text-3xl font-extrabold text-[#30d158] flex items-center gap-2">
-                $39 <span className="text-sm font-normal text-gray-500 line-through">$78</span>
-              </div>
-              <p className="text-xs text-[#30d158] font-bold bg-[#30d158]/10 border border-[#30d158]/20 px-2 py-0.5 rounded inline-block mb-4">Code LAUNCH50 Applied</p>
-              <ul className="space-y-3 mb-8 text-sm text-gray-300">
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> Unlimited AI Generations</li>
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> All 30 Outreach Modes</li>
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> Spam Trigger Sanitizer</li>
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> 1-Click Mail Launch</li>
-              </ul>
-              <Link href="/pricing" className="block w-full rounded-xl bg-[#0a84ff] py-3 text-center text-sm font-semibold text-white hover:bg-[#0071e3] transition shadow-lg shadow-[#0a84ff]/20">Get Growth Pass</Link>
-            </div>
-
-            <div className="rounded-3xl border border-[#1c1c1e] bg-[#0a0a0a] p-8">
-              <h3 className="text-xl font-bold text-white">Enterprise</h3>
-              <div className="my-4 text-3xl font-extrabold text-white">$79 <span className="text-sm font-normal text-gray-500">/ 30 days</span></div>
-              <ul className="space-y-3 mb-8 text-sm text-gray-400">
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> Unlimited Everything</li>
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> Priority AI Queueing</li>
-                <li className="flex gap-2"><Check className="h-4 w-4 text-[#0a84ff] shrink-0" /> Direct Support Access</li>
-              </ul>
-              <Link href="/pricing" className="block w-full rounded-xl border border-[#222224] bg-[#141415] py-3 text-center text-sm font-semibold text-white hover:bg-[#1c1c1e] transition">View Pass</Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* 10. FAQ ACCORDION */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="py-24 bg-[#0a0a0a] border-t border-[#1c1c1e]">
-        <div className="mx-auto max-w-3xl px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-              Frequently Asked Questions
-            </h2>
-          </div>
-
-          <div className="space-y-4">
-            {faqs.map((faq, index) => (
-              <div key={index} className="rounded-2xl border border-[#1c1c1e] bg-[#141415] overflow-hidden">
-                <button
-                  onClick={() => toggleFaq(index)}
-                  className="w-full flex items-center justify-between p-6 text-left"
+          {/* Right Action Button (Real Auth Sync) */}
+          <div className="flex items-center gap-3">
+            {currentUser ? (
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/glent/passport"
+                  className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.04] text-xs font-mono text-neutral-300 hover:text-white transition-colors"
                 >
-                  <span className="text-sm font-bold text-white">{faq.question}</span>
-                  <ChevronDown className={`h-5 w-5 text-gray-500 transition-transform duration-200 ${activeFaq === index ? "rotate-180" : ""}`} />
+                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span className="max-w-[110px] truncate">{currentUser.email}</span>
+                </Link>
+                <Link
+                  href="/studio"
+                  className="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-neutral-200 transition-all flex items-center gap-1.5 shadow-md shadow-white/5"
+                >
+                  Enter Studio <ArrowUpRight size={13} />
+                </Link>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/glent/passport"
+                  className="px-3.5 py-2 text-xs font-mono uppercase tracking-wider text-neutral-400 hover:text-white transition-colors hidden sm:inline-block"
+                >
+                  Passport ID
+                </Link>
+                <Link
+                  href="/studio"
+                  className="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold uppercase tracking-wider hover:bg-neutral-200 transition-all flex items-center gap-1.5 shadow-md shadow-white/5"
+                >
+                  Launch Studio <ArrowUpRight size={13} />
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* 3. HERO SECTION */}
+      <section className="relative pt-24 pb-28 px-6 max-w-7xl mx-auto space-y-10 text-center">
+        {/* Ambient Top Glow */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-gradient-to-r from-blue-600/15 via-purple-600/10 to-emerald-500/5 blur-[160px] pointer-events-none -z-10" />
+
+        {/* Hero Badges */}
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/[0.03] text-xs font-mono tracking-widest text-neutral-300">
+          <Sparkles size={14} className="text-blue-400" />
+          <span className="uppercase text-[11px]">Meta Llama 3.3 70B • Groq LPU Engine • Zero-Spam Audits</span>
+        </div>
+
+        {/* Main Headline */}
+        <h1 className="text-5xl sm:text-7xl lg:text-8xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-b from-white via-neutral-100 to-neutral-500 leading-[1.05] max-w-5xl mx-auto">
+          Outreach that lands in the Inbox. Deals that actually close.
+        </h1>
+
+        {/* Sub-headline */}
+        <p className="text-base sm:text-xl text-neutral-400 leading-relaxed font-light max-w-3xl mx-auto">
+          Stop guessing why your cold emails disappear into spam. WriteYourEmail pairs deterministic 
+          deliverability physics with 30 high-converting AI strategies to generate revenue-generating 
+          prospecting in under 800 milliseconds.
+        </p>
+
+        {/* Call to Actions */}
+        <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
+          <Link
+            href="/studio"
+            className="px-8 py-4 rounded-xl bg-white text-black font-semibold text-xs uppercase tracking-widest hover:bg-neutral-200 transition-all flex items-center gap-2 shadow-xl shadow-white/10 group"
+          >
+            Open Email Studio Free <ArrowUpRight size={15} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+          </Link>
+
+          <a
+            href="#auditor"
+            className="px-8 py-4 rounded-xl border border-white/10 hover:border-white/30 bg-white/[0.02] text-neutral-300 font-semibold text-xs uppercase tracking-widest transition-all flex items-center gap-2"
+          >
+            <ShieldCheck size={14} className="text-emerald-400" /> Test Deliverability Tool
+          </a>
+        </div>
+
+        {/* Confidence Stats */}
+        <div className="pt-6 flex flex-wrap items-center justify-center gap-8 text-neutral-500 font-mono text-xs">
+          <span>✓ 5 FREE GENERATIONS</span>
+          <span>✓ NO CREDIT CARD REQUIRED</span>
+          <span>✓ 100% PREPAID (ZERO RECURRING CHARGES)</span>
+          <span>✓ RBI INDIA COMPLIANT</span>
+        </div>
+      </section>
+
+      {/* 4. QUANTITATIVE BENCHMARK STRIP */}
+      <section className="border-y border-white/5 bg-neutral-950/60 py-12 px-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="space-y-1 border-l border-white/10 pl-6">
+            <p className="text-3xl sm:text-4xl font-mono font-bold text-white tracking-tight">30 Modes</p>
+            <p className="text-xs text-neutral-400 font-mono uppercase tracking-wider">Outreach Archetypes</p>
+          </div>
+          <div className="space-y-1 border-l border-white/10 pl-6">
+            <p className="text-3xl sm:text-4xl font-mono font-bold text-blue-400 tracking-tight">&lt;800ms</p>
+            <p className="text-xs text-neutral-400 font-mono uppercase tracking-wider">LPU Inference Velocity</p>
+          </div>
+          <div className="space-y-1 border-l border-white/10 pl-6">
+            <p className="text-3xl sm:text-4xl font-mono font-bold text-emerald-400 tracking-tight">99.8%</p>
+            <p className="text-xs text-neutral-400 font-mono uppercase tracking-wider">Inbox Placement Audit</p>
+          </div>
+          <div className="space-y-1 border-l border-white/10 pl-6">
+            <p className="text-3xl sm:text-4xl font-mono font-bold text-purple-400 tracking-tight">1-Click</p>
+            <p className="text-xs text-neutral-400 font-mono uppercase tracking-wider">Gmail & Outlook Launch</p>
+          </div>
+        </div>
+      </section>
+
+      {/* 5. LIVE WORKING DELIVERABILITY & SPAM AUDITOR ENGINE */}
+      <section id="auditor" className="py-24 px-6 max-w-7xl mx-auto space-y-12">
+        <div className="max-w-3xl space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/[0.03] text-[10px] font-mono uppercase tracking-[0.25em] text-emerald-400">
+            <ShieldCheck size={12} /> Interactive Deliverability Sandbox
+          </div>
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
+            Audit your email copy before you hit send.
+          </h2>
+          <p className="text-sm text-neutral-400 font-light leading-relaxed">
+            Test any cold email draft or subject line right here. Our algorithmic heuristic checks 
+            for banned sales terminology, exclamation penalties, and aggressive phrasing in real time.
+          </p>
+        </div>
+
+        {/* Interactive Editor Box */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Left: Input Textarea with Live Polish Action */}
+          <div className="lg:col-span-7 rounded-3xl border border-white/15 bg-neutral-950 p-6 sm:p-8 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <span className="text-xs font-mono uppercase tracking-wider text-neutral-400 flex items-center gap-2">
+                <Terminal size={14} className="text-blue-400" /> Interactive Draft Input
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={applyInstantCleanPolish}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-mono flex items-center gap-1.5 transition-colors"
+                >
+                  <Sparkles size={13} /> Auto-Fix Spam Triggers
                 </button>
-                {activeFaq === index && (
-                  <div className="px-6 pb-6 text-sm text-gray-400 leading-relaxed border-t border-[#1c1c1e] pt-4">
-                    {faq.answer}
-                  </div>
-                )}
+                <button
+                  onClick={() => handleCopyText(auditInput)}
+                  className="px-3 py-1.5 rounded-lg border border-white/10 hover:border-white/25 text-neutral-300 text-xs font-mono flex items-center gap-1.5 transition-colors"
+                >
+                  {copiedAudit ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                  {copiedAudit ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+
+            <textarea
+              value={auditInput}
+              onChange={(e) => setAuditInput(e.target.value)}
+              rows={9}
+              placeholder="Paste any cold outreach draft here to inspect deliverability heuristics..."
+              className="w-full bg-transparent text-sm text-neutral-200 placeholder-neutral-600 focus:outline-none font-mono leading-relaxed resize-y"
+            />
+
+            <div className="flex flex-wrap items-center justify-between text-xs font-mono text-neutral-500 pt-2 border-t border-white/5">
+              <span>WORD COUNT: {deliverabilityAnalysis.wordCount} WORDS</span>
+              <span>READING TIME: ~{deliverabilityAnalysis.estimatedReadingTime} MIN</span>
+              <span>EXCLAMATIONS: {deliverabilityAnalysis.exclamationCount}</span>
+            </div>
+          </div>
+
+          {/* Right: Live Heuristic Deliverability Scorecard */}
+          <div className="lg:col-span-5 rounded-3xl border border-white/15 bg-gradient-to-b from-white/[0.04] to-black p-6 sm:p-8 space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <span className="text-xs font-mono uppercase tracking-wider text-neutral-400">
+                Deliverability Audit Report
+              </span>
+              <span className={`px-2.5 py-0.5 rounded text-[10px] font-mono uppercase ${
+                deliverabilityAnalysis.score >= 90
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : deliverabilityAnalysis.score >= 70
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  : 'bg-red-500/10 text-red-400 border border-red-500/20'
+              }`}>
+                {deliverabilityAnalysis.status}
+              </span>
+            </div>
+
+            {/* Score Wheel */}
+            <div className="flex items-center gap-6">
+              <div className={`text-6xl font-mono font-bold tracking-tight ${
+                deliverabilityAnalysis.score >= 90
+                  ? 'text-emerald-400'
+                  : deliverabilityAnalysis.score >= 70
+                  ? 'text-amber-400'
+                  : 'text-red-400'
+              }`}>
+                {deliverabilityAnalysis.score}
+                <span className="text-2xl text-neutral-600 font-normal">/100</span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-white">Calculated Placement Rate</p>
+                <p className="text-xs text-neutral-400 font-light leading-snug">
+                  Evaluated against Gmail, Outlook 365, and corporate spam heuristics.
+                </p>
+              </div>
+            </div>
+
+            {/* Flagged Spam Trigger Terms List */}
+            <div className="space-y-3 pt-2">
+              <p className="text-xs font-mono uppercase tracking-wider text-neutral-400">
+                Identified Spam Words ({deliverabilityAnalysis.triggers.length})
+              </p>
+
+              {deliverabilityAnalysis.triggers.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {deliverabilityAnalysis.triggers.map((item, idx) => (
+                    <div key={idx} className="p-2.5 rounded-xl border border-red-500/20 bg-red-500/5 flex items-start justify-between gap-3 text-xs">
+                      <div className="space-y-0.5">
+                        <span className="font-mono font-semibold text-red-400 uppercase tracking-wider">
+                          &quot;{item.word}&quot;
+                        </span>
+                        <p className="text-[11px] text-neutral-400 font-light">{item.tip}</p>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-red-500/20 text-red-300 shrink-0">
+                        -14 PTS
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 text-xs text-emerald-400 flex items-center gap-2">
+                  <CheckCircle2 size={16} />
+                  <span>Zero harmful spam trigger terms detected. Clean copy!</span>
+                </div>
+              )}
+            </div>
+
+            {/* Launch into Studio CTA */}
+            <div className="pt-2">
+              <Link
+                href="/studio"
+                className="w-full py-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
+              >
+                Launch Studio for Full 30-Mode Audit <ArrowUpRight size={14} />
+              </Link>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 6. INTERACTIVE 30-STRATEGY MODES CATALOG */}
+      <section id="strategies" className="py-24 px-6 max-w-7xl mx-auto space-y-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-white/5 pb-6 gap-6">
+          <div className="space-y-3 max-w-2xl">
+            <p className="text-xs font-mono uppercase tracking-[0.3em] text-blue-400">Strategy Engine</p>
+            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
+              30 Specialized Outreach Archetypes
+            </h2>
+            <p className="text-sm text-neutral-400 font-light">
+              Unlike generic ChatGPT prompts, every WriteYourEmail mode enforces rigorous structural constraints, 
+              psychological pacing, and delivery safeguards.
+            </p>
+          </div>
+
+          {/* Search & Category Filter */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+              <input
+                type="text"
+                placeholder="Search modes..."
+                value={modeSearch}
+                onChange={(e) => setModeSearch(e.target.value)}
+                className="pl-9 pr-4 py-2 rounded-xl bg-neutral-900 border border-white/10 text-xs text-white focus:outline-none focus:border-blue-500 transition-colors w-full sm:w-48"
+              />
+            </div>
+
+            <div className="flex p-1 rounded-xl bg-neutral-900 border border-white/10 text-xs font-mono uppercase">
+              {(['all', 'starter', 'growth', 'enterprise'] as const).map((tier) => (
+                <button
+                  key={tier}
+                  onClick={() => setModeFilter(tier)}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    modeFilter === tier ? 'bg-white text-black font-bold' : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  {tier}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Dynamic Mode Grid & Interactive Detail View */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* List of Modes */}
+          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[560px] overflow-y-auto pr-2">
+            {filteredModes.map((mode) => (
+              <div
+                key={mode.id}
+                onClick={() => setSelectedPreviewMode(mode)}
+                className={`p-5 rounded-2xl border transition-all cursor-pointer space-y-3 ${
+                  selectedPreviewMode.id === mode.id
+                    ? 'border-blue-500/60 bg-blue-500/10 shadow-lg'
+                    : 'border-white/5 bg-white/[0.01] hover:border-white/20'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded ${
+                    mode.category === 'enterprise'
+                      ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+                      : mode.category === 'growth'
+                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                      : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  }`}>
+                    {mode.category}
+                  </span>
+                  {selectedPreviewMode.id === mode.id && (
+                    <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-base font-semibold text-white tracking-tight">{mode.name}</h4>
+                  <p className="text-xs text-neutral-400 mt-1 line-clamp-2 font-light">{mode.tagline}</p>
+                </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-10 text-center">
-            <p className="text-sm text-gray-500">
-              Still have questions? Check out our <Link href="/docs" className="text-[#0a84ff] hover:underline">Documentation</Link> or email <a href="mailto:help@writeyouremail.com" className="text-[#0a84ff] hover:underline">help@writeyouremail.com</a>.
-            </p>
+          {/* Mode Detail Card Preview */}
+          <div className="lg:col-span-5 rounded-3xl border border-white/15 bg-gradient-to-b from-white/[0.04] to-black p-8 space-y-6 shadow-2xl">
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-blue-400">
+                Mode Specification
+              </span>
+              <h3 className="text-2xl font-bold text-white">{selectedPreviewMode.name}</h3>
+              <p className="text-xs text-neutral-400">{selectedPreviewMode.tagline}</p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-white/5 bg-black/60 space-y-1 text-xs">
+              <span className="text-[10px] font-mono text-neutral-500 uppercase">RECOMMENDED TARGETING</span>
+              <p className="text-neutral-300 font-light leading-relaxed">{selectedPreviewMode.idealFor}</p>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[10px] font-mono text-neutral-500 uppercase">SAMPLE SYNTHESIS</span>
+              <div className="p-4 rounded-xl border border-white/10 bg-black font-mono text-xs space-y-3">
+                <div>
+                  <span className="text-neutral-500">Subject: </span>
+                  <span className="text-blue-400 font-semibold">{selectedPreviewMode.sampleSubject}</span>
+                </div>
+                <div className="pt-2 border-t border-white/5 text-neutral-300 leading-relaxed font-light">
+                  {selectedPreviewMode.samplePreview}
+                </div>
+              </div>
+            </div>
+
+            <Link
+              href={`/studio?mode=${selectedPreviewMode.id}`}
+              className="w-full py-3.5 rounded-xl bg-white hover:bg-neutral-200 text-black font-semibold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2"
+            >
+              Launch Mode in Studio <ArrowUpRight size={14} />
+            </Link>
           </div>
+
         </div>
       </section>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 11. FINAL CTA */}
-      {/* ------------------------------------------------------------------ */}
-      <section className="py-24 bg-gradient-to-r from-[#0a84ff]/20 via-[#bf5af2]/20 to-[#0a84ff]/20 border-t border-[#1c1c1e] text-center relative overflow-hidden">
-        {/* Glow behind CTA */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-[300px] bg-[#0a84ff]/10 blur-[100px] rounded-full pointer-events-none -z-10" />
-
-        <div className="mx-auto max-w-4xl px-6 space-y-8 relative z-10">
-          <h2 className="text-4xl font-extrabold text-white sm:text-5xl">
-            Ready to fix your deliverability?
+      {/* 7. LIVE INTERACTIVE ROI & SAVINGS CALCULATOR */}
+      <section id="calculator" className="py-24 px-6 max-w-7xl mx-auto space-y-12 border-t border-white/5">
+        <div className="max-w-3xl space-y-3">
+          <p className="text-xs font-mono uppercase tracking-[0.3em] text-emerald-400">Value Economics</p>
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
+            Calculate your operational ROI.
           </h2>
-          <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-            Try 2 free generations as a guest right now. No account required. Or lock in your 50% discount with promo code <span className="font-mono text-white underline bg-[#000000]/50 px-2 py-0.5 rounded">LAUNCH50</span>.
+          <p className="text-sm text-neutral-400 font-light">
+            Adjust the sliders below to estimate the monthly engineering and sales hours saved, along with 
+            projected additional pipeline from zero-spam deliverability.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Link
-              href="/studio"
-              className="w-full sm:w-auto rounded-xl bg-[#0a84ff] px-10 py-4 text-base font-bold text-white hover:bg-[#0071e3] transition shadow-xl shadow-[#0a84ff]/30 flex items-center justify-center gap-2"
-            >
-              Open Studio Now <ArrowRight className="h-5 w-5" />
-            </Link>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          
+          {/* Sliders Box */}
+          <div className="lg:col-span-7 rounded-3xl border border-white/10 bg-neutral-950 p-8 space-y-8">
+            
+            {/* Slider 1: Team Size */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-neutral-400 uppercase">Outreach Team Size / Senders</span>
+                <span className="text-white font-bold text-sm">{teamSize} Reps</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={25}
+                value={teamSize}
+                onChange={(e) => setTeamSize(Number(e.target.value))}
+                className="w-full accent-blue-500 bg-neutral-800 rounded-lg h-2 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] font-mono text-neutral-600">
+                <span>1 Solo Founder</span>
+                <span>25 SDR Team</span>
+              </div>
+            </div>
+
+            {/* Slider 2: Weekly Emails */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-neutral-400 uppercase">Emails Dispatched Per Rep / Week</span>
+                <span className="text-white font-bold text-sm">{emailsPerWeek} Emails</span>
+              </div>
+              <input
+                type="range"
+                min={50}
+                max={1500}
+                step={50}
+                value={emailsPerWeek}
+                onChange={(e) => setEmailsPerWeek(Number(e.target.value))}
+                className="w-full accent-blue-500 bg-neutral-800 rounded-lg h-2 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] font-mono text-neutral-600">
+                <span>50 Handcrafted</span>
+                <span>1,500 High Volume</span>
+              </div>
+            </div>
+
+            {/* Slider 3: Deal Value */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-neutral-400 uppercase">Average Customer Deal Value (LTV)</span>
+                <span className="text-emerald-400 font-bold text-sm">${avgDealValue.toLocaleString()}</span>
+              </div>
+              <input
+                type="range"
+                min={500}
+                max={20000}
+                step={500}
+                value={avgDealValue}
+                onChange={(e) => setAvgDealValue(Number(e.target.value))}
+                className="w-full accent-emerald-500 bg-neutral-800 rounded-lg h-2 cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] font-mono text-neutral-600">
+                <span>$500 Standard</span>
+                <span>$20,000 Enterprise</span>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Results Summary Box */}
+          <div className="lg:col-span-5 rounded-3xl border border-white/15 bg-gradient-to-b from-white/[0.05] to-black p-8 space-y-6 shadow-2xl">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400">
+              Projected Monthly Leverage
+            </span>
+
+            <div className="space-y-4">
+              <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.02] space-y-1">
+                <span className="text-[10px] font-mono uppercase text-neutral-500">HOURS SAVED PER MONTH</span>
+                <p className="text-3xl font-mono font-bold text-white tracking-tight">
+                  {calculatedSavings.monthlyHoursSaved} Hours
+                </p>
+                <p className="text-[11px] text-neutral-400 font-light">Eliminating blank-screen copywriting fatigue</p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-white/5 bg-white/[0.02] space-y-1">
+                <span className="text-[10px] font-mono uppercase text-neutral-500">ADDITIONAL BOOKED PIPELINE</span>
+                <p className="text-3xl font-mono font-bold text-emerald-400 tracking-tight">
+                  +${calculatedSavings.potentialPipeline}
+                </p>
+                <p className="text-[11px] text-neutral-400 font-light">
+                  From ~{calculatedSavings.additionalLeadsClosed} additional deal conversations/mo
+                </p>
+              </div>
+            </div>
+
             <Link
               href="/pricing"
-              className="w-full sm:w-auto rounded-xl border border-[#222224] bg-[#141415] px-10 py-4 text-base font-semibold text-gray-300 hover:bg-[#1c1c1e] hover:text-white transition"
+              className="w-full py-3.5 rounded-xl bg-white hover:bg-neutral-200 text-black font-semibold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
             >
-              View Prepaid Passes
+              Unlock Studio with Prepaid Pass <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="flex items-center justify-center gap-2 text-xs text-gray-500 pt-4">
-            <Lock className="h-3.5 w-3.5" /> Secure Checkout via PayPal Standard Orders
+
+        </div>
+      </section>
+
+      {/* 8. PREPAID PASS SELECTOR WITH LIVE LAUNCH50 COUPON ENGINE */}
+      <section className="py-24 px-6 max-w-7xl mx-auto space-y-12 border-t border-white/5">
+        <div className="text-center space-y-3 max-w-2xl mx-auto">
+          <p className="text-xs font-mono uppercase tracking-[0.3em] text-blue-400">Simple Economics</p>
+          <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
+            Prepaid 30-Day Passes. Zero Auto-Debit Churn.
+          </h2>
+          <p className="text-sm text-neutral-400 font-light">
+            We reject predatory auto-renewing subscriptions. Purchase a 30-day block via PayPal. 
+            Stack passes whenever you need them. Fully compliant with RBI India e-mandates.
+          </p>
+        </div>
+
+        {/* Promo Code Input Box */}
+        <div className="max-w-md mx-auto p-2 rounded-2xl border border-white/10 bg-neutral-950 flex items-center gap-2">
+          <input
+            type="text"
+            placeholder='Enter code "LAUNCH50" for 50% off'
+            value={promoCodeInput}
+            onChange={(e) => setPromoCodeInput(e.target.value)}
+            className="flex-1 bg-transparent px-4 py-2 text-xs text-white uppercase font-mono placeholder-neutral-600 focus:outline-none"
+          />
+          <button
+            onClick={handleApplyPromo}
+            className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white text-white hover:text-black font-semibold text-xs uppercase transition-colors shrink-0 font-mono"
+          >
+            Apply Code
+          </button>
+        </div>
+
+        {promoApplied && (
+          <div className="max-w-md mx-auto p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-xs font-mono text-emerald-400 text-center">
+            ✓ 50% LAUNCH DISCOUNT ACTIVE ACROSS ALL PASSES
+          </div>
+        )}
+
+        {promoError && (
+          <div className="max-w-md mx-auto p-3 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-mono text-red-400 text-center">
+            {promoError}
+          </div>
+        )}
+
+        {/* Tier Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-4">
+          
+          {/* TIER 1: STARTER */}
+          <div className="rounded-3xl border border-white/10 bg-white/[0.01] p-8 flex flex-col justify-between space-y-6">
+            <div className="space-y-4">
+              <span className="text-[10px] font-mono uppercase px-2.5 py-1 rounded bg-white/5 text-neutral-400">
+                Solo Founders & Freelancers
+              </span>
+              <div>
+                <h3 className="text-2xl font-bold text-white">Starter Pass</h3>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-4xl font-mono font-bold text-white">${getPassPrice('starter')}</span>
+                  <span className="text-xs font-mono text-neutral-500">/ 30-Day Pass</span>
+                </div>
+                {promoApplied && <span className="text-[10px] font-mono text-emerald-400 line-through mr-2">$19.00</span>}
+              </div>
+
+              <div className="space-y-2.5 pt-2 text-xs text-neutral-300">
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> 100 Studio Generations</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> Core Outreach Modes</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> Basic Deliverability Audit</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> Gmail & Outlook Dispatch</div>
+              </div>
+            </div>
+
+            <Link
+              href="/pricing"
+              className="w-full py-3 rounded-xl border border-white/10 hover:border-white/30 text-white text-xs font-semibold uppercase tracking-wider transition-colors text-center block"
+            >
+              Get Starter Pass
+            </Link>
+          </div>
+
+          {/* TIER 2: GROWTH (POPULAR) */}
+          <div className="rounded-3xl border border-blue-500/40 bg-gradient-to-b from-blue-600/10 via-neutral-950 to-black p-8 flex flex-col justify-between space-y-6 relative shadow-2xl">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-blue-600 text-white font-mono text-[10px] uppercase tracking-wider">
+              Most Popular
+            </div>
+
+            <div className="space-y-4">
+              <span className="text-[10px] font-mono uppercase px-2.5 py-1 rounded bg-blue-500/20 text-blue-400">
+                Growth Teams & Agencies
+              </span>
+              <div>
+                <h3 className="text-2xl font-bold text-white">Growth Pass</h3>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-4xl font-mono font-bold text-white">${getPassPrice('growth')}</span>
+                  <span className="text-xs font-mono text-neutral-500">/ 30-Day Pass</span>
+                </div>
+                {promoApplied && <span className="text-[10px] font-mono text-emerald-400 line-through mr-2">$39.00</span>}
+              </div>
+
+              <div className="space-y-2.5 pt-2 text-xs text-neutral-300">
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> 300 Studio Generations</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> All 30 Outreach Modes</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> Full Spam Heuristic Matrix</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> A/B Subject Line Engine</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-blue-400" /> Priority LPU Inference Route</div>
+              </div>
+            </div>
+
+            <Link
+              href="/pricing"
+              className="w-full py-3.5 rounded-xl bg-white hover:bg-neutral-200 text-black text-xs font-semibold uppercase tracking-wider transition-colors text-center block"
+            >
+              Get Growth Pass
+            </Link>
+          </div>
+
+          {/* TIER 3: ENTERPRISE */}
+          <div className="rounded-3xl border border-white/10 bg-white/[0.01] p-8 flex flex-col justify-between space-y-6">
+            <div className="space-y-4">
+              <span className="text-[10px] font-mono uppercase px-2.5 py-1 rounded bg-purple-500/10 text-purple-400">
+                High Volume Outreach
+              </span>
+              <div>
+                <h3 className="text-2xl font-bold text-white">Enterprise Pass</h3>
+                <div className="flex items-baseline gap-2 mt-2">
+                  <span className="text-4xl font-mono font-bold text-white">${getPassPrice('enterprise')}</span>
+                  <span className="text-xs font-mono text-neutral-500">/ 30-Day Pass</span>
+                </div>
+                {promoApplied && <span className="text-[10px] font-mono text-emerald-400 line-through mr-2">$79.00</span>}
+              </div>
+
+              <div className="space-y-2.5 pt-2 text-xs text-neutral-300">
+                <div className="flex items-center gap-2"><Check size={14} className="text-purple-400" /> 1,000 Studio Generations</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-purple-400" /> Full Suite + Early Phase 02 Access</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-purple-400" /> Custom Tone Fine-Tuning</div>
+                <div className="flex items-center gap-2"><Check size={14} className="text-purple-400" /> Glent Passport Priority Node</div>
+              </div>
+            </div>
+
+            <Link
+              href="/pricing"
+              className="w-full py-3 rounded-xl border border-white/10 hover:border-white/30 text-white text-xs font-semibold uppercase tracking-wider transition-colors text-center block"
+            >
+              Get Enterprise Pass
+            </Link>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 9. COMPETITIVE BENCHMARK COMPARISON MATRIX */}
+      <section className="py-24 px-6 max-w-7xl mx-auto space-y-12 border-t border-white/5">
+        <div className="space-y-3 max-w-2xl">
+          <p className="text-xs font-mono uppercase tracking-[0.3em] text-neutral-400">Technical Rigor</p>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+            Architecture Comparison
+          </h2>
+          <p className="text-sm text-neutral-400 font-light">
+            How WriteYourEmail stacks against generic LLM chats (ChatGPT/Claude) and traditional sales sequencers.
+          </p>
+        </div>
+
+        <div className="overflow-x-auto rounded-3xl border border-white/10 bg-neutral-950">
+          <table className="w-full text-left text-xs font-mono">
+            <thead>
+              <tr className="border-b border-white/10 text-neutral-400 uppercase tracking-wider">
+                <th className="p-5">Capability / Metric</th>
+                <th className="p-5 text-blue-400 font-bold">WriteYourEmail Studio</th>
+                <th className="p-5">Generic LLMs (ChatGPT)</th>
+                <th className="p-5">Legacy Sales Sequencers</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 text-neutral-300">
+              <tr>
+                <td className="p-5 font-semibold text-white">Inference Latency</td>
+                <td className="p-5 text-emerald-400 font-bold">&lt;800ms (Groq LPUs)</td>
+                <td className="p-5 text-neutral-500">4,000ms – 9,000ms</td>
+                <td className="p-5 text-neutral-500">N/A (Templates only)</td>
+              </tr>
+              <tr>
+                <td className="p-5 font-semibold text-white">Live Spam Word Auditor</td>
+                <td className="p-5 text-emerald-400 font-bold">✓ 200+ Term Dictionary</td>
+                <td className="p-5 text-red-400">✗ None (Outputs raw spam words)</td>
+                <td className="p-5 text-neutral-400">Basic post-send metrics</td>
+              </tr>
+              <tr>
+                <td className="p-5 font-semibold text-white">B2B Strategy Templates</td>
+                <td className="p-5 text-emerald-400 font-bold">30 Engineered Modes</td>
+                <td className="p-5 text-neutral-400">Requires custom prompt engineering</td>
+                <td className="p-5 text-neutral-500">Static templates</td>
+              </tr>
+              <tr>
+                <td className="p-5 font-semibold text-white">Billing Philosophy</td>
+                <td className="p-5 text-emerald-400 font-bold">Prepaid 30-Day Passes ($0 Churn)</td>
+                <td className="p-5 text-neutral-400">Monthly recurring subscription</td>
+                <td className="p-5 text-neutral-400">$100–$300/mo annual contracts</td>
+              </tr>
+              <tr>
+                <td className="p-5 font-semibold text-white">One-Click Dispatch</td>
+                <td className="p-5 text-emerald-400 font-bold">✓ Native Gmail & Outlook</td>
+                <td className="p-5 text-red-400">✗ Manual copy & paste</td>
+                <td className="p-5 text-neutral-400">Requires SMTP / IMAP setup</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* 10. INTERACTIVE FAQ ACCORDION */}
+      <section className="py-24 px-6 max-w-4xl mx-auto space-y-12 border-t border-white/5">
+        <div className="text-center space-y-3">
+          <p className="text-xs font-mono uppercase tracking-[0.3em] text-neutral-400">Frequently Asked Questions</p>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+            Everything you need to know.
+          </h2>
+        </div>
+
+        <div className="space-y-4">
+          {[
+            {
+              q: 'How does WriteYourEmail stop cold emails from landing in spam?',
+              a: 'Spam filters evaluate emails using statistical penalty heuristics. WriteYourEmail executes a local dictionary audit checking for over 200 high-risk solicitation phrases, excessive capitalization, and exclamation mark density before you send. This ensures your copy conforms to Google Workspace and Microsoft 365 inbox placement guidelines.'
+            },
+            {
+              q: 'What is a 30-Day Prepaid Pass and why not a subscription?',
+              a: 'We reject dark-pattern auto-billing. With our PayPal Orders v2 prepaid engine, you pay once for 30 days of access. When it expires, you are never charged automatically. If you purchase multiple passes, they stack +30 days consecutively. This ensures 100% compliance with central banking regulations, including RBI India e-mandates.'
+            },
+            {
+              q: 'What is the Glent Sovereign Passport?',
+              a: 'Glent Global Enterprises is the parent technology venture lab behind WriteYourEmail.com. A Glent Passport is a single sign-on credential that unlocks WriteYourEmail and all forthcoming intelligence tools in the Glent ecosystem without needing separate accounts.'
+            },
+            {
+              q: 'Is my data used to train AI models?',
+              a: 'Absolutely not. We enforce strict data sovereignty boundaries. All generations are stored in PostgreSQL with Row Level Security (RLS) isolating your account from all others. Your inputs and generated emails are never used to train public foundation models.'
+            },
+            {
+              q: 'How does the Gmail & Outlook 1-Click launcher work?',
+              a: 'When an email is generated and passes deliverability checks, clicking the Gmail or Outlook button creates an encoded mailto dispatch that opens directly in your desktop or web client with the subject and body pre-formatted, ready for a final review.'
+            }
+          ].map((faq, i) => (
+            <div
+              key={i}
+              onClick={() => setOpenFaqIndex(openFaqIndex === i ? null : i)}
+              className="rounded-2xl border border-white/5 bg-white/[0.01] p-6 cursor-pointer space-y-3 transition-colors hover:border-white/15"
+            >
+              <div className="flex items-center justify-between text-base font-semibold text-white">
+                <span>{faq.q}</span>
+                <ChevronDown size={16} className={`transition-transform duration-200 text-neutral-400 ${openFaqIndex === i ? 'rotate-180 text-blue-400' : ''}`} />
+              </div>
+              {openFaqIndex === i && (
+                <p className="text-xs text-neutral-400 font-light leading-relaxed pt-2 border-t border-white/5">
+                  {faq.a}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* 11. FINAL HIGH-STAKES CONVERSION CTA */}
+      <section className="py-24 px-6 max-w-7xl mx-auto">
+        <div className="rounded-3xl border border-white/15 bg-gradient-to-b from-blue-600/10 via-neutral-950 to-black p-10 sm:p-16 text-center space-y-8 relative overflow-hidden shadow-2xl">
+          <div className="space-y-3 max-w-2xl mx-auto">
+            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white">
+              Ready to turn cold outreach into closed revenue?
+            </h2>
+            <p className="text-sm text-neutral-400 font-light leading-relaxed">
+              Experience the sub-second speed of Groq LPUs paired with algorithmic deliverability audits. 
+              Start generating in under 10 seconds.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link
+              href="/studio"
+              className="px-8 py-4 rounded-xl bg-white hover:bg-neutral-200 text-black font-semibold text-xs uppercase tracking-widest transition-all shadow-xl shadow-white/5 inline-flex items-center gap-2"
+            >
+              Launch Email Studio Free <ArrowUpRight size={14} />
+            </Link>
+            <Link
+              href="/glent/passport"
+              className="px-8 py-4 rounded-xl border border-white/10 hover:border-white/30 text-neutral-300 font-semibold text-xs uppercase tracking-widest transition-colors inline-flex items-center gap-2"
+            >
+              Create Glent Passport ID
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* 12. MEGA FOOTER */}
-      {/* ------------------------------------------------------------------ */}
-      <footer className="border-t border-[#1c1c1e] bg-[#000000] pt-20 pb-12">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-            <div className="col-span-1 md:col-span-1 space-y-4">
-              <Logo />
-              <p className="text-xs text-gray-500 leading-relaxed max-w-xs">
-                The AI outreach generator built specifically to bypass spam filters, score deliverability, and maximize B2B open rates.
-              </p>
+      {/* 12. INSTITUTIONAL PARENT COMPANY FOOTER */}
+      <footer className="border-t border-white/5 bg-black py-16 px-6 mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+          
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-white via-neutral-300 to-neutral-600 text-black flex items-center justify-center font-bold text-xs shadow-md">
+                G
+              </div>
+              <span className="text-white font-semibold text-xs tracking-[0.25em] uppercase">
+                Glent Global Enterprises
+              </span>
             </div>
-
-            <div>
-              <h4 className="text-sm font-bold text-white mb-4">Product</h4>
-              <ul className="space-y-3 text-sm text-gray-400">
-                <li><Link href="/studio" className="hover:text-[#0a84ff] transition">AI Studio</Link></li>
-                <li><Link href="/pricing" className="hover:text-[#0a84ff] transition">Prepaid Passes</Link></li>
-                <li><Link href="/#features" className="hover:text-[#0a84ff] transition">Features</Link></li>
-                <li><Link href="/#modes" className="hover:text-[#0a84ff] transition">30 Outreach Modes</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-bold text-white mb-4">Resources</h4>
-              <ul className="space-y-3 text-sm text-gray-400">
-                <li><Link href="/docs" className="hover:text-[#0a84ff] transition">Documentation Hub</Link></li>
-                <li><Link href="/docs" className="hover:text-[#0a84ff] transition">Deliverability Scorecard</Link></li>
-                <li><Link href="/docs" className="hover:text-[#0a84ff] transition">DNS Setup (SPF/DKIM)</Link></li>
-                <li><Link href="/docs" className="hover:text-[#0a84ff] transition">Spam Trigger Words</Link></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-bold text-white mb-4">Company</h4>
-              <ul className="space-y-3 text-sm text-gray-400">
-                <li><a href="mailto:help@writeyouremail.com" className="hover:text-[#0a84ff] transition">Contact Support</a></li>
-                <li><Link href="/privacy" className="hover:text-[#0a84ff] transition">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="hover:text-[#0a84ff] transition">Terms of Service</Link></li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="border-t border-[#1c1c1e] pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-xs text-gray-600">
-              © 2025 WriteYourEmail.com. All rights reserved.
+            <p className="text-xs text-neutral-500 max-w-sm font-light">
+              WriteYourEmail.com is engineered and maintained by Glent Global Enterprises. 
+              Engineering high-performance AI systems and sovereign software primitives.
             </p>
-            <div className="flex items-center gap-4 text-xs text-gray-600">
-              <span>Built for high-deliverability outreach.</span>
-            </div>
           </div>
+
+          <div className="flex flex-wrap gap-x-8 gap-y-3 text-xs font-mono text-neutral-500 uppercase tracking-wider">
+            <Link href="/studio" className="hover:text-white transition-colors">Studio</Link>
+            <Link href="/pricing" className="hover:text-white transition-colors">Passes</Link>
+            <Link href="/glent" className="hover:text-white transition-colors">Parent Lab</Link>
+            <Link href="/glent/ecosystem" className="hover:text-white transition-colors">Ecosystem</Link>
+            <Link href="/glent/philosophy" className="hover:text-white transition-colors">Philosophy</Link>
+            <Link href="/glent/passport" className="hover:text-blue-400 transition-colors">Glent Passport</Link>
+            <Link href="/glent/contact" className="hover:text-white transition-colors">Institutional Desk</Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <a
+              href="https://instagram.com/glentglobal"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors flex items-center gap-1.5"
+            >
+              <InstagramIcon size={14} /> @glentglobal
+            </a>
+          </div>
+
+        </div>
+
+        <div className="max-w-7xl mx-auto mt-12 pt-6 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center text-[10px] font-mono text-neutral-600 gap-2">
+          <span>© 2025 GLENT GLOBAL ENTERPRISES. ALL RIGHTS RESERVED.</span>
+          <span>WRITEYOUREMAIL.COM — AUTONOMOUS OUTREACH & DELIVERABILITY SUITE</span>
         </div>
       </footer>
+
     </div>
   );
 }
