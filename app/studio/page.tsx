@@ -1174,8 +1174,11 @@ export default function StudioPage() {
         <span className="text-white font-bold text-lg">W</span>
       </div>
       <p className="text-[10px] tracking-[0.5em] uppercase text-gray-500 font-semibold">
-        A Product of <span className="text-gray-200">Glent Global Enterprises</span>
-      </p>
+  A Product of{' '}
+  <a href="/glent" className="text-gray-200 hover:text-white hover:underline transition-colors">
+    Glent Global Enterprises
+  </a>
+</p>
     </div>
 
     {/* Social & Support Icons */}
