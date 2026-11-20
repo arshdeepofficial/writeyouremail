@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { Mail, Instagram, MessageSquare, Send } from 'lucide-react';
+import { Mail, MessageSquare, Send } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Institutional Inquiries | Glent Global Enterprises',
@@ -27,7 +27,6 @@ export default function GlentContactPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Direct Channels */}
         <div className="space-y-4">
           <div className="p-6 rounded-2xl border border-white/5 bg-white/[0.01] space-y-3">
             <div className="flex items-center gap-2 text-neutral-400">
@@ -60,7 +59,6 @@ export default function GlentContactPage() {
           </div>
         </div>
 
-        {/* Corporate Profile Card */}
         <div className="p-8 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent flex flex-col justify-between space-y-6">
           <div className="space-y-3">
             <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center font-bold text-black text-sm">
