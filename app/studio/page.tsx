@@ -997,26 +997,52 @@ export default function StudioWorkspace() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
             {filteredModes.map((mode) => {
               const isSelected = mode.id === selectedModeId;
+              const eligible = isTierEligible(mode.requiredTier);
+
+              // Distinct color styling per tier
+              const tierBadgeStyle = 
+                mode.requiredTier === 'free' 
+                  ? 'bg-[#30d158]/10 text-[#30d158] border-[#30d158]/30'
+                  : mode.requiredTier === 'starter'
+                  ? 'bg-[#0a84ff]/10 text-[#0a84ff] border-[#0a84ff]/30'
+                  : mode.requiredTier === 'growth'
+                  ? 'bg-[#bf5af2]/10 text-[#bf5af2] border-[#bf5af2]/30'
+                  : 'bg-amber-400/10 text-amber-300 border-amber-400/30';
+
               return (
                 <button
                   key={mode.id}
                   onClick={() => setSelectedModeId(mode.id)}
-                  className={`w-full text-left p-2.5 rounded-xl transition-all border flex items-center justify-between ${
-                    isSelected ? 'bg-[#141415] border-[#0a84ff]/50' : 'border-transparent hover:bg-white/5'
+                  className={`w-full text-left p-3 rounded-xl transition-all border flex items-center justify-between gap-2.5 group ${
+                    isSelected 
+                      ? 'bg-[#18181b] border-[#0a84ff] shadow-lg shadow-blue-500/10' 
+                      : 'border-white/5 bg-[#101012]/60 hover:bg-[#18181b] hover:border-white/10'
                   }`}
                 >
-                  <div className="truncate pr-2">
-                    <p className={`text-xs font-semibold ${isSelected ? 'text-[#0a84ff]' : 'text-zinc-300'}`}>{mode.name}</p>
-                    <p className="text-[10px] text-zinc-500 truncate">{mode.tagline}</p>
+                  <div className="flex-1 min-w-0 pr-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs font-bold truncate ${isSelected ? 'text-[#0a84ff]' : 'text-zinc-200 group-hover:text-white'}`}>
+                        {mode.name}
+                      </span>
+                      <span className={`text-[9px] uppercase tracking-wider font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${tierBadgeStyle}`}>
+                        {mode.requiredTier}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 line-clamp-1 group-hover:text-zinc-400 transition-colors">
+                      {mode.tagline}
+                    </p>
                   </div>
-                  {isTierEligible(mode.requiredTier) ? (
-                    <Unlock className="w-3 h-3 text-zinc-600 shrink-0" />
-                  ) : (
-                    <Lock className="w-3 h-3 text-amber-500/60 shrink-0" />
-                  )}
+
+                  <div className="shrink-0 flex items-center pl-1">
+                    {eligible ? (
+                      <Unlock className="w-3.5 h-3.5 text-[#30d158]/70 group-hover:text-[#30d158]" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5 text-amber-400/70 group-hover:text-amber-400" />
+                    )}
+                  </div>
                 </button>
               );
             })}
