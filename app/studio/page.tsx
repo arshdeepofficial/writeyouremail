@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Sparkles, 
-  Send, 
   Copy, 
   Check, 
   RotateCcw, 
@@ -18,7 +17,6 @@ import {
   AlertCircle, 
   Search, 
   Layers, 
-  ArrowRight, 
   LogOut, 
   LogIn, 
   CheckCircle2, 
@@ -26,8 +24,23 @@ import {
   FileText,
   Sliders,
   ChevronRight,
-  ExternalLink
+  Briefcase,
+  Building2,
+  Globe,
+  UserCheck,
+  Plus,
+  Save,
+  CheckSquare,
+  X
 } from 'lucide-react';
+
+import { 
+  BrandProfile, 
+  DEFAULT_BRAND_PRESETS, 
+  loadLocalBrandProfiles, 
+  saveLocalBrandProfiles, 
+  getActiveBrandProfile 
+} from '../glent/lib/brand-memory';
 
 // ==========================================
 // 1. ALL 30 OMNI-CHANNEL STRATEGIES & SCHEMAS
@@ -41,7 +54,7 @@ export interface FormFieldConfig {
   placeholder: string;
   type: 'text' | 'textarea' | 'select';
   options?: string[];
-  help?: string;
+  brandMemoryKey?: keyof BrandProfile;
 }
 
 export interface OmniMode {
@@ -63,9 +76,10 @@ export const OMNI_MODES: OmniMode[] = [
     requiredTier: 'free',
     tagline: 'High-conversion first-touch prospecting with personalized value hooks.',
     fields: [
-      { key: 'recipientRole', label: 'Prospect Role & Company', placeholder: 'e.g. VP of Engineering at ScaleOps', type: 'text' },
+      { key: 'recipientRole', label: 'Prospect Role & Target Segment', placeholder: 'e.g. VP of Engineering at ScaleOps', type: 'text', brandMemoryKey: 'icp' },
       { key: 'painPoint', label: 'Primary Operational Pain Point', placeholder: 'e.g. Cloud egress costs rising 40% QoQ', type: 'text' },
-      { key: 'valueProp', label: 'Unique Value Proposition / Solution', placeholder: 'e.g. Real-time cost-optimizer cutting AWS idle waste by 32%', type: 'textarea' },
+      { key: 'valueProp', label: 'Unique Value Proposition / Solution', placeholder: 'e.g. Cuts idle waste by 32%', type: 'textarea', brandMemoryKey: 'elevatorPitch' },
+      { key: 'proofAsset', label: 'Proof Point / Credibility Anchor', placeholder: 'e.g. Trusted by 12,000 teams', type: 'text', brandMemoryKey: 'proofPoints' },
       { key: 'ctaType', label: 'Call-To-Action Format', placeholder: 'Select CTA', type: 'select', options: ['Low-friction 9-minute feedback call', 'Permission to send 2-page brief', 'Async video teardown link'] }
     ],
     systemInstruction: 'Draft a razor-sharp, under-100-word cold email. Zero boilerplate fluff. Immediate hook tied to pain point.'
@@ -79,7 +93,7 @@ export const OMNI_MODES: OmniMode[] = [
     fields: [
       { key: 'previousContext', label: 'Previous Discussion Summary', placeholder: 'e.g. Sent Q3 pricing proposal last Tuesday', type: 'text' },
       { key: 'daysElapsed', label: 'Time Since Last Contact', placeholder: 'e.g. 4 days ago', type: 'text' },
-      { key: 'newMicroValue', label: 'New Micro-Value or Trigger Event', placeholder: 'e.g. Saw your LinkedIn update regarding Europe expansion', type: 'textarea' }
+      { key: 'newMicroValue', label: 'New Micro-Value or Trigger Event', placeholder: 'e.g. Saw your LinkedIn update regarding expansion', type: 'textarea' }
     ],
     systemInstruction: 'Keep it below 60 words. No guilt-tripping ("just bubbling this up"). Offer crisp new context.'
   },
@@ -91,7 +105,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Non-aggressive inquiry to determine if ghosted accounts are still active.',
     fields: [
       { key: 'leadHistory', label: 'Past Negotiation Stage', placeholder: 'e.g. Stopped responding after enterprise pilot quote in November', type: 'text' },
-      { key: 'updatedFeature', label: 'Major Company or Product Milestone', placeholder: 'e.g. Added automated SOC2 compliance module', type: 'text' },
+      { key: 'updatedFeature', label: 'Major Company or Product Milestone', placeholder: 'e.g. Added automated SOC2 compliance module', type: 'text', brandMemoryKey: 'proofPoints' },
       { key: 'cleanExitOffer', label: 'Permission to Close File?', placeholder: 'Select style', type: 'select', options: ['Polite 9-word breakup note', 'Direct priority check', 'Resource gift without pitch'] }
     ],
     systemInstruction: 'Use the 9-word Dean Jackson framework or clean enterprise opt-out. Remove all pressure.'
@@ -105,6 +119,7 @@ export const OMNI_MODES: OmniMode[] = [
     fields: [
       { key: 'vipName', label: 'Decision Maker & Title', placeholder: 'e.g. Chief Revenue Officer', type: 'text' },
       { key: 'agendaThreePoints', label: '3-Bullet Value Agenda', placeholder: 'e.g. 1. Pipeline leak audit\n2. Net-new quota benchmark\n3. Integration roadmap', type: 'textarea' },
+      { key: 'calendarUrl', label: 'Direct Calendar Link', placeholder: 'e.g. cal.com/your-team/15min', type: 'text', brandMemoryKey: 'primaryCta' },
       { key: 'proposedSlots', label: 'Specific Time Windows (UTC/EST)', placeholder: 'e.g. Thursday 2:00 PM EST or Friday 10:30 AM EST', type: 'text' }
     ],
     systemInstruction: 'Format for high-speed executive reading. Ultra-clean bulleted agenda.'
@@ -130,7 +145,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Frame pricing and contractual terms around ROI to preempt sticker shock.',
     fields: [
       { key: 'solutionTier', label: 'Proposed Package / Tier', placeholder: 'e.g. Enterprise 100-Seat License', type: 'text' },
-      { key: 'roiMetrics', label: 'Projected Economic Upside', placeholder: 'e.g. Saves 18 developer hours per sprint (~$4,200/mo)', type: 'textarea' },
+      { key: 'roiMetrics', label: 'Projected Economic Upside', placeholder: 'e.g. Saves 18 developer hours per sprint (~$4,200/mo)', type: 'textarea', brandMemoryKey: 'elevatorPitch' },
       { key: 'expirationWindow', label: 'Quote Validity Window', placeholder: 'e.g. Valid until close of business Friday', type: 'text' }
     ],
     systemInstruction: 'Lead with financial upside before stating commercial investment terms.'
@@ -145,7 +160,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Drive users toward their primary "aha moment" with zero confusion.',
     fields: [
       { key: 'firstMilestone', label: 'Single Mandatory First Action', placeholder: 'e.g. Connect your Postgres database URL', type: 'text' },
-      { key: 'documentationLink', label: 'Quickstart Documentation Link', placeholder: 'e.g. writeyouremail.com/docs/quickstart', type: 'text' },
+      { key: 'documentationLink', label: 'Quickstart Documentation Link', placeholder: 'e.g. writeyouremail.com/docs', type: 'text', brandMemoryKey: 'websiteUrl' },
       { key: 'supportResource', label: 'Dedicated Support Desk Contact', placeholder: 'e.g. help@writeyouremail.com', type: 'text' }
     ],
     systemInstruction: 'Enforce single-action focus. Eliminate overwhelm. Clean congratulatory tone.'
@@ -235,8 +250,8 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Create structured anticipation across Teaser, Launch Day, and Final Window.',
     fields: [
       { key: 'phase', label: 'Launch Phase', placeholder: 'Select Phase', type: 'select', options: ['Phase 1: The Teaser Hook', 'Phase 2: Public General Availability', 'Phase 3: Final 24-Hour Access Window'] },
-      { key: 'productName', label: 'Product / System Name', placeholder: 'e.g. WriteYourEmail Omni-Engine', type: 'text' },
-      { key: 'keyBreakthrough', label: 'The Core Technical Breakthrough', placeholder: 'e.g. 0.8-second cold email synthesis with zero rate limits', type: 'textarea' }
+      { key: 'productName', label: 'Product / System Name', placeholder: 'e.g. WriteYourEmail Omni-Engine', type: 'text', brandMemoryKey: 'companyName' },
+      { key: 'keyBreakthrough', label: 'The Core Technical Breakthrough', placeholder: 'e.g. 0.8-second cold email synthesis with zero rate limits', type: 'textarea', brandMemoryKey: 'elevatorPitch' }
     ],
     systemInstruction: 'Build organic momentum. Clear narrative arc with a firm deadline.'
   },
@@ -248,7 +263,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Drive registrations by promising specific tactical knowledge over sales pitches.',
     fields: [
       { key: 'briefingTitle', label: 'Event Title', placeholder: 'e.g. How to Hit 99.4% Inbox Deliverability in 2026', type: 'text' },
-      { key: 'speakerCredential', label: 'Host & Guest Credentials', placeholder: 'e.g. Arshdeep Bains & Enterprise Deliverability Architects', type: 'text' },
+      { key: 'speakerCredential', label: 'Host & Guest Credentials', placeholder: 'e.g. Lead Enterprise Deliverability Architects', type: 'text', brandMemoryKey: 'senderTitle' },
       { key: 'takeawayList', label: 'Tactical Takeaways (Not Slides)', placeholder: 'e.g. Exact DNS record setup for Vercel/Supabase apps', type: 'textarea' }
     ],
     systemInstruction: 'Focus 85% of copy on the operational utility attendees walk away with.'
@@ -261,7 +276,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Deliver promised resources instantly while laying the groundwork for a follow-up.',
     fields: [
       { key: 'assetName', label: 'Resource / Document Title', placeholder: 'e.g. The 2026 Enterprise Email Deliverability Blueprint', type: 'text' },
-      { key: 'downloadUrl', label: 'Direct Download Link', placeholder: 'e.g. writeyouremail.com/blueprint.pdf', type: 'text' },
+      { key: 'downloadUrl', label: 'Direct Download Link', placeholder: 'e.g. writeyouremail.com/blueprint.pdf', type: 'text', brandMemoryKey: 'websiteUrl' },
       { key: 'thoughtQuestion', label: 'Follow-Up Provocation Question', placeholder: 'e.g. Which of the 5 spam audits caught you off guard?', type: 'text' }
     ],
     systemInstruction: 'Deliver asset in first sentence. Follow with single thought-provoking question.'
@@ -301,7 +316,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Calm, transparent executive briefings covering metrics, milestones, and headwinds.',
     fields: [
       { key: 'reportingPeriod', label: 'Reporting Period', placeholder: 'e.g. February 2026 Operational Update', type: 'text' },
-      { key: 'topKpis', label: 'Core Metrics (ARR, Run-rate, MAU)', placeholder: 'e.g. Active passes: +48% MoM, Server cost: $0.00, Uptime: 99.98%', type: 'textarea' },
+      { key: 'topKpis', label: 'Core Metrics (ARR, Run-rate, MAU)', placeholder: 'e.g. Active passes: +48% MoM, Server cost: $0.00, Uptime: 99.98%', type: 'textarea', brandMemoryKey: 'proofPoints' },
       { key: 'headwinds', label: 'Key Challenges / Blockers', placeholder: 'e.g. Payment gateway onboarding in select overseas jurisdictions', type: 'textarea' },
       { key: 'theAsk', label: 'Specific Ask to Advisors / Board', placeholder: 'e.g. Intros to B2B outbound marketing leads', type: 'text' }
     ],
@@ -315,7 +330,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Deliver company-wide shifts or strategy pivots with clarity and vision.',
     fields: [
       { key: 'initiativeName', label: 'Core Change or Strategic Focus', placeholder: 'e.g. Transition to Glent Global Sovereign Infrastructure', type: 'text' },
-      { key: 'whyNow', label: 'The Strategic Imperative ("Why Now")', placeholder: 'e.g. Eliminates SaaS subscription dependencies and ensures 100% data sovereignty', type: 'textarea' },
+      { key: 'whyNow', label: 'The Strategic Imperative ("Why Now")', placeholder: 'e.g. Eliminates SaaS subscription dependencies', type: 'textarea' },
       { key: 'employeeNextSteps', label: 'Direct Impact on Teams', placeholder: 'e.g. Team leads will conduct briefings on Monday', type: 'text' }
     ],
     systemInstruction: 'Inspiring yet grounded. Clear answers to "What does this mean for me?".'
@@ -328,7 +343,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Attract elite engineering and product minds with technical specificity.',
     fields: [
       { key: 'candidateNameRole', label: 'Candidate Specialty / Portfolio', placeholder: 'e.g. Principal Next.js Architect with Rust experience', type: 'text' },
-      { key: 'hardProblem', label: 'The Hard Technical Problem to Solve', placeholder: 'e.g. Building sub-100ms LLM streaming pipelines at zero marginal cost', type: 'textarea' },
+      { key: 'hardProblem', label: 'The Hard Technical Problem to Solve', placeholder: 'e.g. Building sub-100ms LLM streaming pipelines at zero marginal cost', type: 'textarea', brandMemoryKey: 'elevatorPitch' },
       { key: 'equityComp', label: 'Compensation & Autonomy Structure', placeholder: 'e.g. Top-of-market equity grant + fully sovereign remote autonomy', type: 'text' }
     ],
     systemInstruction: 'Focus on technical intrigue and autonomy rather than standard corporate benefits.'
@@ -354,7 +369,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Deliver balanced, actionable behavioral critique without eroding trust.',
     fields: [
       { key: 'positiveContributions', label: 'Validated Wins & Strengths', placeholder: 'e.g. Shipped the authentication overhaul 3 days ahead of schedule', type: 'textarea' },
-      { key: 'criticalGap', label: 'Specific Area Requiring Calibration', placeholder: 'e.g. Cross-functional documentation was omitted, causing QA blockages', type: 'textarea' },
+      { key: 'criticalGap', label: 'Specific Area Requiring Calibration', placeholder: 'e.g. Cross-functional documentation was omitted', type: 'textarea' },
       { key: 'remedyPlan', label: '30-Day Measurable Correction Goal', placeholder: 'e.g. Conduct peer architectural teardowns before production merge', type: 'text' }
     ],
     systemInstruction: 'Radical candor framework: clear, compassionate, and specific.'
@@ -409,7 +424,7 @@ export const OMNI_MODES: OmniMode[] = [
     tagline: 'Propose co-marketing, technical integrations, or distribution syndication.',
     fields: [
       { key: 'partnerEntity', label: 'Target Company & Ecosystem', placeholder: 'e.g. ModernCRM Systems', type: 'text' },
-      { key: 'mutualBenefit', label: 'Symmetric Value Equation', placeholder: 'e.g. Give your 40,000 users 1-click email synthesis; we route CRM signups to you', type: 'textarea' },
+      { key: 'mutualBenefit', label: 'Symmetric Value Equation', placeholder: 'e.g. Give your 40,000 users 1-click email synthesis; we route CRM signups to you', type: 'textarea', brandMemoryKey: 'elevatorPitch' },
       { key: 'initialStep', label: 'Proposed Discovery Exploration', placeholder: 'e.g. 15-minute informal call with Product Leadership', type: 'text' }
     ],
     systemInstruction: 'Highlight symmetrical economics. Prove you did deep research on their product.'
@@ -423,7 +438,7 @@ export const OMNI_MODES: OmniMode[] = [
     fields: [
       { key: 'publicationBeat', label: 'Journalist Beat & Outlet', placeholder: 'e.g. AI Infrastructure writer at TechCrunch', type: 'text' },
       { key: 'counterIntuitiveAngle', label: 'Counter-Intuitive News Hook', placeholder: 'e.g. Why SaaS subscription fatigue is driving indie founders toward prepaid passes', type: 'textarea' },
-      { key: 'proofAsset', label: 'Verifiable Data / Case Study', placeholder: 'e.g. Open-source telemetry tracking 100k generated emails', type: 'text' }
+      { key: 'proofAsset', label: 'Verifiable Data / Case Study', placeholder: 'e.g. Open-source telemetry tracking 100k generated emails', type: 'text', brandMemoryKey: 'proofPoints' }
     ],
     systemInstruction: 'Under 120 words. No "hope you are having a wonderful week". Get straight to the news peg.'
   },
@@ -448,17 +463,14 @@ export const OMNI_MODES: OmniMode[] = [
     requiredTier: 'free',
     tagline: 'Deliver meaningful, unhurried appreciation that cements long-term loyalty.',
     fields: [
-      { key: 'recipientNameRole', label: 'Recipient Name & Relationship', placeholder: 'e.g. David Vance, Advisory Board Member', type: 'text' },
+      { key: 'recipientNameRole', label: 'Recipient Name & Relationship', placeholder: 'e.g. Advisory Board Member', type: 'text' },
       { key: 'specificGesture', label: 'Specific Contribution Acknowledged', placeholder: 'e.g. Connecting us with the lead enterprise pilot customer last month', type: 'textarea' }
     ],
     systemInstruction: 'Warm, sincere, and dignified. Never asks for anything in return.'
   }
 ];
 
-// ==========================================
-// 2. LIVE DELIVERABILITY SPAM AUDITOR LOGIC
-// ==========================================
-
+// Deliverability Spam Auditor
 const SPAM_TRIGGERS = [
   'guarantee', '100% free', 'make money', 'risk free', 'act now', 'click here', 
   'instant cash', 'winner', 'no hidden fees', 'order now', 'wire transfer', 
@@ -467,12 +479,10 @@ const SPAM_TRIGGERS = [
 
 function calculateDeliverabilityScore(text: string): { score: number; issues: string[] } {
   if (!text || text.length < 20) return { score: 100, issues: [] };
-
   let penalties = 0;
   const detectedIssues: string[] = [];
   const lower = text.toLowerCase();
 
-  // 1. Check Spam Triggers
   SPAM_TRIGGERS.forEach(word => {
     if (lower.includes(word)) {
       penalties += 12;
@@ -480,39 +490,35 @@ function calculateDeliverabilityScore(text: string): { score: number; issues: st
     }
   });
 
-  // 2. Check Exclamation Marks
   const exclamations = (text.match(/!/g) || []).length;
   if (exclamations > 2) {
     penalties += 15;
     detectedIssues.push(`Excessive exclamation marks (${exclamations}) degrade deliverability`);
   }
 
-  // 3. Check All-Caps Words
   const allCapsWords = text.split(/\s+/).filter(w => w.length > 3 && w === w.toUpperCase() && /^[A-Z]+$/.test(w));
   if (allCapsWords.length > 1) {
     penalties += 14;
-    detectedIssues.push(`Aggressive capitalization detected: "${allCapsWords.slice(0, 3).join(', ')}"`);
+    detectedIssues.push(`Aggressive capitalization: "${allCapsWords.slice(0, 3).join(', ')}"`);
   }
 
-  // 4. Length Penalties
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   if (wordCount > 300) {
     penalties += 10;
-    detectedIssues.push(`Length penalty: ${wordCount} words (recommend under 150 words for optimal cold response)`);
+    detectedIssues.push(`Length penalty: ${wordCount} words (recommend under 150 for cold response)`);
   }
 
-  const finalScore = Math.max(12, 100 - penalties);
-  return { score: finalScore, issues: detectedIssues };
+  return { score: Math.max(12, 100 - penalties), issues: detectedIssues };
 }
 
 // ==========================================
-// 3. MAIN COMPONENT: STUDIO WORKSPACE
+// MAIN COMPONENT
 // ==========================================
 
 export default function StudioWorkspace() {
   const router = useRouter();
-  
-  // Safe Universal Supabase Client
+
+  // Safe Supabase Client
   const supabase = useMemo(() => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -520,27 +526,31 @@ export default function StudioWorkspace() {
     return createClient(url, key);
   }, []);
 
-  // User & Quota State
+  // Auth & Quota
   const [user, setUser] = useState<any>(null);
   const [planTier, setPlanTier] = useState<TierLevel>('free');
   const [generationsUsed, setGenerationsUsed] = useState<number>(0);
-  const [maxGenerations, setMaxGenerations] = useState<number>(5); // Free tier daily limit
+  const [maxGenerations, setMaxGenerations] = useState<number>(5);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
-  // Strategy & Mode State
+  // Strategy & Forms
   const [selectedModeId, setSelectedModeId] = useState<string>('cold-outreach');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [strategicTone, setStrategicTone] = useState<string>('Professional & Direct');
   const [formValues, setFormValues] = useState<Record<string, string>>({});
 
-  // Output & Execution State
+  // Brand Memory State
+  const [brandProfiles, setBrandProfiles] = useState<BrandProfile[]>([]);
+  const [isBrandDrawerOpen, setIsBrandDrawerOpen] = useState<boolean>(false);
+  const [autoInjectBrand, setAutoInjectBrand] = useState<boolean>(true);
+  const [editingBrand, setEditingBrand] = useState<BrandProfile | null>(null);
+
+  // Output & History
   const [generatedDraft, setGeneratedDraft] = useState<string>('');
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: 'success' | 'warn' | 'error' } | null>(null);
-
-  // History State
   const [historyItems, setHistoryItems] = useState<Array<{
     id: string;
     modeId: string;
@@ -550,22 +560,23 @@ export default function StudioWorkspace() {
     score: number;
   }>>([]);
 
-  // Active Mode Reference
+  // Active Brand Helper
+  const activeBrand = useMemo(() => {
+    return getActiveBrandProfile(brandProfiles);
+  }, [brandProfiles]);
+
   const activeMode = useMemo(() => {
     return OMNI_MODES.find(m => m.id === selectedModeId) || OMNI_MODES[0];
   }, [selectedModeId]);
 
-  // Deliverability Computation
   const deliverabilityAudit = useMemo(() => {
     return calculateDeliverabilityScore(generatedDraft);
   }, [generatedDraft]);
 
-  // Categories List
   const categories = useMemo(() => {
     return ['All', 'Outbound & Sales', 'Relationship & Success', 'Marketing & Lifecycle', 'Internal & Executive', 'Formal & Compliance'];
   }, []);
 
-  // Filtered Modes
   const filteredModes = useMemo(() => {
     return OMNI_MODES.filter(m => {
       const matchesCategory = selectedCategory === 'All' || m.category === selectedCategory;
@@ -576,11 +587,16 @@ export default function StudioWorkspace() {
   }, [selectedCategory, searchQuery]);
 
   // ----------------------------------------------------
-  // INITIALIZATION & SUPABASE SESSION SYNC
+  // INITIALIZE SESSION & BRAND PROFILES
   // ----------------------------------------------------
-   useEffect(() => {
+  useEffect(() => {
     const initSession = async () => {
       try {
+        // 1. Load Local Brands First
+        const localProfiles = loadLocalBrandProfiles();
+        setBrandProfiles(localProfiles);
+        setEditingBrand(localProfiles[0] || null);
+
         if (!supabase) {
           setIsAuthLoading(false);
           return;
@@ -609,6 +625,32 @@ export default function StudioWorkspace() {
             setMaxGenerations(100);
             setGenerationsUsed(3);
           }
+
+          // Fetch Brand Profiles from Supabase if table exists
+          const { data: dbBrands, error: brandErr } = await supabase
+            .from('brand_profiles')
+            .select('*')
+            .eq('user_id', user.id);
+
+          if (!brandErr && dbBrands && dbBrands.length > 0) {
+            const mapped: BrandProfile[] = dbBrands.map((b: any) => ({
+              id: b.id,
+              profileName: b.profile_name,
+              companyName: b.company_name,
+              industry: b.industry || '',
+              websiteUrl: b.website_url || '',
+              elevatorPitch: b.elevator_pitch || '',
+              icp: b.icp || '',
+              brandVoice: b.brand_voice || '',
+              primaryCta: b.primary_cta || '',
+              senderName: b.sender_name || '',
+              senderTitle: b.sender_title || '',
+              proofPoints: b.proof_points || '',
+              isActive: b.is_active
+            }));
+            setBrandProfiles(mapped);
+            setEditingBrand(mapped.find(m => m.isActive) || mapped[0]);
+          }
         } else {
           setUser(null);
           setPlanTier('free');
@@ -616,8 +658,11 @@ export default function StudioWorkspace() {
           const guestUsage = parseInt(localStorage.getItem('wye_guest_quota') || '1', 10);
           setGenerationsUsed(guestUsage);
         }
+
+        const savedHistory = localStorage.getItem('wye_session_history');
+        if (savedHistory) setHistoryItems(JSON.parse(savedHistory));
       } catch (err) {
-        console.error("Auth init error:", err);
+        console.error("Init error:", err);
       } finally {
         setIsAuthLoading(false);
       }
@@ -626,47 +671,126 @@ export default function StudioWorkspace() {
     initSession();
   }, [supabase]);
 
-  // ----------------------------------------------------
-  // TIER ELIGIBILITY HELPER
-  // ----------------------------------------------------
   const isTierEligible = (requiredTier: TierLevel): boolean => {
-    const hierarchy: Record<TierLevel, number> = {
-      free: 0,
-      starter: 1,
-      growth: 2,
-      enterprise: 3
-    };
+    const hierarchy: Record<TierLevel, number> = { free: 0, starter: 1, growth: 2, enterprise: 3 };
     return hierarchy[planTier] >= hierarchy[requiredTier];
   };
 
-  // ----------------------------------------------------
-  // INPUT FORM HANDLER
-  // ----------------------------------------------------
   const handleInputChange = (key: string, value: string) => {
-    setFormValues(prev => ({
-      ...prev,
-      [key]: value
-    }));
+    setFormValues(prev => ({ ...prev, [key]: value }));
   };
 
   // ----------------------------------------------------
-  // LPU GENERATION SYNTHESIS
+  // BRAND MEMORY 1-CLICK AUTOFILL
+  // ----------------------------------------------------
+  const handleAutoFillFromBrand = () => {
+    if (!activeBrand) return;
+    const updated = { ...formValues };
+    
+    activeMode.fields.forEach(field => {
+      if (field.brandMemoryKey && activeBrand[field.brandMemoryKey]) {
+        updated[field.key] = String(activeBrand[field.brandMemoryKey]);
+      }
+    });
+
+    setFormValues(updated);
+    setFeedbackToast({
+      type: 'success',
+      message: `Injected "${activeBrand.companyName}" Brand DNA into fields.`
+    });
+  };
+
+  // Switch Active Brand
+  const handleSelectActiveBrand = async (brandId: string) => {
+    const updated = brandProfiles.map(b => ({
+      ...b,
+      isActive: b.id === brandId
+    }));
+    setBrandProfiles(updated);
+    saveLocalBrandProfiles(updated);
+    const selected = updated.find(b => b.id === brandId) || null;
+    setEditingBrand(selected);
+
+    // Sync to Supabase if authenticated
+    if (supabase && user) {
+      await supabase.from('brand_profiles').update({ is_active: false }).eq('user_id', user.id);
+      await supabase.from('brand_profiles').update({ is_active: true }).eq('id', brandId);
+    }
+
+    setFeedbackToast({
+      type: 'success',
+      message: `Switched active brand profile to "${selected?.profileName}".`
+    });
+  };
+
+  // Save/Update Brand Profile
+  const handleSaveBrandProfile = async () => {
+    if (!editingBrand) return;
+    if (!editingBrand.companyName.trim()) {
+      setFeedbackToast({ type: 'warn', message: 'Company Name is required.' });
+      return;
+    }
+
+    let updatedProfiles = [...brandProfiles];
+    const exists = updatedProfiles.some(b => b.id === editingBrand.id);
+
+    if (exists) {
+      updatedProfiles = updatedProfiles.map(b => b.id === editingBrand.id ? editingBrand : b);
+    } else {
+      updatedProfiles.push(editingBrand);
+    }
+
+    setBrandProfiles(updatedProfiles);
+    saveLocalBrandProfiles(updatedProfiles);
+
+    // Persist to Supabase if logged in
+    if (supabase && user) {
+      const payload = {
+        user_id: user.id,
+        profile_name: editingBrand.profileName,
+        company_name: editingBrand.companyName,
+        industry: editingBrand.industry,
+        website_url: editingBrand.websiteUrl,
+        elevator_pitch: editingBrand.elevatorPitch,
+        icp: editingBrand.icp,
+        brand_voice: editingBrand.brandVoice,
+        primary_cta: editingBrand.primaryCta,
+        sender_name: editingBrand.senderName,
+        sender_title: editingBrand.senderTitle,
+        proof_points: editingBrand.proofPoints,
+        is_active: editingBrand.isActive
+      };
+
+      if (exists && !editingBrand.id.startsWith('preset-')) {
+        await supabase.from('brand_profiles').update(payload).eq('id', editingBrand.id);
+      } else {
+        const { data: inserted } = await supabase.from('brand_profiles').insert([payload]).select().single();
+        if (inserted) {
+          editingBrand.id = inserted.id;
+        }
+      }
+    }
+
+    setFeedbackToast({ type: 'success', message: 'Brand Memory profile saved successfully.' });
+    setIsBrandDrawerOpen(false);
+  };
+
+  // ----------------------------------------------------
+  // LPU SYNTHESIS WITH BRAND MEMORY INJECTION
   // ----------------------------------------------------
   const handleSynthesizeEmail = async () => {
-    // 1. Quota Check
     if (generationsUsed >= maxGenerations) {
       setFeedbackToast({
         type: 'error',
-        message: `Quota exhausted (${generationsUsed}/${maxGenerations}). Upgrade your prepaid pass in the Glent Passport to continue.`
+        message: `Daily quota exhausted (${generationsUsed}/${maxGenerations}). Upgrade in Sovereign Passport.`
       });
       return;
     }
 
-    // 2. Tier Access Check
     if (!isTierEligible(activeMode.requiredTier)) {
       setFeedbackToast({
         type: 'warn',
-        message: `This mode requires a ${activeMode.requiredTier.toUpperCase()} pass. Please upgrade your Sovereign Passport.`
+        message: `Requires ${activeMode.requiredTier.toUpperCase()} pass.`
       });
       return;
     }
@@ -675,77 +799,69 @@ export default function StudioWorkspace() {
     setFeedbackToast(null);
 
     try {
-      // Collect input values
-      const contextStrings = activeMode.fields
-        .map(f => `${f.label}: ${formValues[f.key] || 'Not specified'}`)
-        .join('\n');
+      await new Promise(r => setTimeout(r, 780)); // Simulate ultra-fast Groq LPU latency
 
-      // Simulated sub-second Groq LPU response
-      await new Promise(r => setTimeout(r, 850));
+      const brand = activeBrand;
+      const signature = brand.senderName 
+        ? `${brand.senderName}\n${brand.senderTitle || 'Executive Lead'}\n${brand.companyName} | ${brand.websiteUrl}`
+        : `[Your Name]\n${brand.companyName || '[Your Company]'}`;
 
-      // Build structured enterprise copy based on mode
-      let generatedDraftOutput = "";
+      let output = "";
 
       if (activeMode.id === 'cold-outreach') {
-        const role = formValues['recipientRole'] || 'Team Lead';
-        const pain = formValues['painPoint'] || 'operational latency';
-        const value = formValues['valueProp'] || 'our sovereign neural architecture';
-        const cta = formValues['ctaType'] || 'open to reviewing a 2-page brief';
+        const pain = formValues['painPoint'] || 'systemic operational bottlenecks';
+        const role = formValues['recipientRole'] || brand.icp || 'VP of Operations';
+        const pitch = formValues['valueProp'] || brand.elevatorPitch;
+        const proof = formValues['proofAsset'] || brand.proofPoints;
 
-        generatedDraftOutput = `Subject: Quick question regarding ${pain}\n\nHi [First Name],\n\nNoticed you lead ${role}. Many engineering teams at this stage struggle with ${pain}.\n\nWe engineered ${value} to eliminate this bottleneck completely without restructuring your stack.\n\nAre you ${cta.toLowerCase()} this Thursday at 2:00 PM EST?\n\nBest,\n[Your Name]\n[Your Title]`;
-      } else if (activeMode.id === 'overdue-invoice-reminder') {
-        const invNum = formValues['invoiceNumber'] || 'INV-2026-001';
-        const bal = formValues['balanceDue'] || '$2,400.00';
-        const days = formValues['daysOverdue'] || '7 days';
-        const sev = formValues['escalationLevel'] || 'Formal Accounting Notice';
+        output = `Subject: Quick question regarding ${pain}\n\nHi [First Name],\n\nNoticed your work leading ${role}. Most scaling teams encounter ${pain} once they push past current volume.\n\nAt ${brand.companyName}, we built a way to solve this: ${pitch}.\n\nFor context, ${proof}.\n\nAre you open to reviewing a 2-page brief this Thursday?\n\nBest,\n${signature}`;
+      } else if (activeMode.id === 'meeting-request-vip') {
+        const vip = formValues['vipName'] || 'Executive Director';
+        const agenda = formValues['agendaThreePoints'] || `1. ${brand.companyName} architecture review\n2. Pipeline efficiency benchmark\n3. Integration roadmap`;
+        const link = formValues['calendarUrl'] || brand.primaryCta || 'writeyouremail.com';
 
-        generatedDraftOutput = `Subject: Past Due Notice: Statement for ${invNum} (${bal})\n\nDear Accounts Payable Team,\n\nOur records indicate invoice ${invNum} for ${bal} remains unsettled and is currently ${days} past agreed commercial terms.\n\nPlease confirm if this transfer has been queued in your upcoming payment run, or if updated banking wires are required on our end.\n\nAttached is the original PDF statement for your reference.\n\nSincerely,\nFinance & Commercial Operations\nGlent Global Enterprises`;
+        output = `Subject: Strategic alignment for ${brand.companyName}\n\nHi ${vip},\n\nI want to respect your calendar, so I'll keep this brief.\n\nOur team would value 12 minutes to share how we are approaching this quarter:\n\n${agenda}\n\nIf you have a window this week, you can grab a direct slot here: ${link}\n\nRegards,\n${signature}`;
       } else {
-        // High quality programmatic synthesis for all remaining modes
-        generatedDraftOutput = `Subject: Strategic Follow-Up: ${activeMode.name.replace(/^\d+\.\s*/, '')}\n\nHi [First Name],\n\nI am reaching out regarding our operational alignment on ${activeMode.name.toLowerCase()}.\n\n${contextStrings}\n\nOur objective is to ensure deterministic execution with zero unnecessary friction. Given the ${strategicTone.toLowerCase()} nature of this initiative, let's confirm the next milestone.\n\nPlease let me know your thoughts before the end of the day.\n\nKind regards,\n[Your Name]`;
+        // Universal Ingestion Engine
+        const contextLines = activeMode.fields
+          .map(f => `${f.label}: ${formValues[f.key] || (f.brandMemoryKey ? brand[f.brandMemoryKey] : 'Not specified')}`)
+          .join('\n');
+
+        output = `Subject: ${activeMode.name.replace(/^\d+\.\s*/, '')} — ${brand.companyName}\n\nHi [First Name],\n\nI am reaching out from ${brand.companyName} regarding our ongoing engagement with ${activeMode.name.toLowerCase()}.\n\n${contextLines}\n\nAs a reminder, our primary objective is: ${brand.elevatorPitch}\n\nLooking forward to your thoughts.\n\nSincerely,\n${signature}`;
       }
 
-      setGeneratedDraft(generatedDraftOutput);
+      setGeneratedDraft(output);
 
-      // Increment quota
+      // Telemetry & History
       const newCount = generationsUsed + 1;
       setGenerationsUsed(newCount);
-      if (!user) {
-        localStorage.setItem('wye_guest_quota', newCount.toString());
-      }
+      if (!user) localStorage.setItem('wye_guest_quota', newCount.toString());
 
-      // Add to Session History
-      const audit = calculateDeliverabilityScore(generatedDraftOutput);
-      const newHistoryEntry = {
+      const audit = calculateDeliverabilityScore(output);
+      const newEntry = {
         id: Date.now().toString(),
         modeId: activeMode.id,
         modeName: activeMode.name,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        draft: generatedDraftOutput,
+        draft: output,
         score: audit.score
       };
 
-      const updatedHistory = [newHistoryEntry, ...historyItems.slice(0, 19)];
+      const updatedHistory = [newEntry, ...historyItems.slice(0, 19)];
       setHistoryItems(updatedHistory);
       localStorage.setItem('wye_session_history', JSON.stringify(updatedHistory));
 
       setFeedbackToast({
         type: 'success',
-        message: 'Synthesized via Groq LPU in 842ms • Deliverability Score: ' + audit.score + '%'
+        message: `Draft generated with "${brand.companyName}" Brand DNA • Deliverability: ${audit.score}%`
       });
     } catch (err: any) {
-      setFeedbackToast({
-        type: 'error',
-        message: err?.message || 'Synthesis failed. Please verify connection.'
-      });
+      setFeedbackToast({ type: 'error', message: err?.message || 'Synthesis failed.' });
     } finally {
       setIsSynthesizing(false);
     }
   };
 
-  // ----------------------------------------------------
-  // CLIPBOARD COPY
-  // ----------------------------------------------------
   const handleCopyClipboard = () => {
     if (!generatedDraft) return;
     navigator.clipboard.writeText(generatedDraft);
@@ -753,10 +869,7 @@ export default function StudioWorkspace() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // ----------------------------------------------------
-  // PRIVACY PURGE / LOGOUT
-  // ----------------------------------------------------
-    const handleSignOut = async () => {
+  const handleSignOut = async () => {
     setUser(null);
     setPlanTier('free');
     setHistoryItems([]);
@@ -764,36 +877,21 @@ export default function StudioWorkspace() {
     setFormValues({});
     localStorage.removeItem('wye_session_history');
     localStorage.removeItem('wye_guest_quota');
-    localStorage.removeItem('sb-access-token');
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
+    if (supabase) await supabase.auth.signOut();
     router.push('/glent/passport');
-  };
-
-  // ----------------------------------------------------
-  // CLEAR HISTORY
-  // ----------------------------------------------------
-  const handleClearHistory = () => {
-    setHistoryItems([]);
-    localStorage.removeItem('wye_session_history');
-    setFeedbackToast({ type: 'success', message: 'Local session history purged.' });
   };
 
   return (
     <div className="min-h-screen bg-[#000000] text-white flex flex-col font-sans selection:bg-[#0a84ff]/30 antialiased">
       
       {/* ==================================================== */}
-      {/* HEADER NAVBAR */}
+      {/* HEADER NAVBAR WITH BRAND MEMORY PILL */}
       {/* ==================================================== */}
-      <header className="h-16 border-b border-white/10 px-4 md:px-8 flex items-center justify-between bg-[#0a0a0b]/90 backdrop-blur-xl sticky top-0 z-50">
+      <header className="h-16 border-b border-white/10 px-4 md:px-8 flex items-center justify-between bg-[#0a0a0b]/90 backdrop-blur-xl sticky top-0 z-40">
         
-        {/* Left: Brand Identity */}
+        {/* Brand Logo */}
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => router.push('/')}
-            className="flex items-center gap-2.5 group text-left"
-          >
+          <button onClick={() => router.push('/')} className="flex items-center gap-2.5 group text-left">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#0a84ff] to-[#bf5af2] p-[1px] shadow-lg shadow-blue-500/20">
               <div className="w-full h-full bg-[#141415] rounded-[11px] flex items-center justify-center group-hover:bg-transparent transition-colors">
                 <Sparkles className="w-4 h-4 text-white" />
@@ -803,61 +901,47 @@ export default function StudioWorkspace() {
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm md:text-base tracking-tight text-white">WriteYourEmail</span>
                 <span className="px-1.5 py-0.5 text-[9px] uppercase tracking-widest font-bold bg-[#bf5af2]/20 text-[#bf5af2] border border-[#bf5af2]/30 rounded">
-                  Studio 30
+                  Studio
                 </span>
               </div>
               <p className="text-[10px] text-zinc-500 font-mono tracking-wider hidden sm:block">
-                POWERED BY GLENT GLOBAL LPU ENGINE
+                POWERED BY GLENT GLOBAL ENTERPRISES
               </p>
             </div>
           </button>
         </div>
 
-        {/* Center: Real-Time Quota Telemetry */}
-        <div className="hidden lg:flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs">
-          <div className="flex items-center gap-1.5 font-medium">
-            <span className="text-zinc-400">Pass:</span>
-            <span className="uppercase text-[#0a84ff] font-bold tracking-wider">{planTier}</span>
-          </div>
-          <div className="w-px h-3 bg-white/20" />
-          <div className="flex items-center gap-2 text-zinc-300">
-            <span>Quota:</span>
-            <span className="font-mono font-bold text-white">{generationsUsed} / {maxGenerations}</span>
-          </div>
-          <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div 
-              className={`h-full rounded-full transition-all ${
-                generationsUsed >= maxGenerations ? 'bg-red-500' : 'bg-gradient-to-r from-[#0a84ff] to-[#30d158]'
-              }`}
-              style={{ width: `${Math.min(100, (generationsUsed / maxGenerations) * 100)}%` }}
-            />
-          </div>
+        {/* Center: Brand Memory Active Profile Pill */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsBrandDrawerOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-xs group"
+          >
+            <Building2 className="w-3.5 h-3.5 text-[#0a84ff] group-hover:scale-110 transition-transform" />
+            <span className="text-zinc-400 hidden sm:inline">Brand Memory:</span>
+            <span className="font-bold text-white max-w-[120px] truncate">{activeBrand?.companyName || 'Not Set'}</span>
+            <span className="w-2 h-2 rounded-full bg-[#30d158] animate-pulse" />
+          </button>
         </div>
 
-        {/* Right: Auth Status / Passport Trigger */}
+        {/* Right: Auth & Quota */}
         <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg border border-white/10 text-xs">
+            <span className="text-zinc-400 font-mono">{generationsUsed}/{maxGenerations} Used</span>
+          </div>
+
           {user ? (
-            <div className="flex items-center gap-3">
-              <div className="hidden md:flex flex-col text-right">
-                <span className="text-xs font-medium text-white truncate max-w-[140px]">{user.email}</span>
-                <span className="text-[10px] text-[#30d158] flex items-center justify-end gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#30d158] animate-ping" />
-                  Sovereign Session
-                </span>
-              </div>
-              <button
-                onClick={handleSignOut}
-                title="Wipe Session History & Sign Out"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 border border-white/10 hover:border-red-500/20 text-xs transition-all"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </button>
-            </div>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-red-500/10 text-zinc-400 hover:text-red-400 border border-white/10 text-xs transition-all"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sign Out</span>
+            </button>
           ) : (
             <button
               onClick={() => router.push('/glent/passport')}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0a84ff] to-[#0070e0] hover:brightness-110 text-white font-medium text-xs tracking-wide shadow-lg shadow-blue-500/25 transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#0a84ff] hover:bg-[#0070e0] text-white text-xs font-semibold shadow-md transition-all"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Universal Passport</span>
@@ -866,63 +950,45 @@ export default function StudioWorkspace() {
         </div>
       </header>
 
-      {/* ==================================================== */}
-      {/* TOAST NOTIFICATION BANNER */}
-      {/* ==================================================== */}
+      {/* Toast Feedback */}
       {feedbackToast && (
-        <div className={`px-4 py-2.5 text-xs text-center border-b transition-all flex items-center justify-center gap-2 ${
+        <div className={`px-4 py-2 text-xs text-center border-b flex items-center justify-center gap-2 ${
           feedbackToast.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-300' :
           feedbackToast.type === 'warn' ? 'bg-amber-500/10 border-amber-500/30 text-amber-300' :
           'bg-green-500/10 border-green-500/30 text-green-300'
         }`}>
-          {feedbackToast.type === 'error' && <AlertTriangle className="w-4 h-4 text-red-400" />}
-          {feedbackToast.type === 'warn' && <AlertCircle className="w-4 h-4 text-amber-400" />}
-          {feedbackToast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-green-400" />}
+          {feedbackToast.type === 'error' && <AlertTriangle className="w-3.5 h-3.5" />}
+          {feedbackToast.type === 'warn' && <AlertCircle className="w-3.5 h-3.5" />}
+          {feedbackToast.type === 'success' && <CheckCircle2 className="w-3.5 h-3.5" />}
           <span>{feedbackToast.message}</span>
         </div>
       )}
 
       {/* ==================================================== */}
-      {/* 3-COLUMN MAIN WORKSPACE */}
+      {/* WORKSPACE GRID */}
       {/* ==================================================== */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
         
-        {/* -------------------------------------------------- */}
-        {/* COLUMN 1: 30-MODE STRATEGY SELECTOR (Col 1-3) */}
-        {/* -------------------------------------------------- */}
-        <aside className="lg:col-span-3 border-r border-white/10 bg-[#0a0a0b]/60 flex flex-col h-[400px] lg:h-[calc(100vh-4rem)] overflow-hidden">
-          
-          {/* Header & Search */}
-          <div className="p-4 border-b border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-[#0a84ff]" />
-                Omni Channels (30)
-              </span>
-              <span className="text-[10px] text-zinc-500 font-mono">TIER GATED</span>
-            </div>
-
+        {/* COL 1: 30 MODES */}
+        <aside className="lg:col-span-3 border-r border-white/10 bg-[#0a0a0b]/60 flex flex-col h-[350px] lg:h-[calc(100vh-4rem)] overflow-hidden">
+          <div className="p-3 border-b border-white/10 space-y-2">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-zinc-500" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-zinc-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search 30 strategies..."
-                className="w-full bg-[#141415] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-zinc-500 focus:border-[#0a84ff] outline-none transition-all"
+                placeholder="Search 30 modes..."
+                className="w-full bg-[#141415] border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:border-[#0a84ff] outline-none"
               />
             </div>
-
-            {/* Category Pills */}
             <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-none">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] whitespace-nowrap transition-all ${
-                    selectedCategory === cat 
-                      ? 'bg-white/15 text-white font-semibold' 
-                      : 'text-zinc-400 hover:bg-white/5'
+                  className={`px-2 py-0.5 rounded text-[10px] whitespace-nowrap ${
+                    selectedCategory === cat ? 'bg-white/15 text-white font-semibold' : 'text-zinc-400 hover:bg-white/5'
                   }`}
                 >
                   {cat}
@@ -931,106 +997,61 @@ export default function StudioWorkspace() {
             </div>
           </div>
 
-          {/* Mode List Scroll */}
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {filteredModes.map((mode) => {
-              const eligible = isTierEligible(mode.requiredTier);
               const isSelected = mode.id === selectedModeId;
-
               return (
                 <button
                   key={mode.id}
                   onClick={() => setSelectedModeId(mode.id)}
-                  className={`w-full text-left p-3 rounded-xl transition-all border flex items-start justify-between gap-2 group ${
-                    isSelected 
-                      ? 'bg-[#141415] border-[#0a84ff]/50 shadow-md' 
-                      : 'bg-transparent border-transparent hover:bg-white/5'
+                  className={`w-full text-left p-2.5 rounded-xl transition-all border flex items-center justify-between ${
+                    isSelected ? 'bg-[#141415] border-[#0a84ff]/50' : 'border-transparent hover:bg-white/5'
                   }`}
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-semibold ${isSelected ? 'text-[#0a84ff]' : 'text-zinc-200 group-hover:text-white'}`}>
-                        {mode.name}
-                      </span>
-                      {mode.requiredTier !== 'free' && (
-                        <span className={`text-[9px] uppercase px-1.5 py-0.2 rounded font-mono font-bold ${
-                          mode.requiredTier === 'enterprise' ? 'bg-[#bf5af2]/20 text-[#bf5af2]' :
-                          mode.requiredTier === 'growth' ? 'bg-[#0a84ff]/20 text-[#0a84ff]' :
-                          'bg-amber-500/20 text-amber-300'
-                        }`}>
-                          {mode.requiredTier}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-zinc-500 line-clamp-1">{mode.tagline}</p>
+                  <div className="truncate pr-2">
+                    <p className={`text-xs font-semibold ${isSelected ? 'text-[#0a84ff]' : 'text-zinc-300'}`}>{mode.name}</p>
+                    <p className="text-[10px] text-zinc-500 truncate">{mode.tagline}</p>
                   </div>
-
-                  <div className="pt-0.5">
-                    {eligible ? (
-                      <Unlock className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-400" />
-                    ) : (
-                      <Lock className="w-3.5 h-3.5 text-amber-500/60" />
-                    )}
-                  </div>
+                  {isTierEligible(mode.requiredTier) ? (
+                    <Unlock className="w-3 h-3 text-zinc-600 shrink-0" />
+                  ) : (
+                    <Lock className="w-3 h-3 text-amber-500/60 shrink-0" />
+                  )}
                 </button>
               );
             })}
           </div>
-
-          {/* Upgrade Mini Prompt */}
-          <div className="p-3 bg-gradient-to-b from-[#141415] to-[#0a0a0b] border-t border-white/10 text-center">
-            <p className="text-[11px] text-zinc-400 mb-1">Need Enterprise / Compliance modes?</p>
-            <button 
-              onClick={() => router.push('/#pricing')}
-              className="text-xs font-bold text-[#0a84ff] hover:underline flex items-center justify-center gap-1 mx-auto"
-            >
-              Get 30-Day Pass (Code: LAUNCH50) <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
         </aside>
 
-        {/* -------------------------------------------------- */}
-        {/* COLUMN 2: DYNAMIC SYNTHESIS ENGINE (Col 4-8) */}
-        {/* -------------------------------------------------- */}
-        <main className="lg:col-span-5 p-4 md:p-6 lg:p-8 overflow-y-auto border-r border-white/10 space-y-6">
+        {/* COL 2: DYNAMIC ADAPTIVE INPUTS */}
+        <main className="lg:col-span-5 p-4 md:p-6 overflow-y-auto border-r border-white/10 space-y-5">
           
-          {/* Active Mode Banner */}
-          <div className="p-5 rounded-2xl bg-[#141415] border border-white/10 space-y-2">
+          {/* Header Card */}
+          <div className="p-4 rounded-xl bg-[#141415] border border-white/10 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-widest font-bold text-[#0a84ff]">
-                {activeMode.category}
-              </span>
-              <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-mono font-bold ${
-                isTierEligible(activeMode.requiredTier)
-                  ? 'bg-green-500/10 text-[#30d158] border border-green-500/30'
-                  : 'bg-amber-500/10 text-amber-300 border border-amber-500/30'
-              }`}>
-                {isTierEligible(activeMode.requiredTier) ? 'Unlocked on your tier' : `Requires ${activeMode.requiredTier.toUpperCase()} Pass`}
-              </span>
+              <span className="text-[10px] uppercase tracking-widest font-bold text-[#0a84ff]">{activeMode.category}</span>
+              <button
+                onClick={handleAutoFillFromBrand}
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0a84ff]/10 hover:bg-[#0a84ff]/20 text-[#0a84ff] border border-[#0a84ff]/30 rounded-lg text-xs font-semibold transition-all"
+                title="Populate inputs automatically from active Brand Profile"
+              >
+                <Zap className="w-3 h-3" /> Auto-Fill Brand DNA
+              </button>
             </div>
-            <h1 className="text-xl font-bold text-white tracking-tight">{activeMode.name}</h1>
-            <p className="text-xs text-zinc-400 leading-relaxed">{activeMode.tagline}</p>
+            <h1 className="text-lg font-bold text-white">{activeMode.name}</h1>
+            <p className="text-xs text-zinc-400">{activeMode.tagline}</p>
           </div>
 
-          {/* Dynamic Adaptation Form */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-xs uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-1.5">
-                <Sliders className="w-3.5 h-3.5 text-[#bf5af2]" />
-                Adaptive Parameter Ingestion
-              </label>
-              <span className="text-[10px] text-zinc-500 font-mono">MORPHS PER MODE</span>
-            </div>
-
-            {/* Strategic Tone Modifier */}
+          {/* Form */}
+          <div className="space-y-3">
             <div>
-              <label className="block text-[11px] text-zinc-400 mb-1.5 font-medium">Strategic Cadence / Tone</label>
+              <label className="block text-[11px] text-zinc-400 mb-1 font-medium">Strategic Tone</label>
               <select
                 value={strategicTone}
                 onChange={(e) => setStrategicTone(e.target.value)}
-                className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-[#0a84ff] outline-none"
+                className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
               >
-                <option>Professional & Direct (Recommended)</option>
+                <option>Professional & Direct</option>
                 <option>Assertive & Commercial C-Level</option>
                 <option>Diplomatic & Conflict De-escalating</option>
                 <option>Casual, Warm & High-Touch</option>
@@ -1038,20 +1059,24 @@ export default function StudioWorkspace() {
               </select>
             </div>
 
-            {/* Dynamic Fields for Selected Mode */}
             {activeMode.fields.map((field) => (
-              <div key={field.key} className="space-y-1.5">
-                <label className="block text-[11px] text-zinc-300 font-medium">
-                  {field.label}
-                </label>
-                
+              <div key={field.key} className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] text-zinc-300 font-medium">{field.label}</label>
+                  {field.brandMemoryKey && (
+                    <span className="text-[9px] text-[#0a84ff] font-mono flex items-center gap-1">
+                      <Briefcase className="w-2.5 h-2.5" /> Memory Linked
+                    </span>
+                  )}
+                </div>
+
                 {field.type === 'text' && (
                   <input
                     type="text"
                     value={formValues[field.key] || ''}
                     onChange={(e) => handleInputChange(field.key, e.target.value)}
                     placeholder={field.placeholder}
-                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-600 focus:border-[#0a84ff] outline-none transition-all"
+                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-[#0a84ff] outline-none"
                   />
                 )}
 
@@ -1061,7 +1086,7 @@ export default function StudioWorkspace() {
                     value={formValues[field.key] || ''}
                     onChange={(e) => handleInputChange(field.key, e.target.value)}
                     placeholder={field.placeholder}
-                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-zinc-600 focus:border-[#0a84ff] outline-none transition-all resize-none"
+                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-[#0a84ff] outline-none resize-none"
                   />
                 )}
 
@@ -1069,7 +1094,7 @@ export default function StudioWorkspace() {
                   <select
                     value={formValues[field.key] || ''}
                     onChange={(e) => handleInputChange(field.key, e.target.value)}
-                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-[#0a84ff] outline-none"
+                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
                   >
                     <option value="">{field.placeholder}</option>
                     {field.options?.map((opt) => (
@@ -1080,20 +1105,15 @@ export default function StudioWorkspace() {
               </div>
             ))}
 
-            {/* Synthesize Action Button */}
             <button
               onClick={handleSynthesizeEmail}
               disabled={isSynthesizing || generationsUsed >= maxGenerations}
-              className={`w-full py-3.5 rounded-xl font-bold text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all shadow-xl ${
-                generationsUsed >= maxGenerations 
-                  ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                  : 'bg-[#0a84ff] hover:bg-[#0070e0] text-white shadow-blue-500/25 active:scale-[0.99]'
-              }`}
+              className="w-full py-3 rounded-xl font-bold text-xs uppercase tracking-wider bg-[#0a84ff] hover:bg-[#0070e0] text-white flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-[0.99] transition-all disabled:opacity-50"
             >
               {isSynthesizing ? (
                 <>
-                  <RotateCcw className="w-4 h-4 animate-spin text-white" />
-                  <span>Synthesizing via Groq LPU (~800ms)...</span>
+                  <RotateCcw className="w-4 h-4 animate-spin" />
+                  <span>Synthesizing via Groq LPU (~780ms)...</span>
                 </>
               ) : (
                 <>
@@ -1103,177 +1123,323 @@ export default function StudioWorkspace() {
               )}
             </button>
           </div>
-
         </main>
 
-        {/* -------------------------------------------------- */}
-        {/* COLUMN 3: OUTPUT, DELIVERABILITY AUDIT & HISTORY (Col 9-12) */}
-        {/* -------------------------------------------------- */}
-        <aside className="lg:col-span-4 p-4 md:p-6 lg:p-8 bg-[#0a0a0b]/40 flex flex-col h-full overflow-y-auto space-y-6">
-          
-          {/* Output Card */}
-          <div className="space-y-3">
+        {/* COL 3: OUTPUT & DELIVERABILITY */}
+        <aside className="lg:col-span-4 p-4 md:p-6 bg-[#0a0a0b]/40 flex flex-col h-full overflow-y-auto space-y-5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase tracking-widest font-bold text-[#bf5af2] flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5" />
-                Deterministic Output
+                <FileText className="w-3.5 h-3.5" /> Output Synthesis
               </span>
-
               {generatedDraft && (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleCopyClipboard}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs text-zinc-300 hover:text-white transition-all"
+                    className="flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs text-zinc-300"
                   >
                     {copied ? <Check className="w-3 h-3 text-[#30d158]" /> : <Copy className="w-3 h-3" />}
                     <span>{copied ? 'Copied' : 'Copy'}</span>
                   </button>
-                  <button
-                    onClick={() => setGeneratedDraft('')}
-                    className="p-1 hover:bg-red-500/20 text-zinc-500 hover:text-red-400 rounded transition-all"
-                    title="Clear editor"
-                  >
+                  <button onClick={() => setGeneratedDraft('')} className="p-1 hover:text-red-400 text-zinc-500">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Editable Output Box */}
-            <div className="relative">
-              <textarea
-                rows={12}
-                value={generatedDraft}
-                onChange={(e) => setGeneratedDraft(e.target.value)}
-                placeholder="Synthesized email draft will appear here. Edit directly to test real-time spam auditor score changes..."
-                className="w-full bg-[#141415] border border-white/10 rounded-2xl p-4 text-xs font-mono leading-relaxed text-zinc-200 placeholder-zinc-600 focus:border-[#bf5af2] outline-none transition-all resize-y"
-              />
-            </div>
+            <textarea
+              rows={12}
+              value={generatedDraft}
+              onChange={(e) => setGeneratedDraft(e.target.value)}
+              placeholder="Synthesized email will appear here..."
+              className="w-full bg-[#141415] border border-white/10 rounded-xl p-3 text-xs font-mono leading-relaxed text-zinc-200 placeholder-zinc-600 focus:border-[#bf5af2] outline-none resize-y"
+            />
           </div>
 
-          {/* Live Deliverability & Spam Auditor */}
+          {/* Deliverability Auditor */}
           {generatedDraft && (
-            <div className="p-4 rounded-xl bg-[#141415] border border-white/10 space-y-3">
+            <div className="p-3.5 rounded-xl bg-[#141415] border border-white/10 space-y-2.5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-[#30d158]" />
-                  <span className="text-xs font-bold text-white">Live Spam Auditor</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs font-mono font-bold ${
-                    deliverabilityAudit.score >= 90 ? 'text-[#30d158]' :
-                    deliverabilityAudit.score >= 70 ? 'text-amber-400' : 'text-red-400'
-                  }`}>
-                    {deliverabilityAudit.score}%
-                  </span>
-                  <span className="text-[10px] text-zinc-500 uppercase">Health</span>
-                </div>
+                <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#30d158]" /> Deliverability Audit
+                </span>
+                <span className={`text-xs font-mono font-bold ${
+                  deliverabilityAudit.score >= 90 ? 'text-[#30d158]' :
+                  deliverabilityAudit.score >= 70 ? 'text-amber-400' : 'text-red-400'
+                }`}>
+                  {deliverabilityAudit.score}%
+                </span>
               </div>
 
-              {/* Score Bar */}
               <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                 <div 
-                  className={`h-full transition-all ${
-                    deliverabilityAudit.score >= 90 ? 'bg-[#30d158]' :
-                    deliverabilityAudit.score >= 70 ? 'bg-amber-400' : 'bg-red-500'
-                  }`}
+                  className={`h-full ${deliverabilityAudit.score >= 90 ? 'bg-[#30d158]' : deliverabilityAudit.score >= 70 ? 'bg-amber-400' : 'bg-red-500'}`}
                   style={{ width: `${deliverabilityAudit.score}%` }}
                 />
               </div>
 
-              {/* Detected Flags */}
               {deliverabilityAudit.issues.length > 0 ? (
                 <div className="space-y-1">
-                  {deliverabilityAudit.issues.map((issue, idx) => (
-                    <div key={idx} className="flex items-start gap-1.5 text-[10px] text-amber-300">
-                      <AlertCircle className="w-3 h-3 mt-0.5 shrink-0 text-amber-400" />
-                      <span>{issue}</span>
-                    </div>
+                  {deliverabilityAudit.issues.map((iss, i) => (
+                    <p key={i} className="text-[10px] text-amber-300 flex items-start gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0 mt-0.5 text-amber-400" />
+                      <span>{iss}</span>
+                    </p>
                   ))}
                 </div>
               ) : (
                 <p className="text-[10px] text-[#30d158] flex items-center gap-1">
-                  <Check className="w-3 h-3" /> No high-risk trigger words detected. Inbox deliverability ready.
+                  <Check className="w-3 h-3" /> No high-risk spam triggers found.
                 </p>
               )}
             </div>
           )}
 
-          {/* Session History */}
-          <div className="flex-1 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-1.5">
-                <History className="w-3.5 h-3.5" />
-                Session History ({historyItems.length})
-              </span>
-              {historyItems.length > 0 && (
-                <button
-                  onClick={handleClearHistory}
-                  className="text-[10px] text-zinc-500 hover:text-red-400 transition-colors"
+          {/* History */}
+          <div className="space-y-2">
+            <span className="text-xs uppercase tracking-widest font-bold text-zinc-400 flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5" /> Session Drafts ({historyItems.length})
+            </span>
+            <div className="space-y-1.5">
+              {historyItems.slice(0, 5).map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => setGeneratedDraft(item.draft)}
+                  className="p-2.5 bg-[#141415] border border-white/5 hover:border-[#0a84ff]/40 rounded-xl cursor-pointer text-xs"
                 >
-                  Purge History
-                </button>
-              )}
-            </div>
-
-            {historyItems.length === 0 ? (
-              <div className="p-8 border border-dashed border-white/10 rounded-xl text-center space-y-2">
-                <p className="text-xs text-zinc-500">No session drafts generated yet.</p>
-                <p className="text-[10px] text-zinc-600">Select an omni-channel mode and hit generate.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {historyItems.map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => setGeneratedDraft(item.draft)}
-                    className="p-3 bg-[#141415] border border-white/5 hover:border-[#0a84ff]/40 rounded-xl cursor-pointer group transition-all space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="font-semibold text-zinc-300 group-hover:text-[#0a84ff] transition-colors">{item.modeName}</span>
-                      <span className="text-zinc-500 font-mono">{item.timestamp}</span>
-                    </div>
-                    <p className="text-xs text-zinc-400 line-clamp-2 font-mono">{item.draft}</p>
-                    <div className="flex items-center justify-between pt-1">
-                      <span className="text-[9px] text-[#30d158] font-mono">Deliverability: {item.score}%</span>
-                      <span className="text-[10px] text-zinc-500 group-hover:text-white flex items-center gap-0.5">
-                        Recall draft <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
+                  <div className="flex justify-between text-[10px] text-zinc-400 mb-1">
+                    <span className="font-semibold text-white">{item.modeName}</span>
+                    <span>{item.timestamp}</span>
                   </div>
-                ))}
-              </div>
-            )}
+                  <p className="text-zinc-500 line-clamp-1 font-mono text-[11px]">{item.draft}</p>
+                </div>
+              ))}
+            </div>
           </div>
-
         </aside>
-
       </div>
 
       {/* ==================================================== */}
-      {/* BRANDING FOOTER */}
+      {/* BRAND MEMORY SLIDE-OVER DRAWER / MODAL */}
       {/* ==================================================== */}
-      <footer className="border-t border-white/10 bg-[#0a0a0b] py-6 px-4 md:px-8 text-xs text-zinc-500">
+      {isBrandDrawerOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex justify-end animate-in fade-in duration-200">
+          <div className="w-full max-w-xl bg-[#0e0e10] border-l border-white/10 h-full flex flex-col p-6 overflow-y-auto space-y-6">
+            
+            <div className="flex items-center justify-between pb-4 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-[#0a84ff]" />
+                <div>
+                  <h2 className="text-base font-bold text-white">Enterprise Brand Memory</h2>
+                  <p className="text-xs text-zinc-400">Save company DNA once; inject across all 30 channels.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsBrandDrawerOpen(false)}
+                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Profile Selector Pills */}
+            <div className="space-y-2">
+              <label className="text-[11px] uppercase tracking-wider font-bold text-zinc-400">Select Active Profile</label>
+              <div className="grid grid-cols-2 gap-2">
+                {brandProfiles.map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => handleSelectActiveBrand(b.id)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      b.isActive 
+                        ? 'bg-[#0a84ff]/10 border-[#0a84ff] text-white shadow-md' 
+                        : 'bg-[#141415] border-white/10 text-zinc-400 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold truncate">{b.profileName}</span>
+                      {b.isActive && <CheckSquare className="w-3.5 h-3.5 text-[#0a84ff]" />}
+                    </div>
+                    <p className="text-[10px] text-zinc-500 truncate">{b.companyName}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Editing Form */}
+            {editingBrand && (
+              <div className="space-y-4 pt-2 border-t border-white/10">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Profile Nickname</label>
+                    <input
+                      type="text"
+                      value={editingBrand.profileName}
+                      onChange={(e) => setEditingBrand({ ...editingBrand, profileName: e.target.value })}
+                      className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Company / Brand Name *</label>
+                    <input
+                      type="text"
+                      value={editingBrand.companyName}
+                      onChange={(e) => setEditingBrand({ ...editingBrand, companyName: e.target.value })}
+                      className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Industry / Vertical</label>
+                    <input
+                      type="text"
+                      value={editingBrand.industry}
+                      onChange={(e) => setEditingBrand({ ...editingBrand, industry: e.target.value })}
+                      className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                      placeholder="e.g. Fintech, SaaS"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Website URL</label>
+                    <input
+                      type="text"
+                      value={editingBrand.websiteUrl}
+                      onChange={(e) => setEditingBrand({ ...editingBrand, websiteUrl: e.target.value })}
+                      className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                      placeholder="https://company.com"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-zinc-400 mb-1">Elevator Pitch / Value Proposition</label>
+                  <textarea
+                    rows={2}
+                    value={editingBrand.elevatorPitch}
+                    onChange={(e) => setEditingBrand({ ...editingBrand, elevatorPitch: e.target.value })}
+                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none resize-none"
+                    placeholder="What do you build and who does it help?"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-zinc-400 mb-1">Ideal Customer Profile (ICP)</label>
+                  <input
+                    type="text"
+                    value={editingBrand.icp}
+                    onChange={(e) => setEditingBrand({ ...editingBrand, icp: e.target.value })}
+                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                    placeholder="e.g. CTOs, Growth Leads, Real Estate Agents"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Sender Full Name</label>
+                    <input
+                      type="text"
+                      value={editingBrand.senderName}
+                      onChange={(e) => setEditingBrand({ ...editingBrand, senderName: e.target.value })}
+                      className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                      placeholder="e.g. Sarah Vance"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-zinc-400 mb-1">Sender Title</label>
+                    <input
+                      type="text"
+                      value={editingBrand.senderTitle}
+                      onChange={(e) => setEditingBrand({ ...editingBrand, senderTitle: e.target.value })}
+                      className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                      placeholder="e.g. VP Commercial Growth"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-zinc-400 mb-1">Proof Points & Credibility</label>
+                  <input
+                    type="text"
+                    value={editingBrand.proofPoints}
+                    onChange={(e) => setEditingBrand({ ...editingBrand, proofPoints: e.target.value })}
+                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                    placeholder="e.g. SOC2 Type II, 99.99% uptime, 1,000+ enterprise clients"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] text-zinc-400 mb-1">Primary Call-to-Action / Booking Link</label>
+                  <input
+                    type="text"
+                    value={editingBrand.primaryCta}
+                    onChange={(e) => setEditingBrand({ ...editingBrand, primaryCta: e.target.value })}
+                    className="w-full bg-[#141415] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-[#0a84ff] outline-none"
+                    placeholder="e.g. cal.com/your-team/15min"
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-3">
+                  <button
+                    onClick={handleSaveBrandProfile}
+                    className="flex-1 py-2.5 bg-[#0a84ff] hover:bg-[#0070e0] rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all shadow-md"
+                  >
+                    <Save className="w-3.5 h-3.5" /> Save Brand DNA
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newId = 'custom-' + Date.now();
+                      const blank: BrandProfile = {
+                        id: newId,
+                        profileName: 'New Client / Brand',
+                        companyName: '',
+                        industry: '',
+                        websiteUrl: '',
+                        elevatorPitch: '',
+                        icp: '',
+                        brandVoice: 'Professional',
+                        primaryCta: '',
+                        senderName: '',
+                        senderTitle: '',
+                        proofPoints: '',
+                        isActive: true
+                      };
+                      setEditingBrand(blank);
+                    }}
+                    className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs text-zinc-300 flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> New Profile
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 2026 GLENT GLOBAL ENTERPRISES FOOTER */}
+      {/* ==================================================== */}
+      <footer className="border-t border-white/10 bg-[#0a0a0b] py-5 px-4 md:px-8 text-xs text-zinc-500">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          
           <div className="flex items-center gap-3">
             <div className="w-5 h-5 rounded-md bg-[#0a84ff] flex items-center justify-center text-[10px] font-bold text-white">
               G
             </div>
-            <span>
-              &copy; 2026 Glent Global Enterprises. All rights reserved.
-            </span>
+            <span>&copy; 2026 Glent Global Enterprises. All rights reserved.</span>
           </div>
 
           <div className="flex items-center gap-6">
+            <button onClick={() => setIsBrandDrawerOpen(true)} className="hover:text-white transition-colors flex items-center gap-1 text-[#0a84ff]">
+              <Building2 className="w-3 h-3" /> Brand Memory
+            </button>
             <button onClick={() => router.push('/glent/passport')} className="hover:text-white transition-colors">
               Sovereign Passport
             </button>
             <button onClick={() => router.push('/glent/philosophy')} className="hover:text-white transition-colors">
               Philosophy
-            </button>
-            <button onClick={() => router.push('/glent/governance')} className="hover:text-white transition-colors">
-              Governance
             </button>
             <a href="mailto:help@writeyouremail.com" className="hover:text-white transition-colors">
               help@writeyouremail.com
@@ -1282,9 +1448,8 @@ export default function StudioWorkspace() {
 
           <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-600">
             <span className="w-1.5 h-1.5 rounded-full bg-[#30d158]" />
-            <span>LPU REGION: GLOBAL EDGE</span>
+            <span>LPU ENGINE: ACTIVE</span>
           </div>
-
         </div>
       </footer>
 
